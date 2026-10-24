@@ -111,12 +111,10 @@
       <div class="progress-actions">
         <label class="btn primary" for="teacherFiles">Load pupil progress files</label>
         <input type="file" id="teacherFiles" accept=".json,application/json" multiple hidden>
-        <label class="btn" for="answerKeyFile">Load answer key (optional)</label>
-        <input type="file" id="answerKeyFile" accept=".json,application/json" hidden>
         <button class="btn" id="teacherClear">Clear</button>
         <button class="btn" id="teacherCsv">⬇ Export CSV</button>
       </div>
-      <p class="muted small">With the answer key loaded, each solve is checked against a proof code only a real solve produces, so edited files show up as <span class="badge bad">unverified</span>.</p>
+      <p class="muted small">Each solve carries a proof code that only a real flag submission produces, so hand-edited files show up as <span class="badge bad">unverified</span>. Challenges solved after the pupil clicked <b>Show answer</b> count as flags but score 0 points.</p>
       <div id="teacherMsg" class="notice" hidden></div>
       <div id="teacherTable"></div>
     </div>

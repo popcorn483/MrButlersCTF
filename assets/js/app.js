@@ -40,11 +40,11 @@
   window.CTFUtil = { esc: esc, toast: toast, download: download, $: $, $$: $$ };
 
   // ---------- state ----------
-  function blankState() { return { v: 1, pid: randId(), name: '', solved: {}, hints: {}, wrong: 0, created: Date.now() }; }
+  function blankState() { return { v: 1, pid: randId(), name: '', solved: {}, hints: {}, revealed: {}, wrong: 0, created: Date.now() }; }
   var S = blankState();
   try { var raw = localStorage.getItem(STORE_KEY); if (raw) S = Object.assign(blankState(), JSON.parse(raw)); } catch (e) { /* storage blocked */ }
   function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { } }
-  function score() { var p = 0; Object.keys(S.solved).forEach(function (id) { if (BY_ID[id]) p += BY_ID[id].pts; }); return p; }
+  function score() { var p = 0; Object.keys(S.solved).forEach(function (id) { if (BY_ID[id] && !S.solved[id].r) p += BY_ID[id].pts; }); return p; }
   function solvedCount() { return Object.keys(S.solved).filter(function (id) { return BY_ID[id]; }).length; }
 
   // ---------- header / rank ----------
@@ -183,6 +183,7 @@
     renderFiles(c);
     renderActions(c);
     renderHints(c);
+    renderAnswer(c);
     $('#flagInput').value = '';
     var msg = $('#flagMsg'); msg.className = 'flag-msg'; msg.textContent = S.solved[id] ? 'You have already solved this one.' : '';
     openModal('#chalModal');
@@ -269,21 +270,44 @@
     }
   }
 
+  var lastTry = {};
+  function renderAnswer(c) {
+    var box = document.getElementById('chalAnswer');
+    if (!box) { box = document.createElement('div'); box.id = 'chalAnswer'; box.className = 'hints'; $('#flagMsg').after(box); }
+    box.innerHTML = '';
+    if (S.revealed[c.id]) {
+      var mine = lastTry[c.id];
+      box.innerHTML = '<div class="hint-box answer-box"><div class="hint-warn">🔑 Answer</div><p>Flag: <code>' + esc(c.f) + '</code></p>' +
+        (mine ? '<p>Your last answer: <code>' + esc(mine) + '</code> ' + (mine.toLowerCase() === c.f.toLowerCase() ? '✓ matches' : '✗ does not match') + '</p>' : '') +
+        (c.sol ? '<p><b>How it\'s solved:</b> ' + c.sol + '</p>' : '') +
+        (S.solved[c.id] && !S.solved[c.id].r ? '' : '<p class="muted small">Revealed answers score 0 points for this challenge.</p>') + '</div>';
+      return;
+    }
+    var b = document.createElement('button'); b.className = 'btn small'; b.textContent = '🔑 Show answer & solution';
+    b.addEventListener('click', function () {
+      if (!S.solved[c.id] && !confirm('Show the answer? You will get 0 points for this challenge if you reveal it before solving it.')) return;
+      S.revealed[c.id] = Date.now(); save(); renderAnswer(c);
+    });
+    box.appendChild(b);
+  }
+
   $('#flagForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var c = current; if (!c) return;
     var raw = $('#flagInput').value.trim(), msg = $('#flagMsg');
     if (!raw) return;
     var norm = raw.toLowerCase();
+    lastTry[c.id] = raw;
     if (sha256(norm) === c.h) {
       if (!S.solved[c.id]) {
-        S.solved[c.id] = { t: Date.now(), p: sha256(S.pid + '|' + norm).slice(0, 16), h: S.hints[c.id] || 0 };
+        var rv = S.revealed[c.id] ? 1 : 0;
+        S.solved[c.id] = { t: Date.now(), p: sha256(S.pid + '|' + norm).slice(0, 16), h: S.hints[c.id] || 0, r: rv };
         save();
-        msg.className = 'flag-msg ok'; msg.textContent = '✓ Correct! +' + c.pts + ' points.';
-        toast('🚩 Flag captured: ' + c.title + ' (+' + c.pts + ')');
+        msg.className = 'flag-msg ok'; msg.textContent = rv ? '✓ Correct, but no points because you revealed the answer first.' : '✓ Correct! +' + c.pts + ' points.';
+        toast(rv ? 'Correct (answer was revealed, 0 pts)' : '🚩 Flag captured: ' + c.title + ' (+' + c.pts + ')');
         if (!S.name) setTimeout(function () { if (confirm('Nice! Add your name so your teacher knows whose progress file this is?')) askName(); }, 600);
       } else { msg.className = 'flag-msg ok'; msg.textContent = '✓ Correct (already solved).'; }
-      refreshHeader(); renderBoard(); openChalMeta(c);
+      refreshHeader(); renderBoard(); openChalMeta(c); renderAnswer(c);
       return;
     }
     S.wrong++; save();
@@ -293,6 +317,7 @@
     } else if (!/^flag\{.*\}$/i.test(raw)) {
       msg.textContent = '✗ Not quite. Flags here look like flag{something}.';
     } else msg.textContent = '✗ Not the flag. Keep digging!';
+    renderAnswer(c);
     var f = $('#flagForm'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake');
   });
   function openChalMeta(c) {
@@ -303,7 +328,7 @@
 
   // ---------- progress ----------
   function renderProgress() {
-    var sc = score(), n = solvedCount(), hintsUsed = Object.keys(S.hints).reduce(function (s, k) { return s + S.hints[k]; }, 0);
+    var sc = score(), n = solvedCount(), hintsUsed = Object.keys(S.hints).reduce(function (s, k) { return s + S.hints[k]; }, 0), revCount = Object.keys(S.revealed || {}).length;
     var tierDone = [0, 0, 0, 0, 0, 0];
     Object.keys(S.solved).forEach(function (id) { if (BY_ID[id]) tierDone[BY_ID[id].tier]++; });
     $('#statGrid').innerHTML =
@@ -311,6 +336,7 @@
       '<div class="stat"><b>' + n + '</b><span>flags of ' + CH.length + '</span></div>' +
       '<div class="stat"><b>' + hintsUsed + '</b><span>hints used</span></div>' +
       '<div class="stat"><b>' + S.wrong + '</b><span>wrong guesses</span></div>' +
+      '<div class="stat"><b>' + revCount + '</b><span>answers revealed</span></div>' +
       [1, 2, 3, 4, 5].map(function (t) {
         var tot = CH.filter(function (c) { return c.tier === t; }).length;
         return '<div class="stat ' + TIERS[t].cls + '"><b style="color:var(--tc)">' + tierDone[t] + '/' + tot + '</b><span>' + TIERS[t].name + '</span></div>';
@@ -322,12 +348,12 @@
     var hist = Object.keys(S.solved).filter(function (id) { return BY_ID[id]; }).sort(function (a, b) { return S.solved[b].t - S.solved[a].t; });
     $('#history').innerHTML = hist.length ? hist.map(function (id) {
       var c = BY_ID[id];
-      return '<div><span class="when">' + fmtDate(S.solved[id].t) + '</span><span>' + esc(c.title) + ' <span class="muted">(' + esc(c.id) + ', ' + c.pts + ' pts' + (S.solved[id].h ? ', ' + S.solved[id].h + ' hint' + (S.solved[id].h > 1 ? 's' : '') : '') + ')</span></span></div>';
+      return '<div><span class="when">' + fmtDate(S.solved[id].t) + '</span><span>' + esc(c.title) + ' <span class="muted">(' + esc(c.id) + ', ' + c.pts + ' pts' + (S.solved[id].h ? ', ' + S.solved[id].h + ' hint' + (S.solved[id].h > 1 ? 's' : '') : '') + (S.solved[id].r ? ', answer revealed' : '') + ')</span></span></div>';
     }).join('') : '<p class="muted">No flags yet. Head to the board and start with the Warm-Up category.</p>';
   }
 
   function makeExport() {
-    var payload = { app: 'MrButlersCTF', v: 1, pid: S.pid, name: S.name, exported: Date.now(), score: score(), solved: S.solved, hints: S.hints, wrong: S.wrong, created: S.created };
+    var payload = { app: 'MrButlersCTF', v: 1, pid: S.pid, name: S.name, exported: Date.now(), score: score(), solved: S.solved, hints: S.hints, revealed: S.revealed, wrong: S.wrong, created: S.created };
     var body = JSON.stringify(payload);
     return JSON.stringify({ data: payload, check: sha256(body + SALT) }, null, 1);
   }
@@ -356,9 +382,10 @@
       if (d.pid === S.pid) {
         Object.keys(d.solved || {}).forEach(function (id) { if (!S.solved[id]) { S.solved[id] = d.solved[id]; added++; } });
       } else {
-        Object.keys(d.solved || {}).forEach(function (id) { if (!S.solved[id]) { S.solved[id] = { t: d.solved[id].t, p: '', h: d.solved[id].h || 0, m: 1 }; added++; } });
+        Object.keys(d.solved || {}).forEach(function (id) { if (!S.solved[id]) { S.solved[id] = { t: d.solved[id].t, p: '', h: d.solved[id].h || 0, r: d.solved[id].r || 0, m: 1 }; added++; } });
       }
       Object.keys(d.hints || {}).forEach(function (id) { S.hints[id] = Math.max(S.hints[id] || 0, d.hints[id]); });
+      Object.keys(d.revealed || {}).forEach(function (id) { if (!S.revealed[id]) S.revealed[id] = d.revealed[id]; });
       S.wrong = Math.max(S.wrong, d.wrong || 0);
       if (!S.name && d.name) S.name = d.name;
       save(); refreshHeader(); renderBoard(); renderProgress();
@@ -373,7 +400,8 @@
   });
 
   // ---------- teacher ----------
-  var T = { rows: [], key: null, sort: 'score' };
+  var T = { rows: [], key: {}, sort: 'pts' };
+  CH.forEach(function (c) { T.key[c.id] = c.f; });
   $('#teacherFiles').addEventListener('change', function () {
     var files = Array.prototype.slice.call(this.files), input = this;
     Promise.all(files.map(function (f) { return f.text().then(function (t) { try { var r = parseImport(t); r.file = f.name; return r; } catch (e) { return { err: f.name }; } }); }))
@@ -390,14 +418,6 @@
         renderTeacher(); input.value = '';
       });
   });
-  $('#answerKeyFile').addEventListener('change', function () {
-    var f = this.files[0], input = this; if (!f) return;
-    f.text().then(function (t) {
-      var k = JSON.parse(t); if (!k.flags) throw new Error();
-      T.key = k.flags; var m = $('#teacherMsg'); m.hidden = false; m.className = 'notice good'; m.textContent = 'Answer key loaded: solves will now be verified.';
-      renderTeacher();
-    }).catch(function () { alert('That is not the answer key file.'); }).then(function () { input.value = ''; });
-  });
   $('#teacherClear').addEventListener('click', function () { T.rows = []; renderTeacher(); $('#teacherMsg').hidden = true; });
   function rowStats(r) {
     var d = r.data, pts = 0, n = 0, unv = 0, tiers = [0, 0, 0, 0, 0, 0], last = 0;
@@ -406,10 +426,10 @@
       var s = d.solved[id], valid = true;
       if (T.key && T.key[id]) valid = !!s.p && sha256(d.pid + '|' + T.key[id].toLowerCase()).slice(0, 16) === s.p;
       if (!valid) { unv++; return; }
-      pts += c.pts; n++; tiers[c.tier]++; last = Math.max(last, s.t);
+      if (!s.r) pts += c.pts; n++; tiers[c.tier]++; last = Math.max(last, s.t);
     });
-    var hints = Object.keys(d.hints || {}).reduce(function (s, k) { return s + d.hints[k]; }, 0);
-    return { name: d.name || '(no name)', pts: pts, n: n, unv: unv, tiers: tiers, hints: hints, last: last, ok: r.ok, file: r.file };
+    var hints = Object.keys(d.hints || {}).reduce(function (s, k) { return s + d.hints[k]; }, 0), rev = Object.keys(d.revealed || {}).length;
+    return { name: d.name || '(no name)', pts: pts, n: n, unv: unv, rev: rev, tiers: tiers, hints: hints, last: last, ok: r.ok, file: r.file };
   }
   function renderTeacher() {
     var box = $('#teacherTable');
@@ -419,23 +439,22 @@
     rows.sort(function (a, b) { return k === 'name' ? a.name.localeCompare(b.name) : (b[k] - a[k]) || (a.last - b.last); });
     box.innerHTML = '<table class="lb"><thead><tr><th>#</th><th data-k="name">Name</th><th data-k="pts">Points</th><th data-k="n">Flags</th>' +
       [1, 2, 3, 4, 5].map(function (t) { return '<th>' + TIERS[t].name + '</th>'; }).join('') +
-      '<th data-k="hints">Hints</th><th>Last solve</th><th>File</th></tr></thead><tbody>' +
+      '<th data-k="hints">Hints</th><th data-k="rev">Answers revealed</th><th>Last solve</th><th>File</th></tr></thead><tbody>' +
       rows.map(function (r, i) {
         return '<tr><td class="num">' + (i + 1) + '</td><td>' + esc(r.name) + '</td><td class="num">' + r.pts + '</td><td class="num">' + r.n + '</td>' +
           [1, 2, 3, 4, 5].map(function (t) { return '<td class="num">' + r.tiers[t] + '</td>'; }).join('') +
-          '<td class="num">' + r.hints + '</td><td class="num">' + (r.last ? fmtDate(r.last) : '-') + '</td><td>' +
+          '<td class="num">' + r.hints + '</td><td class="num">' + r.rev + '</td><td class="num">' + (r.last ? fmtDate(r.last) : '-') + '</td><td>' +
           (r.ok ? '<span class="badge good">ok</span>' : '<span class="badge bad">edited</span>') +
           (r.unv ? ' <span class="badge bad">' + r.unv + ' unverified</span>' : '') + '</td></tr>';
       }).join('') + '</tbody></table>';
     $$('th[data-k]', box).forEach(function (th) { th.addEventListener('click', function () { T.sort = th.dataset.k === 'pts' ? 'pts' : th.dataset.k; renderTeacher(); }); });
     T.lastRows = rows;
   }
-  T.sort = 'pts';
   $('#teacherCsv').addEventListener('click', function () {
     if (!T.lastRows) return toast('Load some files first');
-    var lines = [['Rank', 'Name', 'Points', 'Flags', 'Beginner', 'Easy', 'Medium', 'Hard', 'Expert', 'Hints', 'Unverified', 'Last solve'].join(',')];
+    var lines = [['Rank', 'Name', 'Points', 'Flags', 'Beginner', 'Easy', 'Medium', 'Hard', 'Expert', 'Hints', 'Answers revealed', 'Unverified', 'Last solve'].join(',')];
     T.lastRows.forEach(function (r, i) {
-      lines.push([i + 1, '"' + r.name.replace(/"/g, '""') + '"', r.pts, r.n, r.tiers[1], r.tiers[2], r.tiers[3], r.tiers[4], r.tiers[5], r.hints, r.unv, r.last ? new Date(r.last).toISOString() : ''].join(','));
+      lines.push([i + 1, '"' + r.name.replace(/"/g, '""') + '"', r.pts, r.n, r.tiers[1], r.tiers[2], r.tiers[3], r.tiers[4], r.tiers[5], r.hints, r.rev, r.unv, r.last ? new Date(r.last).toISOString() : ''].join(','));
     });
     download('MrButlersCTF-leaderboard.csv', lines.join('\n'), 'text/csv');
   });
