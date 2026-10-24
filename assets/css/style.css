@@ -301,3 +301,12 @@ textarea.io { min-height: 120px; resize: vertical; }
   .sub-grid { grid-template-columns: repeat(7, 1fr); }
   .search input { width: 160px; }
 }
+
+/* walkthrough */
+.answer-box .walk { margin: 6px 0 6px 18px; padding: 0; }
+.answer-box .walk li { margin: 4px 0; }
+.answer-box .flag-reveal { font-size: 1rem; }
+.answer-box .flag-reveal code { color: var(--green); border-color: var(--green-d); }
+.answer-box .ok-tick { color: var(--green); font-weight: 600; }
+.walk-nudge { border-color: rgba(76,201,255,.4); background: rgba(76,201,255,.07); }
+.walk-nudge .hint-warn { color: var(--cyan); }

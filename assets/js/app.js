@@ -40,7 +40,7 @@
   window.CTFUtil = { esc: esc, toast: toast, download: download, $: $, $$: $$ };
 
   // ---------- state ----------
-  function blankState() { return { v: 1, pid: randId(), name: '', solved: {}, hints: {}, revealed: {}, wrong: 0, created: Date.now() }; }
+  function blankState() { return { v: 1, pid: randId(), name: '', solved: {}, hints: {}, revealed: {}, tries: {}, wrong: 0, created: Date.now() }; }
   var S = blankState();
   try { var raw = localStorage.getItem(STORE_KEY); if (raw) S = Object.assign(blankState(), JSON.parse(raw)); } catch (e) { /* storage blocked */ }
   function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { } }
@@ -271,24 +271,40 @@
   }
 
   var lastTry = {};
+  function reveal(c) {
+    if (!S.solved[c.id] && !S.revealed[c.id] && !confirm('Show the full walkthrough? You will get 0 points for this challenge if you reveal it before solving it.')) return false;
+    S.revealed[c.id] = S.revealed[c.id] || Date.now(); save(); renderAnswer(c);
+    var box = document.getElementById('chalAnswer'); if (box) box.scrollIntoView({ block: 'nearest' });
+    return true;
+  }
   function renderAnswer(c) {
     var box = document.getElementById('chalAnswer');
     if (!box) { box = document.createElement('div'); box.id = 'chalAnswer'; box.className = 'hints'; $('#flagMsg').after(box); }
     box.innerHTML = '';
+    var tries = (S.tries && S.tries[c.id]) || 0;
     if (S.revealed[c.id]) {
       var mine = lastTry[c.id];
-      box.innerHTML = '<div class="hint-box answer-box"><div class="hint-warn">🔑 Answer</div><p>Flag: <code>' + esc(c.f) + '</code></p>' +
-        (mine ? '<p>Your last answer: <code>' + esc(mine) + '</code> ' + (mine.toLowerCase() === c.f.toLowerCase() ? '✓ matches' : '✗ does not match') + '</p>' : '') +
-        (c.sol ? '<p><b>How it\'s solved:</b> ' + c.sol + '</p>' : '') +
-        (S.solved[c.id] && !S.solved[c.id].r ? '' : '<p class="muted small">Revealed answers score 0 points for this challenge.</p>') + '</div>';
+      var steps = (c.hints || []).map(function (h, i) { return '<li>' + h + '</li>'; }).join('');
+      box.innerHTML = '<div class="hint-box answer-box"><div class="hint-warn">📖 Full walkthrough</div>' +
+        (steps ? '<p><b>Step by step:</b></p><ol class="walk">' + steps + '</ol>' : '') +
+        (c.sol ? '<p><b>Why it works:</b> ' + c.sol + '</p>' : '') +
+        '<p class="flag-reveal">The flag is <code>' + esc(c.f) + '</code></p>' +
+        (mine ? '<p>Your last answer was <code>' + esc(mine) + '</code> ' + (mine.toLowerCase() === c.f.toLowerCase() ? '<span class="ok-tick">✓ that matches</span>' : '✗ which does not match') + '</p>' : '') +
+        (S.solved[c.id] && !S.solved[c.id].r ? '' : '<p class="muted small">Revealed challenges score 0 points, but you can still submit the flag to tick it off.</p>') + '</div>';
       return;
     }
-    var b = document.createElement('button'); b.className = 'btn small'; b.textContent = '🔑 Show answer & solution';
-    b.addEventListener('click', function () {
-      if (!S.solved[c.id] && !confirm('Show the answer? You will get 0 points for this challenge if you reveal it before solving it.')) return;
-      S.revealed[c.id] = Date.now(); save(); renderAnswer(c);
-    });
-    box.appendChild(b);
+    // after 3 wrong tries, nudge a full walkthrough; otherwise a quieter button
+    if (tries >= 3) {
+      var n = document.createElement('div'); n.className = 'hint-box walk-nudge';
+      n.innerHTML = '<div class="hint-warn">Stuck? That\'s okay.</div><p>You\'ve had a few goes at this one. Want a full step-by-step walkthrough?</p>';
+      var wb = document.createElement('button'); wb.className = 'btn primary small'; wb.textContent = '📖 Walk me through it';
+      wb.addEventListener('click', function () { reveal(c); });
+      n.appendChild(wb); box.appendChild(n);
+    } else {
+      var b = document.createElement('button'); b.className = 'btn small'; b.textContent = '📖 Show full walkthrough';
+      b.addEventListener('click', function () { reveal(c); });
+      box.appendChild(b);
+    }
   }
 
   $('#flagForm').addEventListener('submit', function (e) {
@@ -310,7 +326,7 @@
       refreshHeader(); renderBoard(); openChalMeta(c); renderAnswer(c);
       return;
     }
-    S.wrong++; save();
+    S.wrong++; if (!S.tries) S.tries = {}; S.tries[c.id] = (S.tries[c.id] || 0) + 1; save();
     msg.className = 'flag-msg bad';
     if (!/^flag\{.*\}$/i.test(raw) && !/^\w+\{/.test(raw) && sha256('flag{' + norm + '}') === c.h) {
       msg.className = 'flag-msg info'; msg.textContent = 'So close: that is the right answer, but flags must be wrapped like flag{...}';
@@ -353,7 +369,7 @@
   }
 
   function makeExport() {
-    var payload = { app: 'MrButlersCTF', v: 1, pid: S.pid, name: S.name, exported: Date.now(), score: score(), solved: S.solved, hints: S.hints, revealed: S.revealed, wrong: S.wrong, created: S.created };
+    var payload = { app: 'MrButlersCTF', v: 1, pid: S.pid, name: S.name, exported: Date.now(), score: score(), solved: S.solved, hints: S.hints, revealed: S.revealed, tries: S.tries, wrong: S.wrong, created: S.created };
     var body = JSON.stringify(payload);
     return JSON.stringify({ data: payload, check: sha256(body + SALT) }, null, 1);
   }
@@ -386,6 +402,7 @@
       }
       Object.keys(d.hints || {}).forEach(function (id) { S.hints[id] = Math.max(S.hints[id] || 0, d.hints[id]); });
       Object.keys(d.revealed || {}).forEach(function (id) { if (!S.revealed[id]) S.revealed[id] = d.revealed[id]; });
+      if (!S.tries) S.tries = {}; Object.keys(d.tries || {}).forEach(function (id) { S.tries[id] = Math.max(S.tries[id] || 0, d.tries[id]); });
       S.wrong = Math.max(S.wrong, d.wrong || 0);
       if (!S.name && d.name) S.name = d.name;
       save(); refreshHeader(); renderBoard(); renderProgress();
