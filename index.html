@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mr Butler's CTF</title>
+<meta name="description" content="200 practice capture-the-flag challenges for secondary school pupils getting ready for a ZeroDays-style cyber security competition.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b1220'/%3E%3Cpath d='M9 6v20' stroke='%2339ff9e' stroke-width='3'/%3E%3Cpath d='M10 7h13l-4 5 4 5H10z' fill='%2339ff9e'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-flag" aria-hidden="true">⚑</span>
+    <div>
+      <div class="brand-name">MR&nbsp;BUTLER'S&nbsp;CTF</div>
+      <div class="brand-sub">practice arena · 200 challenges</div>
+    </div>
+  </div>
+  <nav class="tabs" aria-label="Main">
+    <button class="tab active" data-view="board">Challenges</button>
+    <button class="tab" data-view="start">Getting started</button>
+    <button class="tab" data-view="toolkit">Toolkit</button>
+    <button class="tab" data-view="progress">My progress</button>
+    <button class="tab" data-view="teacher">Teacher</button>
+  </nav>
+  <div class="player" id="playerBox">
+    <button class="player-name" id="playerName" title="Change your name">Set your name</button>
+    <div class="player-stats"><span id="playerScore">0</span> pts · <span id="playerSolved">0</span>/<span id="playerTotal">200</span></div>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ============ BOARD ============ -->
+  <section class="view active" id="view-board">
+    <div class="board-intro">
+      <div>
+        <h1>Challenge board</h1>
+        <p>Pick a tile, find the flag, submit it. Tiles get harder from left to right. New to CTFs? Start with <b>Warm-Up</b> and read <a href="#" data-goto="start">Getting started</a>.</p>
+      </div>
+      <div class="rank-card">
+        <div class="rank-label">Rank</div>
+        <div class="rank-name" id="rankName">Script Kiddie</div>
+        <div class="rank-bar"><span id="rankBar"></span></div>
+        <div class="rank-next" id="rankNext"></div>
+      </div>
+    </div>
+
+    <div class="filters" role="group" aria-label="Filters">
+      <div class="chip-row" id="tierChips"></div>
+      <div class="chip-row">
+        <label class="search"><span class="sr">Search</span><input id="searchBox" type="search" placeholder="Search challenges…"></label>
+        <label class="toggle"><input type="checkbox" id="hideSolved"> Hide solved</label>
+      </div>
+    </div>
+
+    <div id="board" class="board"></div>
+  </section>
+
+  <!-- ============ GETTING STARTED ============ -->
+  <section class="view" id="view-start">
+    <div class="prose" id="startContent"></div>
+  </section>
+
+  <!-- ============ TOOLKIT ============ -->
+  <section class="view" id="view-toolkit">
+    <div class="tool-head">
+      <h1>Toolkit</h1>
+      <p>School computers block <i>Inspect Element</i>, so this site has its own tools. At the real event you'll usually have the internet, so learn the names: the decoder here works like <b>CyberChef</b>, and the browser's panels work like <b>DevTools</b> (F12).</p>
+    </div>
+    <div class="subtabs" id="toolTabs">
+      <button class="subtab active" data-tool="decoder">Decoder</button>
+      <button class="subtab" data-tool="freq">Frequency analysis</button>
+      <button class="subtab" data-tool="hash">Hashes</button>
+      <button class="subtab" data-tool="hex">Hex viewer</button>
+      <button class="subtab" data-tool="image">Image inspector</button>
+      <button class="subtab" data-tool="scratch">JS scratchpad</button>
+      <button class="subtab" data-tool="ascii">ASCII table</button>
+    </div>
+    <div id="toolPanel" class="tool-panel"></div>
+  </section>
+
+  <!-- ============ PROGRESS ============ -->
+  <section class="view" id="view-progress">
+    <div class="prose wide">
+      <h1>My progress</h1>
+      <p>Your progress saves automatically in this browser. School computers can clear browser storage when you log off, so <b>download a progress file at the end of every session</b> and load it next time.</p>
+      <div class="progress-actions">
+        <button class="btn primary" id="exportBtn">⬇ Download my progress</button>
+        <label class="btn" for="importFile">⬆ Load a progress file</label>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
+        <button class="btn danger" id="resetBtn">Reset everything</button>
+      </div>
+      <div id="importMsg" class="notice" hidden></div>
+      <div class="stat-grid" id="statGrid"></div>
+      <h2>By category</h2>
+      <div id="catBars" class="cat-bars"></div>
+      <h2>Solve history</h2>
+      <div id="history" class="history"></div>
+    </div>
+  </section>
+
+  <!-- ============ TEACHER ============ -->
+  <section class="view" id="view-teacher">
+    <div class="prose wide">
+      <h1>Teacher leaderboard</h1>
+      <p>Ask pupils to download their progress file and send it to you (Teams, shared drive or email). Load them all here at once to build a class leaderboard. Nothing is uploaded anywhere; it all stays on this computer.</p>
+      <div class="progress-actions">
+        <label class="btn primary" for="teacherFiles">Load pupil progress files</label>
+        <input type="file" id="teacherFiles" accept=".json,application/json" multiple hidden>
+        <label class="btn" for="answerKeyFile">Load answer key (optional)</label>
+        <input type="file" id="answerKeyFile" accept=".json,application/json" hidden>
+        <button class="btn" id="teacherClear">Clear</button>
+        <button class="btn" id="teacherCsv">⬇ Export CSV</button>
+      </div>
+      <p class="muted small">With the answer key loaded, each solve is checked against a proof code only a real solve produces, so edited files show up as <span class="badge bad">unverified</span>.</p>
+      <div id="teacherMsg" class="notice" hidden></div>
+      <div id="teacherTable"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>Practice challenges written for this site. They are in the style of ZeroDays / Cyber-Schools events but are <b>not</b> the real competition tasks.</span>
+  <button class="linkish" id="viewSiteHtml">View this page's HTML</button>
+</footer>
+
+<!-- ============ CHALLENGE MODAL ============ -->
+<div class="modal" id="chalModal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="chalTitle">
+    <button class="modal-x" data-close aria-label="Close">✕</button>
+    <div class="chal-meta" id="chalMeta"></div>
+    <h2 id="chalTitle"></h2>
+    <div class="chal-desc" id="chalDesc"></div>
+    <div id="chalFiles"></div>
+    <div class="chal-actions" id="chalActions"></div>
+    <div class="hints" id="chalHints"></div>
+    <form class="flag-form" id="flagForm" autocomplete="off">
+      <label class="sr" for="flagInput">Flag</label>
+      <input id="flagInput" placeholder="flag{...}" spellcheck="false">
+      <button class="btn primary" type="submit">Submit</button>
+    </form>
+    <div class="flag-msg" id="flagMsg" aria-live="polite"></div>
+  </div>
+</div>
+
+<!-- ============ SOURCE VIEWER ============ -->
+<div class="modal" id="srcModal" hidden>
+  <div class="modal-card wide" role="dialog" aria-modal="true" aria-labelledby="srcTitle">
+    <button class="modal-x" data-close aria-label="Close">✕</button>
+    <h2 id="srcTitle">View HTML</h2>
+    <pre class="code" id="srcCode"></pre>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="assets/js/challenges.js"></script>
+<script src="assets/js/hashes.js"></script>
+<script src="assets/js/content.js"></script>
+<script src="assets/js/tools.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>

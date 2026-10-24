@@ -1,0 +1,451 @@
+/* Mr Butler's CTF — main app: board, challenge modal, flags, progress, teacher view */
+(function () {
+  'use strict';
+
+  // ---------- decode challenge bundle (lightly scrambled so answers aren't sitting in plain text) ----------
+  function decodeBundle(b64, key) {
+    var bin = atob(b64), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i) ^ key.charCodeAt(i % key.length);
+    return JSON.parse(new TextDecoder().decode(out));
+  }
+  var DATA = decodeBundle(window.CTF_BUNDLE, window.CTF_KEY);
+  var CH = DATA.challenges, CATS = DATA.cats;
+  var BY_ID = {}; CH.forEach(function (c) { BY_ID[c.id] = c; });
+  window.CTF = { DATA: DATA, BY_ID: BY_ID };
+
+  var TIERS = [null,
+    { name: 'Beginner', cls: 't1' }, { name: 'Easy', cls: 't2' }, { name: 'Medium', cls: 't3' },
+    { name: 'Hard', cls: 't4' }, { name: 'Expert', cls: 't5' }];
+  var RANKS = [[0, 'Script Kiddie'], [150, 'Packet Sniffer'], [500, 'Bug Hunter'], [1200, 'Flag Collector'],
+    [2500, 'Cipher Breaker'], [4500, 'Exploit Engineer'], [7000, 'Red Teamer'], [10000, 'Zero-Day Legend']];
+  var TOTAL_PTS = CH.reduce(function (s, c) { return s + c.pts; }, 0);
+  var SALT = 'mbctf-progress-v1';
+  var STORE_KEY = 'mbctf-progress-v1';
+
+  // ---------- helpers ----------
+  function $(s, r) { return (r || document).querySelector(s); }
+  function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function toast(msg, ms) {
+    var t = $('#toast'); t.textContent = msg; t.hidden = false;
+    clearTimeout(toast._t); toast._t = setTimeout(function () { t.hidden = true; }, ms || 2200);
+  }
+  function fmtDate(t) { var d = new Date(t); return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  function randId() { var a = new Uint8Array(8); (window.crypto || {}).getRandomValues ? crypto.getRandomValues(a) : a.forEach(function (_, i) { a[i] = Math.random() * 256; }); return Array.prototype.map.call(a, function (b) { return ('0' + b.toString(16)).slice(-2); }).join(''); }
+  function download(name, text, type) {
+    var blob = new Blob([text], { type: type || 'application/json' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+  window.CTFUtil = { esc: esc, toast: toast, download: download, $: $, $$: $$ };
+
+  // ---------- state ----------
+  function blankState() { return { v: 1, pid: randId(), name: '', solved: {}, hints: {}, wrong: 0, created: Date.now() }; }
+  var S = blankState();
+  try { var raw = localStorage.getItem(STORE_KEY); if (raw) S = Object.assign(blankState(), JSON.parse(raw)); } catch (e) { /* storage blocked */ }
+  function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { } }
+  function score() { var p = 0; Object.keys(S.solved).forEach(function (id) { if (BY_ID[id]) p += BY_ID[id].pts; }); return p; }
+  function solvedCount() { return Object.keys(S.solved).filter(function (id) { return BY_ID[id]; }).length; }
+
+  // ---------- header / rank ----------
+  function refreshHeader() {
+    $('#playerName').textContent = S.name || 'Set your name';
+    $('#playerScore').textContent = score();
+    $('#playerSolved').textContent = solvedCount();
+    $('#playerTotal').textContent = CH.length;
+    var sc = score(), cur = RANKS[0], nxt = null;
+    for (var i = 0; i < RANKS.length; i++) { if (sc >= RANKS[i][0]) { cur = RANKS[i]; nxt = RANKS[i + 1] || null; } }
+    $('#rankName').textContent = cur[1];
+    var pct = nxt ? (sc - cur[0]) / (nxt[0] - cur[0]) * 100 : 100;
+    $('#rankBar').style.width = Math.min(100, pct) + '%';
+    $('#rankNext').textContent = nxt ? (nxt[0] - sc) + ' pts to ' + nxt[1] : 'Top rank reached!';
+  }
+  $('#playerName').addEventListener('click', askName);
+  function askName() {
+    var n = prompt('Your name (or team name). This goes on your progress file for your teacher:', S.name || '');
+    if (n !== null) { S.name = n.trim().slice(0, 40); save(); refreshHeader(); }
+  }
+
+  // ---------- navigation ----------
+  function show(view) {
+    $$('.tab').forEach(function (t) { t.classList.toggle('active', t.dataset.view === view); });
+    $$('.view').forEach(function (v) { v.classList.toggle('active', v.id === 'view-' + view); });
+    if (view === 'progress') renderProgress();
+    if (view === 'toolkit' && window.Toolkit) Toolkit.ensure();
+    window.scrollTo(0, 0);
+  }
+  window.CTFShow = show;
+  $$('.tab').forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.view); }); });
+  document.addEventListener('click', function (e) {
+    var g = e.target.closest('[data-goto]');
+    if (g) { e.preventDefault(); show(g.dataset.goto); if (g.dataset.anchor) { var el = document.getElementById(g.dataset.anchor); if (el) el.scrollIntoView(); } }
+  });
+
+  // ---------- filters ----------
+  var F = { tiers: { 1: true, 2: true, 3: true, 4: true, 5: true }, q: '', hide: false };
+  function renderChips() {
+    var box = $('#tierChips'); box.innerHTML = '';
+    for (var t = 1; t <= 5; t++) {
+      var b = document.createElement('button');
+      b.className = 'chip ' + TIERS[t].cls + (F.tiers[t] ? ' on' : '');
+      b.innerHTML = '<span class="dot" style="background:var(--tc)"></span>' + TIERS[t].name;
+      b.dataset.t = t;
+      b.addEventListener('click', function () { var k = this.dataset.t; F.tiers[k] = !F.tiers[k]; renderChips(); renderBoard(); });
+      box.appendChild(b);
+    }
+  }
+  $('#searchBox').addEventListener('input', function () { F.q = this.value.toLowerCase(); renderBoard(); });
+  $('#hideSolved').addEventListener('change', function () { F.hide = this.checked; renderBoard(); });
+
+  // ---------- board ----------
+  function renderBoard() {
+    var board = $('#board'); board.innerHTML = '';
+    var shown = 0;
+    CATS.forEach(function (cat) {
+      var list = CH.filter(function (c) {
+        if (c.cat !== cat.id || !F.tiers[c.tier]) return false;
+        if (F.hide && S.solved[c.id]) return false;
+        if (F.q && (c.title + ' ' + c.id).toLowerCase().indexOf(F.q) < 0) return false;
+        return true;
+      });
+      if (!list.length) return;
+      var all = CH.filter(function (c) { return c.cat === cat.id; });
+      var done = all.filter(function (c) { return S.solved[c.id]; }).length;
+      var sec = document.createElement('section'); sec.className = 'cat';
+      sec.innerHTML = '<div class="cat-head"><div class="cat-title"><span class="cat-icon">' + cat.icon + '</span>' + esc(cat.name) +
+        '</div><div class="cat-blurb">' + esc(cat.blurb) + '</div><button class="cat-guide" data-guide="' + cat.id + '">How to approach</button>' +
+        '<div class="cat-count">' + done + '/' + all.length + '</div></div><div class="tiles"></div>';
+      var tiles = $('.tiles', sec);
+      list.forEach(function (c) {
+        var b = document.createElement('button');
+        b.className = 'tile ' + TIERS[c.tier].cls + (S.solved[c.id] ? ' solved' : '');
+        b.innerHTML = '<div class="tile-title">' + esc(c.title) + '</div><div class="tile-foot"><span>' + TIERS[c.tier].name + '</span><span class="tile-pts">' + c.pts + '</span></div>';
+        b.addEventListener('click', function () { openChal(c.id); });
+        tiles.appendChild(b); shown++;
+      });
+      board.appendChild(sec);
+    });
+    if (!shown) board.innerHTML = '<div class="empty">No challenges match those filters.</div>';
+  }
+  document.addEventListener('click', function (e) {
+    var g = e.target.closest('[data-guide]');
+    if (g) { show('start'); var el = document.getElementById('guide-' + g.dataset.guide); if (el) { el.scrollIntoView({ block: 'start' }); el.style.outline = '2px solid var(--cyan)'; setTimeout(function () { el.style.outline = ''; }, 1500); } }
+  });
+
+  // ---------- modals ----------
+  function openModal(id) { $(id).hidden = false; document.body.style.overflow = 'hidden'; }
+  function closeModal(m) { m.hidden = true; if ($$('.modal').every(function (x) { return x.hidden; })) document.body.style.overflow = ''; }
+  window.CTFModal = { open: openModal, close: function (id) { closeModal($(id)); } };
+  $$('.modal').forEach(function (m) {
+    m.addEventListener('click', function (e) { if (e.target === m || e.target.closest('[data-close]')) closeModal(m); });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    var open = $$('.modal').filter(function (m) { return !m.hidden; });
+    if (open.length) closeModal(open[open.length - 1]);
+  });
+
+  // ---------- source viewer with highlighting ----------
+  function highlightHTML(src) {
+    var s = esc(src);
+    s = s.replace(/(&lt;!--[\s\S]*?--&gt;)/g, '\u0001$1\u0002');
+    s = s.replace(/(&lt;\/?)([a-zA-Z][\w-]*)([\s\S]*?)(\/?&gt;)/g, function (m, a, tag, attrs, b) {
+      if (m.indexOf('\u0001') >= 0) return m;
+      attrs = attrs.replace(/([\w-:@]+)(=)(&quot;[\s\S]*?&quot;|&#39;[\s\S]*?&#39;)/g, '<span class="hl-attr">$1</span>$2<span class="hl-str">$3</span>');
+      return '<span class="hl-tag">' + a + tag + '</span>' + attrs + '<span class="hl-tag">' + b + '</span>';
+    });
+    return s.replace(/\u0001/g, '<span class="hl-com">').replace(/\u0002/g, '</span>');
+  }
+  window.CTFHighlight = highlightHTML;
+  function showSource(title, src) {
+    $('#srcTitle').textContent = title;
+    $('#srcCode').innerHTML = highlightHTML(src);
+    openModal('#srcModal');
+  }
+  window.CTFShowSource = showSource;
+  $('#viewSiteHtml').addEventListener('click', function () {
+    showSource("View HTML: this page", '<!doctype html>\n' + document.documentElement.outerHTML.replace(/<script>window\.CTF_BUNDLE[\s\S]*?<\/script>/, ''));
+  });
+
+  // ---------- challenge modal ----------
+  var current = null;
+  function openChal(id) {
+    var c = BY_ID[id]; if (!c) return;
+    current = c;
+    var cat = CATS.filter(function (x) { return x.id === c.cat; })[0];
+    var card = $('#chalModal .modal-card');
+    card.className = 'modal-card ' + TIERS[c.tier].cls;
+    $('#chalMeta').innerHTML = '<span class="tag">' + cat.icon + ' ' + esc(cat.name) + '</span><span class="tag tier">' + TIERS[c.tier].name +
+      '</span><span class="tag pts">' + c.pts + ' pts</span><span class="tag">' + esc(c.id) + '</span>' + (S.solved[id] ? '<span class="tag done">✓ solved</span>' : '');
+    $('#chalTitle').textContent = c.title;
+    var desc = $('#chalDesc'); desc.innerHTML = c.desc;
+    enhanceData(desc);
+    renderFiles(c);
+    renderActions(c);
+    renderHints(c);
+    $('#flagInput').value = '';
+    var msg = $('#flagMsg'); msg.className = 'flag-msg'; msg.textContent = S.solved[id] ? 'You have already solved this one.' : '';
+    openModal('#chalModal');
+    setTimeout(function () { $('#flagInput').focus(); }, 50);
+  }
+  window.CTFOpenChal = openChal;
+
+  function enhanceData(root) {
+    $$('pre.data', root).forEach(function (pre) {
+      var wrap = document.createElement('div'); wrap.className = 'data-wrap';
+      pre.parentNode.insertBefore(wrap, pre); wrap.appendChild(pre);
+      var tools = document.createElement('div'); tools.className = 'data-tools';
+      tools.innerHTML = '<button class="btn small" data-act="copy">Copy</button><button class="btn small" data-act="dec">Send to Decoder</button>' +
+        (pre.dataset.freq ? '<button class="btn small" data-act="freq">Send to Frequency analysis</button>' : '');
+      wrap.appendChild(tools);
+      tools.addEventListener('click', function (e) {
+        var b = e.target.closest('button'); if (!b) return;
+        var text = pre.textContent;
+        if (b.dataset.act === 'copy') { copyText(text); }
+        if (b.dataset.act === 'dec') { closeModal($('#chalModal')); show('toolkit'); Toolkit.open('decoder', text); }
+        if (b.dataset.act === 'freq') { closeModal($('#chalModal')); show('toolkit'); Toolkit.open('freq', text); }
+      });
+    });
+  }
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { toast('Copied'); }, fallback);
+    else fallback();
+    function fallback() { var t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); toast('Copied'); } catch (e) { } t.remove(); }
+  }
+  window.CTFCopy = copyText;
+
+  function renderFiles(c) {
+    var box = $('#chalFiles'); box.innerHTML = '';
+    if (!c.files || !c.files.length) return;
+    var wrap = document.createElement('div'); wrap.className = 'files';
+    c.files.forEach(function (f, i) {
+      var row = document.createElement('div'); row.className = 'file-row';
+      var btns = '';
+      if (f.kind === 'text') btns += '<button class="btn small" data-f="view">View</button>';
+      if (f.kind === 'image') btns += '<button class="btn small" data-f="img">Open in Image inspector</button>';
+      btns += '<button class="btn small" data-f="hex">Open in Hex viewer</button><button class="btn small" data-f="dl">Download</button>';
+      row.innerHTML = '<span class="fname">📄 ' + esc(f.name) + '</span>' + btns;
+      row.addEventListener('click', function (e) {
+        var b = e.target.closest('button'); if (!b) return;
+        var act = b.dataset.f;
+        if (act === 'view') { showText(f.name, f.text); }
+        if (act === 'dl') { if (f.url) { var a = document.createElement('a'); a.href = f.url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); } else download(f.name, f.text, 'text/plain'); }
+        if (act === 'hex') { closeModal($('#chalModal')); show('toolkit'); Toolkit.open('hex', { file: f }); }
+        if (act === 'img') { closeModal($('#chalModal')); show('toolkit'); Toolkit.open('image', { file: f }); }
+      });
+      wrap.appendChild(row);
+    });
+    box.appendChild(wrap);
+  }
+  function showText(name, text) {
+    $('#srcTitle').textContent = name;
+    $('#srcCode').textContent = text;
+    openModal('#srcModal');
+  }
+
+  function renderActions(c) {
+    var box = $('#chalActions'); box.innerHTML = '';
+    var v = document.createElement('button'); v.className = 'btn';
+    v.textContent = '</> View HTML of this challenge';
+    v.title = 'Inspect Element is blocked on school PCs, so use this to see the raw HTML of the challenge text.';
+    v.addEventListener('click', function () { showSource('View HTML: ' + c.title, c.desc); });
+    box.appendChild(v);
+  }
+
+  function renderHints(c) {
+    var box = $('#chalHints'); box.innerHTML = '';
+    if (!c.hints || !c.hints.length) return;
+    var used = S.hints[c.id] || 0;
+    for (var i = 0; i < used && i < c.hints.length; i++) {
+      var h = document.createElement('div'); h.className = 'hint-box';
+      h.innerHTML = '<div class="hint-warn">⚠ Hint ' + (i + 1) + ' of ' + c.hints.length + ': practice only. There are no hints at the real competition.</div>' + c.hints[i];
+      box.appendChild(h);
+    }
+    if (used < c.hints.length) {
+      var b = document.createElement('button'); b.className = 'btn small';
+      b.textContent = used ? '💡 Show another hint' : '💡 Show a hint (' + c.hints.length + ' available)';
+      b.addEventListener('click', function () { S.hints[c.id] = used + 1; save(); renderHints(c); });
+      box.appendChild(b);
+    }
+  }
+
+  $('#flagForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var c = current; if (!c) return;
+    var raw = $('#flagInput').value.trim(), msg = $('#flagMsg');
+    if (!raw) return;
+    var norm = raw.toLowerCase();
+    if (sha256(norm) === c.h) {
+      if (!S.solved[c.id]) {
+        S.solved[c.id] = { t: Date.now(), p: sha256(S.pid + '|' + norm).slice(0, 16), h: S.hints[c.id] || 0 };
+        save();
+        msg.className = 'flag-msg ok'; msg.textContent = '✓ Correct! +' + c.pts + ' points.';
+        toast('🚩 Flag captured: ' + c.title + ' (+' + c.pts + ')');
+        if (!S.name) setTimeout(function () { if (confirm('Nice! Add your name so your teacher knows whose progress file this is?')) askName(); }, 600);
+      } else { msg.className = 'flag-msg ok'; msg.textContent = '✓ Correct (already solved).'; }
+      refreshHeader(); renderBoard(); openChalMeta(c);
+      return;
+    }
+    S.wrong++; save();
+    msg.className = 'flag-msg bad';
+    if (!/^flag\{.*\}$/i.test(raw) && !/^\w+\{/.test(raw) && sha256('flag{' + norm + '}') === c.h) {
+      msg.className = 'flag-msg info'; msg.textContent = 'So close: that is the right answer, but flags must be wrapped like flag{...}';
+    } else if (!/^flag\{.*\}$/i.test(raw)) {
+      msg.textContent = '✗ Not quite. Flags here look like flag{something}.';
+    } else msg.textContent = '✗ Not the flag. Keep digging!';
+    var f = $('#flagForm'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake');
+  });
+  function openChalMeta(c) {
+    var cat = CATS.filter(function (x) { return x.id === c.cat; })[0];
+    $('#chalMeta').innerHTML = '<span class="tag">' + cat.icon + ' ' + esc(cat.name) + '</span><span class="tag tier">' + TIERS[c.tier].name +
+      '</span><span class="tag pts">' + c.pts + ' pts</span><span class="tag">' + esc(c.id) + '</span><span class="tag done">✓ solved</span>';
+  }
+
+  // ---------- progress ----------
+  function renderProgress() {
+    var sc = score(), n = solvedCount(), hintsUsed = Object.keys(S.hints).reduce(function (s, k) { return s + S.hints[k]; }, 0);
+    var tierDone = [0, 0, 0, 0, 0, 0];
+    Object.keys(S.solved).forEach(function (id) { if (BY_ID[id]) tierDone[BY_ID[id].tier]++; });
+    $('#statGrid').innerHTML =
+      '<div class="stat"><b>' + sc + '</b><span>points of ' + TOTAL_PTS + '</span></div>' +
+      '<div class="stat"><b>' + n + '</b><span>flags of ' + CH.length + '</span></div>' +
+      '<div class="stat"><b>' + hintsUsed + '</b><span>hints used</span></div>' +
+      '<div class="stat"><b>' + S.wrong + '</b><span>wrong guesses</span></div>' +
+      [1, 2, 3, 4, 5].map(function (t) {
+        var tot = CH.filter(function (c) { return c.tier === t; }).length;
+        return '<div class="stat ' + TIERS[t].cls + '"><b style="color:var(--tc)">' + tierDone[t] + '/' + tot + '</b><span>' + TIERS[t].name + '</span></div>';
+      }).join('');
+    $('#catBars').innerHTML = CATS.map(function (cat) {
+      var all = CH.filter(function (c) { return c.cat === cat.id; }), d = all.filter(function (c) { return S.solved[c.id]; }).length;
+      return '<div class="cat-bar"><span>' + cat.icon + ' ' + esc(cat.name) + '</span><div class="track"><div class="fill" style="width:' + (d / all.length * 100) + '%"></div></div><span class="num">' + d + '/' + all.length + '</span></div>';
+    }).join('');
+    var hist = Object.keys(S.solved).filter(function (id) { return BY_ID[id]; }).sort(function (a, b) { return S.solved[b].t - S.solved[a].t; });
+    $('#history').innerHTML = hist.length ? hist.map(function (id) {
+      var c = BY_ID[id];
+      return '<div><span class="when">' + fmtDate(S.solved[id].t) + '</span><span>' + esc(c.title) + ' <span class="muted">(' + esc(c.id) + ', ' + c.pts + ' pts' + (S.solved[id].h ? ', ' + S.solved[id].h + ' hint' + (S.solved[id].h > 1 ? 's' : '') : '') + ')</span></span></div>';
+    }).join('') : '<p class="muted">No flags yet. Head to the board and start with the Warm-Up category.</p>';
+  }
+
+  function makeExport() {
+    var payload = { app: 'MrButlersCTF', v: 1, pid: S.pid, name: S.name, exported: Date.now(), score: score(), solved: S.solved, hints: S.hints, wrong: S.wrong, created: S.created };
+    var body = JSON.stringify(payload);
+    return JSON.stringify({ data: payload, check: sha256(body + SALT) }, null, 1);
+  }
+  function parseImport(text) {
+    var obj = JSON.parse(text);
+    if (!obj || !obj.data || obj.data.app !== 'MrButlersCTF') throw new Error('This is not a Mr Butler\'s CTF progress file.');
+    var ok = sha256(JSON.stringify(obj.data) + SALT) === obj.check;
+    return { data: obj.data, ok: ok };
+  }
+  $('#exportBtn').addEventListener('click', function () {
+    if (!S.name) askName();
+    var name = (S.name || 'player').replace(/[^\w-]+/g, '_');
+    var d = new Date(), stamp = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    download('MrButlersCTF-' + name + '-' + stamp + '.json', makeExport());
+    toast('Progress file downloaded');
+  });
+  $('#importFile').addEventListener('change', function () {
+    var file = this.files[0]; if (!file) return;
+    var msg = $('#importMsg'); var input = this;
+    file.text().then(function (text) {
+      var r = parseImport(text);
+      if (!r.ok) throw new Error('This progress file has been edited by hand, so it can\'t be loaded.');
+      var d = r.data, added = 0;
+      if (Object.keys(S.solved).length && d.pid !== S.pid && !confirm('This file belongs to "' + (d.name || 'unnamed') + '". Merge their solves into the progress on this computer?')) return;
+      if (!Object.keys(S.solved).length) { S.pid = d.pid; }
+      if (d.pid === S.pid) {
+        Object.keys(d.solved || {}).forEach(function (id) { if (!S.solved[id]) { S.solved[id] = d.solved[id]; added++; } });
+      } else {
+        Object.keys(d.solved || {}).forEach(function (id) { if (!S.solved[id]) { S.solved[id] = { t: d.solved[id].t, p: '', h: d.solved[id].h || 0, m: 1 }; added++; } });
+      }
+      Object.keys(d.hints || {}).forEach(function (id) { S.hints[id] = Math.max(S.hints[id] || 0, d.hints[id]); });
+      S.wrong = Math.max(S.wrong, d.wrong || 0);
+      if (!S.name && d.name) S.name = d.name;
+      save(); refreshHeader(); renderBoard(); renderProgress();
+      msg.hidden = false; msg.className = 'notice good'; msg.textContent = 'Loaded. ' + added + ' new solve' + (added === 1 ? '' : 's') + ' added. Welcome back' + (S.name ? ', ' + S.name : '') + '!';
+    }).catch(function (err) {
+      msg.hidden = false; msg.className = 'notice bad'; msg.textContent = err.message || 'Could not read that file.';
+    }).then(function () { input.value = ''; });
+  });
+  $('#resetBtn').addEventListener('click', function () {
+    if (!confirm('Delete ALL progress on this computer? Download a progress file first if you want to keep it.')) return;
+    S = blankState(); save(); refreshHeader(); renderBoard(); renderProgress(); toast('Progress reset');
+  });
+
+  // ---------- teacher ----------
+  var T = { rows: [], key: null, sort: 'score' };
+  $('#teacherFiles').addEventListener('change', function () {
+    var files = Array.prototype.slice.call(this.files), input = this;
+    Promise.all(files.map(function (f) { return f.text().then(function (t) { try { var r = parseImport(t); r.file = f.name; return r; } catch (e) { return { err: f.name }; } }); }))
+      .then(function (res) {
+        var bad = [];
+        res.forEach(function (r) {
+          if (r.err) { bad.push(r.err); return; }
+          T.rows = T.rows.filter(function (x) { return x.data.pid !== r.data.pid || x.data.exported > r.data.exported; });
+          if (!T.rows.some(function (x) { return x.data.pid === r.data.pid; })) T.rows.push(r);
+        });
+        var m = $('#teacherMsg'); m.hidden = false;
+        m.className = 'notice ' + (bad.length ? 'bad' : 'good');
+        m.textContent = 'Loaded ' + (res.length - bad.length) + ' file(s).' + (bad.length ? ' Could not read: ' + bad.join(', ') : '');
+        renderTeacher(); input.value = '';
+      });
+  });
+  $('#answerKeyFile').addEventListener('change', function () {
+    var f = this.files[0], input = this; if (!f) return;
+    f.text().then(function (t) {
+      var k = JSON.parse(t); if (!k.flags) throw new Error();
+      T.key = k.flags; var m = $('#teacherMsg'); m.hidden = false; m.className = 'notice good'; m.textContent = 'Answer key loaded: solves will now be verified.';
+      renderTeacher();
+    }).catch(function () { alert('That is not the answer key file.'); }).then(function () { input.value = ''; });
+  });
+  $('#teacherClear').addEventListener('click', function () { T.rows = []; renderTeacher(); $('#teacherMsg').hidden = true; });
+  function rowStats(r) {
+    var d = r.data, pts = 0, n = 0, unv = 0, tiers = [0, 0, 0, 0, 0, 0], last = 0;
+    Object.keys(d.solved || {}).forEach(function (id) {
+      var c = BY_ID[id]; if (!c) return;
+      var s = d.solved[id], valid = true;
+      if (T.key && T.key[id]) valid = !!s.p && sha256(d.pid + '|' + T.key[id].toLowerCase()).slice(0, 16) === s.p;
+      if (!valid) { unv++; return; }
+      pts += c.pts; n++; tiers[c.tier]++; last = Math.max(last, s.t);
+    });
+    var hints = Object.keys(d.hints || {}).reduce(function (s, k) { return s + d.hints[k]; }, 0);
+    return { name: d.name || '(no name)', pts: pts, n: n, unv: unv, tiers: tiers, hints: hints, last: last, ok: r.ok, file: r.file };
+  }
+  function renderTeacher() {
+    var box = $('#teacherTable');
+    if (!T.rows.length) { box.innerHTML = '<p class="muted">No files loaded yet.</p>'; return; }
+    var rows = T.rows.map(rowStats);
+    var k = T.sort;
+    rows.sort(function (a, b) { return k === 'name' ? a.name.localeCompare(b.name) : (b[k] - a[k]) || (a.last - b.last); });
+    box.innerHTML = '<table class="lb"><thead><tr><th>#</th><th data-k="name">Name</th><th data-k="pts">Points</th><th data-k="n">Flags</th>' +
+      [1, 2, 3, 4, 5].map(function (t) { return '<th>' + TIERS[t].name + '</th>'; }).join('') +
+      '<th data-k="hints">Hints</th><th>Last solve</th><th>File</th></tr></thead><tbody>' +
+      rows.map(function (r, i) {
+        return '<tr><td class="num">' + (i + 1) + '</td><td>' + esc(r.name) + '</td><td class="num">' + r.pts + '</td><td class="num">' + r.n + '</td>' +
+          [1, 2, 3, 4, 5].map(function (t) { return '<td class="num">' + r.tiers[t] + '</td>'; }).join('') +
+          '<td class="num">' + r.hints + '</td><td class="num">' + (r.last ? fmtDate(r.last) : '-') + '</td><td>' +
+          (r.ok ? '<span class="badge good">ok</span>' : '<span class="badge bad">edited</span>') +
+          (r.unv ? ' <span class="badge bad">' + r.unv + ' unverified</span>' : '') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+    $$('th[data-k]', box).forEach(function (th) { th.addEventListener('click', function () { T.sort = th.dataset.k === 'pts' ? 'pts' : th.dataset.k; renderTeacher(); }); });
+    T.lastRows = rows;
+  }
+  T.sort = 'pts';
+  $('#teacherCsv').addEventListener('click', function () {
+    if (!T.lastRows) return toast('Load some files first');
+    var lines = [['Rank', 'Name', 'Points', 'Flags', 'Beginner', 'Easy', 'Medium', 'Hard', 'Expert', 'Hints', 'Unverified', 'Last solve'].join(',')];
+    T.lastRows.forEach(function (r, i) {
+      lines.push([i + 1, '"' + r.name.replace(/"/g, '""') + '"', r.pts, r.n, r.tiers[1], r.tiers[2], r.tiers[3], r.tiers[4], r.tiers[5], r.hints, r.unv, r.last ? new Date(r.last).toISOString() : ''].join(','));
+    });
+    download('MrButlersCTF-leaderboard.csv', lines.join('\n'), 'text/csv');
+  });
+
+  // ---------- getting started page ----------
+  $('#startContent').innerHTML = window.CTF_START_HTML(CATS);
+
+  // ---------- boot ----------
+  renderChips(); renderBoard(); refreshHeader(); renderTeacher();
+  if (!S.name) setTimeout(function () { var w = $('#playerName'); w.style.color = 'var(--amber)'; }, 300);
+  var hash = location.hash.replace('#', '');
+  if (BY_ID[hash]) openChal(hash);
+})();
