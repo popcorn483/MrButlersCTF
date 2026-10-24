@@ -9,7 +9,7 @@ window.CTF_START_HTML = function (cats) {
     osint: ['OSINT = Open Source Intelligence: finding facts from public information.', 'Usernames are often reused across sites.', 'Photos can leak locations; bios leak birthdays and pet names.'],
     reversing: ['Reverse engineering = work backwards from the code to the input it wants.', 'Read the code line by line and write down what each step does.', 'Undo the steps in reverse order.'],
     networking: ['Know common ports: 21 FTP, 22 SSH, 23 Telnet, 80 HTTP, 443 HTTPS, 53 DNS.', 'Old protocols like FTP, Telnet and HTTP send passwords in plain text.', 'Counting and sorting log lines answers most "who attacked?" questions.'],
-    programming: ['Some answers are too tedious to do by hand: write a short script.', 'Use the JS scratchpad here, or Python if your PC has it.', 'Test your code on a small example you can check by hand first.']
+    programming: ['Some answers are too tedious to do by hand: write a short program.', 'Write it in C# in Visual Studio (the language you use in class), or use the JS scratchpad here for a quick check.', 'Test your code on a small example you can work out by hand first.']
   };
   return '' +
   '<h1>Getting started</h1>' +
