@@ -33,7 +33,32 @@
     { id: 'reverse', name: 'Reverse', f: function (s) { return Array.from(s).reverse().join(''); } },
     { id: 'upper', name: 'To upper case', f: function (s) { return s.toUpperCase(); } },
     { id: 'lower', name: 'To lower case', f: function (s) { return s.toLowerCase(); } },
-    { id: 'nows', name: 'Remove whitespace', f: function (s) { return s.replace(/\s+/g, ''); } }
+    { id: 'nows', name: 'Remove whitespace', f: function (s) { return s.replace(/\s+/g, ''); } },
+    ['More ciphers'],
+    { id: 'fromMorse', name: 'From Morse', f: function (s) {
+      var M = { '.-': 'a', '-...': 'b', '-.-.': 'c', '-..': 'd', '.': 'e', '..-.': 'f', '--.': 'g', '....': 'h', '..': 'i', '.---': 'j', '-.-': 'k', '.-..': 'l', '--': 'm', '-.': 'n', '---': 'o', '.--.': 'p', '--.-': 'q', '.-.': 'r', '...': 's', '-': 't', '..-': 'u', '...-': 'v', '.--': 'w', '-..-': 'x', '-.--': 'y', '--..': 'z', '-----': '0', '.----': '1', '..---': '2', '...--': '3', '....-': '4', '.....': '5', '-....': '6', '--...': '7', '---..': '8', '----.': '9' };
+      return s.trim().split(/\s*\/\s*/).map(function (w) { return w.split(/\s+/).map(function (c) { return M[c] || ''; }).join(''); }).join(' ');
+    } },
+    { id: 'a1z26', name: 'A1Z26 decode', f: function (s) {
+      return s.trim().split(/\s*\/\s*/).map(function (w) { return w.split(/[^0-9]+/).filter(Boolean).map(function (n) { return n >= 1 && n <= 26 ? String.fromCharCode(96 + (+n)) : ''; }).join(''); }).join(' ');
+    } },
+    { id: 'vigdec', name: 'Vigenère decode', arg: 'key', def: 'key', f: function (s, k) {
+      k = (k || '').toLowerCase().replace(/[^a-z]/g, ''); if (!k) return s; var j = 0;
+      return s.replace(/[a-z]/gi, function (c) { var b = c <= 'Z' ? 65 : 97, sh = k.charCodeAt(j % k.length) - 97; j++; return String.fromCharCode((c.charCodeAt(0) - b - sh + 26) % 26 + b); });
+    } },
+    { id: 'vigenc', name: 'Vigenère encode', arg: 'key', def: 'key', f: function (s, k) {
+      k = (k || '').toLowerCase().replace(/[^a-z]/g, ''); if (!k) return s; var j = 0;
+      return s.replace(/[a-z]/gi, function (c) { var b = c <= 'Z' ? 65 : 97, sh = k.charCodeAt(j % k.length) - 97; j++; return String.fromCharCode((c.charCodeAt(0) - b + sh) % 26 + b); });
+    } },
+    { id: 'raildec', name: 'Rail fence decode', arg: 'rails', def: '3', f: function (s, a) {
+      var n = parseInt(a, 10) || 2, len = s.length, patt = [], r = 0, d = 1;
+      for (var i = 0; i < len; i++) { patt.push(r); if (r === 0) d = 1; else if (r === n - 1) d = -1; r += d; }
+      var idx = patt.map(function (v, i) { return [v, i]; }).sort(function (x, y) { return x[0] - y[0] || x[1] - y[1]; });
+      var out = []; for (var j = 0; j < len; j++) out[idx[j][1]] = s[j]; return out.join('');
+    } },
+    { id: 'xorbrute', name: 'XOR brute force (1 byte)', f: function (s) {
+      var lines = []; for (var k = 1; k < 256; k++) { var o = ''; for (var i = 0; i < s.length; i++) o += String.fromCharCode(s.charCodeAt(i) ^ k); if (/flag\{/i.test(o) || /^[\x20-\x7e]+$/.test(o)) lines.push(('00' + k).slice(-3) + ' (0x' + k.toString(16) + '): ' + o); } return lines.join('\n') || '(no printable results)';
+    } }
   ];
   var OP_BY = {}; OPS.forEach(function (o) { if (o.id) OP_BY[o.id] = o; });
   var recipe = [];
@@ -45,7 +70,7 @@
       '<span class="field-label">Recipe</span><div class="recipe" id="recipe"></div>' +
       '<span class="field-label">Output</span><div class="out-box" id="decOut"></div>' +
       '<div class="row"><button class="btn small" id="decCopy">Copy output</button><button class="btn small" id="decMove">Output → Input</button><button class="btn small" id="decClear">Clear recipe</button></div></div></div>';
-    if (typeof payload === 'string') $('#decIn').value = payload;
+    if (typeof payload === 'string') { $('#decIn').value = payload; recipe = []; }
     $('#opsList').addEventListener('click', function (e) { var b = e.target.closest('[data-op]'); if (!b) return; var o = OP_BY[b.dataset.op]; recipe.push({ id: o.id, arg: o.def || '' }); drawRecipe(); });
     $('#decIn').addEventListener('input', runRecipe);
     $('#decCopy').addEventListener('click', function () { window.CTFCopy($('#decOut').textContent); });
