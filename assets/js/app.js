@@ -261,14 +261,17 @@
     var used = S.hints[c.id] || 0;
     for (var i = 0; i < used && i < c.hints.length; i++) {
       var h = document.createElement('div'); h.className = 'hint-box';
-      h.innerHTML = '<div class="hint-warn">⚠ Hint ' + (i + 1) + ' of ' + c.hints.length + ': practice only. There are no hints at the real competition.</div>' + c.hints[i];
+      h.innerHTML = '<div class="hint-warn">💡 Hint ' + (i + 1) + ' of ' + c.hints.length + '</div>' + c.hints[i];
       box.appendChild(h);
     }
     if (used < c.hints.length) {
       var b = document.createElement('button'); b.className = 'btn small';
-      b.textContent = used ? '💡 Show another hint' : '💡 Show a hint (' + c.hints.length + ' available)';
+      b.textContent = used ? '💡 Show another hint' : '💡 Stuck? Take a hint (' + c.hints.length + ' available)';
       b.addEventListener('click', function () { S.hints[c.id] = used + 1; save(); renderHints(c); });
       box.appendChild(b);
+      var note = document.createElement('div'); note.className = 'hint-reassure'; note.textContent = 'Using a hint is a smart move while you practise — that is exactly what they are here for.'; box.appendChild(note);
+    } else {
+      var done = document.createElement('div'); done.className = 'hint-reassure'; done.textContent = 'That is every hint for this one. Still stuck? The full walkthrough below will talk you through it.'; box.appendChild(done);
     }
   }
 
@@ -322,23 +325,46 @@
         var rv = S.revealed[c.id] ? 1 : 0;
         S.solved[c.id] = { t: Date.now(), p: sha256(S.pid + '|' + norm).slice(0, 16), h: S.hints[c.id] || 0, r: rv };
         save();
-        msg.className = 'flag-msg ok'; msg.textContent = rv ? '✓ Correct, but no points because you revealed the answer first.' : '✓ Correct! +' + c.pts + ' points.';
-        toast(rv ? 'Correct (answer was revealed, 0 pts)' : '🚩 Flag captured: ' + c.title + ' (+' + c.pts + ')');
+        var praise = ['Brilliant work', 'Nicely done', 'You got it', 'Spot on', 'Great solve', 'Well played'];
+        var p = praise[Math.floor(Math.random() * praise.length)];
+        msg.className = 'flag-msg ok'; msg.textContent = rv ? '✓ Correct! No points this time because you saw the answer first — but you learned the method, and that is what counts.' : '✓ ' + p + '! +' + c.pts + ' points.';
+        toast(rv ? '✓ Correct — answer was revealed, 0 pts' : '🚩 ' + p + '! ' + c.title + ' (+' + c.pts + ')');
+        milestone(c);
         if (!S.name) setTimeout(function () { if (confirm('Nice! Add your name so your teacher knows whose progress file this is?')) askName(); }, 600);
-      } else { msg.className = 'flag-msg ok'; msg.textContent = '✓ Correct (already solved).'; }
+      } else { msg.className = 'flag-msg ok'; msg.textContent = '✓ Still correct — nice to see it stuck!'; }
       refreshHeader(); renderBoard(); openChalMeta(c); renderAnswer(c);
       return;
     }
     S.wrong++; if (!S.tries) S.tries = {}; S.tries[c.id] = (S.tries[c.id] || 0) + 1; save();
+    var tries = S.tries[c.id];
     msg.className = 'flag-msg bad';
     if (!/^flag\{.*\}$/i.test(raw) && !/^\w+\{/.test(raw) && sha256('flag{' + norm + '}') === c.h) {
-      msg.className = 'flag-msg info'; msg.textContent = 'So close: that is the right answer, but flags must be wrapped like flag{...}';
+      msg.className = 'flag-msg info'; msg.textContent = 'So close — that is exactly right! Just wrap it as flag{...} and submit again.';
     } else if (!/^flag\{.*\}$/i.test(raw)) {
-      msg.textContent = '✗ Not quite. Flags here look like flag{something}.';
-    } else msg.textContent = '✗ Not the flag. Keep digging!';
+      msg.textContent = 'Not quite yet — flags here look like flag{something}. Keep going, you are on the right track.';
+    } else {
+      var enc = ['Not that one — but every wrong guess rules something out. Have another look.',
+                 'Not yet. That is completely normal — take a hint if you would like a nudge.',
+                 'Close the gap bit by bit. Try the Decoder or a hint if you are stuck.',
+                 'Keep at it — the best solvers get plenty wrong before it clicks.'];
+      msg.textContent = enc[Math.min(tries, enc.length) - 1] || enc[enc.length - 1];
+    }
     renderAnswer(c);
     var f = $('#flagForm'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake');
   });
+  function milestone(c) {
+    var n = solvedCount();
+    setTimeout(function () {
+      if (n === 1) { toast('🎉 Your very first flag! This is how every CTF journey starts.'); return; }
+      if (n === 10) { toast('🔟 Ten flags down — you are really getting the hang of this!'); return; }
+      if (n === 25) { toast('⭐ 25 solved! You are building serious skills.'); return; }
+      if (n === 50) { toast('🏅 Halfway-ish — 50 flags! Brilliant commitment.'); return; }
+      if (n === 100) { toast('💯 One hundred flags! You are a force to be reckoned with.'); return; }
+      var cat = CATS.filter(function (x) { return x.id === c.cat; })[0];
+      var all = CH.filter(function (x) { return x.cat === c.cat; });
+      if (all.every(function (x) { return S.solved[x.id]; })) toast('🏆 You cleared every ' + cat.name + ' challenge — amazing!');
+    }, 1300);
+  }
   function openChalMeta(c) {
     var cat = CATS.filter(function (x) { return x.id === c.cat; })[0];
     $('#chalMeta').innerHTML = '<span class="tag">' + cat.icon + ' ' + esc(cat.name) + '</span><span class="tag tier">' + TIERS[c.tier].name +
@@ -350,6 +376,15 @@
     var sc = score(), n = solvedCount(), hintsUsed = Object.keys(S.hints).reduce(function (s, k) { return s + S.hints[k]; }, 0), revCount = Object.keys(S.revealed || {}).length;
     var tierDone = [0, 0, 0, 0, 0, 0];
     Object.keys(S.solved).forEach(function (id) { if (BY_ID[id]) tierDone[BY_ID[id].tier]++; });
+    var enc;
+    if (n === 0) enc = 'Every expert started with zero flags. Head to the board and grab your first — the Warm-Up category is the perfect place to start.';
+    else if (n < 10) enc = 'Great start' + (S.name ? ', ' + S.name : '') + '! You have ' + n + ' flag' + (n === 1 ? '' : 's') + ' already. Keep that momentum going.';
+    else if (n < 50) enc = 'You are doing really well — ' + n + ' flags and climbing. Your pattern-spotting is getting sharper every session.';
+    else if (n < CH.length) enc = 'Seriously impressive: ' + n + ' flags solved. You have turned into a proper flag hunter.';
+    else enc = 'You solved every single challenge. Outstanding — you are ready for anything the event throws at you!';
+    var banner = document.getElementById('progEnc');
+    if (!banner) { banner = document.createElement('div'); banner.id = 'progEnc'; banner.className = 'callout good'; $('#statGrid').before(banner); }
+    banner.innerHTML = enc;
     $('#statGrid').innerHTML =
       '<div class="stat"><b>' + sc + '</b><span>points of ' + TOTAL_PTS + '</span></div>' +
       '<div class="stat"><b>' + n + '</b><span>flags of ' + CH.length + '</span></div>' +
@@ -484,6 +519,7 @@
   if (window.CTF_WALK_HTML) $('#walkContent').innerHTML = window.CTF_WALK_HTML();
   if (window.CTF_RES_HTML) $('#resContent').innerHTML = window.CTF_RES_HTML();
   if (window.CTF_LESSONS_HTML) $('#lessonsContent').innerHTML = window.CTF_LESSONS_HTML();
+  if (window.CTF_TOOLS_HELP_HTML) { var tg = document.getElementById('toolGuideBody'); if (tg) tg.innerHTML = window.CTF_TOOLS_HELP_HTML(); }
 
   // ---------- boot ----------
   renderChips(); renderBoard(); refreshHeader(); renderTeacher();

@@ -348,3 +348,37 @@ window.CTF_LESSONS_HTML = function () {
   L += '<div class="callout good">Finished the lessons? Put them together on the <a href="#" data-goto="board">Challenge board</a>, and when you have internet, the <a href="#" data-goto="resources">Useful sites</a> page lists the real tools for going further.</div>';
   return L;
 };
+
+
+/* Toolkit help: what each tool does, how to use it, and the cue that tells you to reach for it */
+window.CTF_TOOLS_HELP_HTML = function () {
+  var T = [
+    ['🧪 Decoder', 'Your main workhorse. It undoes encodings and ciphers &mdash; Base64, hex, binary, ROT13, Caesar, Vigenere, Morse and more &mdash; and you can chain steps into a "recipe" like CyberChef.',
+      'Type or paste text into Input, then click an operation on the left to add it. Add more steps to build a recipe; the Output updates live. "Output to Input" feeds the result back in for the next layer.',
+      'Reach for it whenever the challenge gives you scrambled text: letters and numbers ending in = (Base64), only 0s and 1s (binary), only 0-9 and a-f (hex), dots and dashes (Morse), or shifted-looking words (Caesar).'],
+    ['📊 Frequency analysis', 'Counts how often each letter appears and lets you build your own letter-for-letter swaps.',
+      'Paste the ciphertext; the bars show the common letters. Fill in guesses in the substitution grid and watch the decoded text update.',
+      'Use it on a substitution cipher where each letter is always swapped for the same other letter, and the Caesar tools have not cracked it.'],
+    ['#️⃣ Hashes', 'Shows the MD5, SHA-1 and SHA-256 of any text, and can crack a weak hash by trying a wordlist.',
+      'Type text to see its hashes. To crack one, paste the hash, check the wordlist, and press "Try every word".',
+      'Reach for it when a challenge gives you a long string of hex that is exactly 32, 40 or 64 characters long &mdash; that is almost always a hash.'],
+    ['🔢 Hex viewer', 'Opens any file and shows its raw bytes, the "magic number" that reveals its true type, and a Strings list of readable text inside.',
+      'Open a file (or use "Open in Hex viewer" on a challenge). Check the first bytes against the magic-number note, and skim the Strings list for flag{.',
+      'Use it on any file challenge: a file that will not open, a wrong-looking extension, or anything where the flag might be hidden as text inside.'],
+    ['🖼️ Image inspector', 'Reveals things hidden in pictures by viewing single colour channels, the lowest bit of each colour, or exaggerating tiny differences.',
+      'Open an image, then try each view from the dropdown. Click a pixel to read its exact colour values.',
+      'Reach for it on steganography challenges &mdash; any picture that "looks normal" or oddly plain probably has something hidden in the pixels.'],
+    ['💻 JS scratchpad', 'A little code runner for quick calculations. Write JavaScript and press Run; use print(...) to show results.',
+      'Type your code and press Run. For programming challenges you will usually write the real answer in C# (Visual Studio), but this is handy for a fast check.',
+      'Use it when an answer is too tedious to work out by hand &mdash; adding up a long list, counting things, looping.'],
+    ['🔤 ASCII table', 'A lookup chart showing every character with its decimal, hex and binary code.',
+      'Just read it &mdash; find a character to get its number, or a number to get its character.',
+      'Use it to check a single code by hand, or to understand what the Decoder is doing under the hood.']
+  ];
+  return T.map(function (t) {
+    return '<div class="tg-item"><h4>' + t[0] + '</h4>' +
+      '<p><b>What it does:</b> ' + t[1] + '</p>' +
+      '<p><b>How to use it:</b> ' + t[2] + '</p>' +
+      '<p class="tg-when"><b>When to use it:</b> ' + t[3] + '</p></div>';
+  }).join('');
+};

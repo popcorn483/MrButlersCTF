@@ -347,3 +347,16 @@ table.recognise tr:nth-child(even) td { background: rgba(255,255,255,.015); }
 .plan-week { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--green); border-radius: 8px; padding: 10px 14px; }
 .plan-week b { display: block; font-family: var(--mono); color: var(--green); }
 .plan-week span { font-size: .9rem; color: var(--text); }
+
+/* tool guide + supportive microcopy */
+.tool-guide { margin: 10px 0 0; background: var(--panel); border: 1px solid var(--line2); border-radius: 10px; }
+.tool-guide > summary { cursor: pointer; padding: 10px 14px; font-weight: 600; color: var(--cyan); list-style: none; }
+.tool-guide > summary::-webkit-details-marker { display: none; }
+.tool-guide > summary::before { content: "▸ "; }
+.tool-guide[open] > summary::before { content: "▾ "; }
+.tool-guide-body { padding: 4px 16px 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.tg-item { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+.tg-item h4 { margin: 0 0 6px; font-family: var(--mono); }
+.tg-item p { margin: 4px 0; font-size: .88rem; }
+.tg-when { color: var(--text); border-left: 3px solid var(--green); padding-left: 8px; }
+.hint-reassure { font-size: .82rem; color: var(--muted); margin-top: 8px; font-style: italic; }
