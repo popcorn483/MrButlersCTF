@@ -67,15 +67,33 @@
   }
 
   // ---------- navigation ----------
+  var LEARN_VIEWS = ['start', 'lessons', 'walkthrough', 'resources', 'reference'];
+  function closeLearnMenu() {
+    var lm = document.getElementById('learnMenu'), lt = document.getElementById('learnToggle');
+    if (lm) lm.hidden = true; if (lt) lt.setAttribute('aria-expanded', 'false');
+  }
   function show(view) {
     $$('.tab').forEach(function (t) { t.classList.toggle('active', t.dataset.view === view); });
     $$('.view').forEach(function (v) { v.classList.toggle('active', v.id === 'view-' + view); });
+    var lt = document.getElementById('learnToggle');
+    if (lt) lt.classList.toggle('active', LEARN_VIEWS.indexOf(view) >= 0);
+    closeLearnMenu();
+    if (view === 'board') renderRecommend();
     if (view === 'progress') renderProgress();
     if (view === 'toolkit' && window.Toolkit) Toolkit.ensure();
+    if (view === 'test' && window.TestArea) TestArea.enter();
     window.scrollTo(0, 0);
   }
   window.CTFShow = show;
-  $$('.tab').forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.view); }); });
+  $$('.tab[data-view]').forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.view); }); });
+  $$('.tab-menu-item').forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.view); }); });
+  var learnToggle = document.getElementById('learnToggle');
+  if (learnToggle) learnToggle.addEventListener('click', function (e) {
+    e.stopPropagation();
+    var lm = document.getElementById('learnMenu'), open = lm.hidden;
+    lm.hidden = !open; learnToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  document.addEventListener('click', function (e) { if (!e.target.closest('.tab-group')) closeLearnMenu(); });
   document.addEventListener('click', function (e) {
     var g = e.target.closest('[data-goto]');
     if (g) { e.preventDefault(); show(g.dataset.goto); if (g.dataset.anchor) { var el = document.getElementById(g.dataset.anchor); if (el) el.scrollIntoView(); } return; }
@@ -128,6 +146,29 @@
       board.appendChild(sec);
     });
     if (!shown) board.innerHTML = '<div class="empty">No challenges match those filters.</div>';
+    renderRecommend();
+  }
+  function renderRecommend() {
+    var box = document.getElementById('recommend'); if (!box) return;
+    var unsolved = CH.filter(function (c) { return !S.solved[c.id]; });
+    var n = solvedCount();
+    if (!unsolved.length) {
+      box.innerHTML = '<div class="recommend-card done"><div class="rec-left"><div class="rec-label">🏆 All done</div><div class="rec-title">You have solved every challenge!</div><div class="rec-why">Incredible work. Try the Test area to see how you do under real conditions.</div></div><button class="btn primary" data-goto="test">Go to Test area</button></div>';
+      return;
+    }
+    var catIdx = {}; CATS.forEach(function (c, i) { catIdx[c.id] = i; });
+    unsolved.sort(function (a, b) { return a.tier - b.tier || catIdx[a.cat] - catIdx[b.cat] || a.id.localeCompare(b.id); });
+    var pick = unsolved[0];
+    var cat = CATS.filter(function (x) { return x.id === pick.cat; })[0];
+    var why = n === 0 ? 'A gentle place to begin — this is your first flag.' :
+      (pick.tier <= 1 ? 'A quick Beginner win to keep your streak going.' :
+       pick.tier === 2 ? 'A nice next step up from the basics.' : 'Ready for a bit more of a challenge?');
+    box.innerHTML = '<div class="recommend-card"><div class="rec-left"><div class="rec-label">👉 ' + (n === 0 ? 'Start here' : 'Recommended next') + '</div>' +
+      '<div class="rec-title">' + esc(pick.title) + '</div>' +
+      '<div class="rec-why">' + cat.icon + ' ' + esc(cat.name) + ' · ' + TIERS[pick.tier].name + ' · ' + pick.pts + ' pts — ' + why + '</div></div>' +
+      '<button class="btn primary" data-rec="' + pick.id + '">Open this one</button></div>';
+    var btn = box.querySelector('[data-rec]');
+    if (btn) btn.addEventListener('click', function () { openChal(pick.id); });
   }
   document.addEventListener('click', function (e) {
     var g = e.target.closest('[data-guide]');
@@ -255,8 +296,10 @@
     box.appendChild(v);
   }
 
+  function testLive() { return window.TestArea && TestArea.isLive && TestArea.isLive(); }
   function renderHints(c) {
     var box = $('#chalHints'); box.innerHTML = '';
+    if (testLive()) { box.innerHTML = '<div class="hint-box" style="border-color:var(--red)"><div class="hint-warn" style="color:var(--red)">🔒 Assistance is off during a test</div>Hints and walkthroughs are hidden while a test is running — just like the real event. They come back when the test ends.</div>'; return; }
     if (!c.hints || !c.hints.length) return;
     var used = S.hints[c.id] || 0;
     for (var i = 0; i < used && i < c.hints.length; i++) {
@@ -286,6 +329,7 @@
     var box = document.getElementById('chalAnswer');
     if (!box) { box = document.createElement('div'); box.id = 'chalAnswer'; box.className = 'hints'; $('#flagMsg').after(box); }
     box.innerHTML = '';
+    if (testLive() && !S.revealed[c.id]) return;
     var tries = (S.tries && S.tries[c.id]) || 0;
     if (S.revealed[c.id]) {
       var mine = lastTry[c.id];

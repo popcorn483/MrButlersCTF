@@ -21,12 +21,18 @@
   </div>
   <nav class="tabs" aria-label="Main">
     <button class="tab active" data-view="board">Challenges</button>
-    <button class="tab" data-view="start">Getting started</button>
-    <button class="tab" data-view="lessons">Lessons</button>
-    <button class="tab" data-view="walkthrough">Walkthrough</button>
+    <div class="tab-group">
+      <button class="tab" id="learnToggle" aria-haspopup="true" aria-expanded="false">Learn ▾</button>
+      <div class="tab-menu" id="learnMenu" hidden>
+        <button class="tab-menu-item" data-view="start">Getting started</button>
+        <button class="tab-menu-item" data-view="lessons">Lessons</button>
+        <button class="tab-menu-item" data-view="walkthrough">Walkthrough</button>
+        <button class="tab-menu-item" data-view="resources">Useful sites</button>
+        <button class="tab-menu-item" data-view="reference">Reference</button>
+      </div>
+    </div>
     <button class="tab" data-view="toolkit">Toolkit</button>
-    <button class="tab" data-view="resources">Useful sites</button>
-    <button class="tab" data-view="reference">Reference</button>
+    <button class="tab tab-test" data-view="test">🔒 Test area</button>
     <button class="tab" data-view="progress">My progress</button>
     <button class="tab" data-view="teacher">Teacher</button>
   </nav>
@@ -52,6 +58,8 @@
         <div class="rank-next" id="rankNext"></div>
       </div>
     </div>
+
+    <div id="recommend"></div>
 
     <div class="filters" role="group" aria-label="Filters">
       <div class="chip-row" id="tierChips"></div>
@@ -88,6 +96,11 @@
   <!-- ============ REFERENCE ============ -->
   <section class="view" id="view-reference">
     <div class="prose wide" id="refContent"></div>
+  </section>
+
+  <!-- ============ TEST AREA ============ -->
+  <section class="view" id="view-test">
+    <div id="testArea"></div>
   </section>
 
   <!-- ============ TOOLKIT ============ -->
@@ -176,6 +189,24 @@
   </div>
 </div>
 
+<!-- ============ TEST CHALLENGE MODAL ============ -->
+<div class="modal" id="testModal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="tChalTitle">
+    <button class="modal-x" data-close aria-label="Close">✕</button>
+    <div class="chal-meta" id="tChalMeta"></div>
+    <h2 id="tChalTitle"></h2>
+    <div class="chal-desc" id="tChalDesc"></div>
+    <div id="tChalFiles"></div>
+    <div class="chal-actions" id="tChalActions"></div>
+    <form class="flag-form" id="tFlagForm" autocomplete="off">
+      <label class="sr" for="tFlagInput">Flag</label>
+      <input id="tFlagInput" placeholder="flag{...}" spellcheck="false">
+      <button class="btn primary" type="submit">Submit</button>
+    </form>
+    <div class="flag-msg" id="tFlagMsg" aria-live="polite"></div>
+  </div>
+</div>
+
 <!-- ============ SOURCE VIEWER ============ -->
 <div class="modal" id="srcModal" hidden>
   <div class="modal-card wide" role="dialog" aria-modal="true" aria-labelledby="srcTitle">
@@ -192,5 +223,6 @@
 <script src="assets/js/content.js"></script>
 <script src="assets/js/app.js"></script>
 <script src="assets/js/tools.js"></script>
+<script src="assets/js/test.js"></script>
 </body>
 </html>
