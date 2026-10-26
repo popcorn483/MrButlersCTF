@@ -288,12 +288,39 @@
   }
 
   function renderActions(c) {
+    var old = document.getElementById('chalTutorial'); if (old) old.remove();
     var box = $('#chalActions'); box.innerHTML = '';
     var v = document.createElement('button'); v.className = 'btn';
     v.textContent = '</> View HTML of this challenge';
     v.title = 'Inspect Element is blocked on school PCs, so use this to see the raw HTML of the challenge text.';
     v.addEventListener('click', function () { showSource('View HTML: ' + c.title, c.desc); });
     box.appendChild(v);
+    if (!testLive()) {
+      var t = document.createElement('button'); t.className = 'btn';
+      t.textContent = '📘 How to complete this';
+      t.title = 'A step-by-step tutorial of the method — without giving away the flag.';
+      t.addEventListener('click', function () { toggleTutorial(c, t); });
+      box.appendChild(t);
+    }
+  }
+  function tutorialSteps(c) {
+    var base = (c.walk && c.walk.length) ? c.walk.slice() : (c.hints || []).slice();
+    var steps = ['Look at the challenge and work out what kind of puzzle it is — the <a href="#" data-goto="reference">Reference cheat sheet</a> helps if you are unsure.'];
+    steps = steps.concat(base);
+    steps.push('Follow those steps, then submit your flag. No need to peek at the answer — you can do this!');
+    return steps;
+  }
+  function toggleTutorial(c, btn) {
+    var box = document.getElementById('chalTutorial');
+    if (box) { box.remove(); if (btn) btn.classList.remove('on'); return; }
+    if (!S.tut) S.tut = {}; S.tut[c.id] = (S.tut[c.id] || 0) + 1; save();
+    box = document.createElement('div'); box.id = 'chalTutorial'; box.className = 'hint-box tutorial-box';
+    box.innerHTML = '<div class="hint-warn" style="color:var(--cyan)">📘 How to complete this</div>' +
+      '<ol class="walk">' + tutorialSteps(c).map(function (s) { return '<li>' + s + '</li>'; }).join('') + '</ol>' +
+      '<p class="muted small">This teaches the method, not the answer — you still find the flag yourself. Want the full answer too? The walkthrough is below.</p>';
+    $('#chalActions').after(box);
+    if (btn) btn.classList.add('on');
+    box.scrollIntoView({ block: 'nearest' });
   }
 
   function testLive() { return window.TestArea && TestArea.isLive && TestArea.isLive(); }
