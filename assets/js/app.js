@@ -284,9 +284,10 @@
     var tries = (S.tries && S.tries[c.id]) || 0;
     if (S.revealed[c.id]) {
       var mine = lastTry[c.id];
-      var steps = (c.hints || []).map(function (h, i) { return '<li>' + h + '</li>'; }).join('');
+      var useWalk = c.walk && c.walk.length;
+      var steps = (useWalk ? c.walk : (c.hints || [])).map(function (h) { return '<li>' + h + '</li>'; }).join('');
       box.innerHTML = '<div class="hint-box answer-box"><div class="hint-warn">📖 Full walkthrough</div>' +
-        (steps ? '<p><b>Step by step:</b></p><ol class="walk">' + steps + '</ol>' : '') +
+        (steps ? '<p><b>' + (useWalk ? 'Thinking it through:' : 'Step by step:') + '</b></p><ol class="walk">' + steps + '</ol>' : '') +
         (c.sol ? '<p><b>Why it works:</b> ' + c.sol + '</p>' : '') +
         '<p class="flag-reveal">The flag is <code>' + esc(c.f) + '</code></p>' +
         (mine ? '<p>Your last answer was <code>' + esc(mine) + '</code> ' + (mine.toLowerCase() === c.f.toLowerCase() ? '<span class="ok-tick">✓ that matches</span>' : '✗ which does not match') + '</p>' : '') +
