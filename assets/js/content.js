@@ -12,6 +12,7 @@ window.CTF_START_HTML = function (cats) {
     programming: ['Some answers are too tedious to do by hand: write a short program.', 'Write it in C# in Visual Studio (the language you use in class), or use the JS scratchpad here for a quick check.', 'Test your code on a small example you can work out by hand first.']
   };
   return '' +
+  '<div class="callout" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>New here? Take the quick welcome tour again any time.</span><button class="btn small" data-action="welcome">▶ Replay welcome tour</button></div>' +
   '<h1>Getting started</h1>' +
   '<p>A <b>Capture The Flag</b> (CTF) is a cyber security competition. Each challenge hides a secret piece of text called a <b>flag</b>. Find it, type it in, score points.</p>' +
   '<div class="callout good"><b>Flag format on this site:</b> <code>flag{something_like_this}</code>. Flags are not case-sensitive here. The real competition will tell you its own flag format on the day.</div>' +
