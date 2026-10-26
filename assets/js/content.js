@@ -94,6 +94,52 @@ window.CTF_WALK_HTML = function () {
     <p class="muted">The pattern to notice: <b>after every step, look at the output and ask "what is this now?"</b> Each layer tells you the next move. You are never guessing blindly.</p>
   </div>
 
+  <h2>More worked examples, category by category</h2>
+  <p>The same five-step loop works everywhere. Here is the thinking for four more kinds of task.</p>
+
+  <div class="worked">
+    <p><b>🌐 Web &mdash; "The login page says the password is checked by the browser."</b></p>
+    <ol class="walk-steps">
+      <li><b>Recognise.</b> It is a web challenge, and it mentions the browser doing the checking. That is the giveaway: if your computer checks the password, the answer must be on your computer.</li>
+      <li><b>Open the code.</b> Click <b>View HTML</b> (Inspect Element is blocked, so this is your window into the page), or open the challenge's <code>.js</code> or <code>.html</code> file.</li>
+      <li><b>Read the check.</b> Find the <code>if</code> that compares the password. The value it compares against, or the flag it shows on success, is sitting right there.</li>
+      <li><b>Also worth a look:</b> HTML comments (<code>&lt;!-- --&gt;</code>), hidden form fields (<code>type="hidden"</code>), cookies and response headers. Flags love to hide in all of these.</li>
+      <li><b>Submit</b> the flag you found. <i>Lesson: anything the browser can see, you can see.</i></li>
+    </ol>
+  </div>
+
+  <div class="worked">
+    <p><b>🔎 Forensics &mdash; "Here is a file called notes.txt, but it will not open as text."</b></p>
+    <ol class="walk-steps">
+      <li><b>Recognise.</b> A file that will not open as its name suggests is a classic forensics trick. File names lie; the bytes do not.</li>
+      <li><b>Open the Hex viewer.</b> Load the file into Toolkit &rarr; Hex viewer and look at the very first bytes (the <b>magic number</b>).</li>
+      <li><b>Name the real type.</b> <code>89 50 4E 47</code> means PNG, <code>FF D8 FF</code> means JPEG, <code>50 4B</code> means a ZIP. So "notes.txt" is really a picture.</li>
+      <li><b>Act on it.</b> Download it, rename it to <code>.png</code>, and open it: the flag is written inside the image. For plain files, skim the <b>Strings</b> list for <code>flag{</code> instead.</li>
+      <li><b>Submit.</b> <i>Lesson: always check what a file really is, not what it is called.</i></li>
+    </ol>
+  </div>
+
+  <div class="worked">
+    <p><b>🖼️ Steganography &mdash; "This photo looks completely normal."</b></p>
+    <ol class="walk-steps">
+      <li><b>Recognise.</b> A picture handed to you "that looks normal" almost always has something hidden in or on it.</li>
+      <li><b>Check the easy places first.</b> Open it in the Hex viewer and read the Strings list &mdash; the flag may be in the image's <b>metadata</b> (a Comment field, for example).</li>
+      <li><b>Then look at the pixels.</b> Open it in the Image inspector and try each view: single colour channels, "lowest bit", and "exaggerate tiny differences". Hidden text jumps out that your eyes could never see at normal brightness.</li>
+      <li><b>Read and submit</b> the revealed flag. <i>Lesson: work from the outside in &mdash; metadata, then strings, then the pixels themselves.</i></li>
+    </ol>
+  </div>
+
+  <div class="worked">
+    <p><b>🕵️ OSINT &mdash; "Here is a public profile. What is the answer to their security question?"</b></p>
+    <ol class="walk-steps">
+      <li><b>Recognise.</b> OSINT means finding answers from information that is already public &mdash; no decoding, just careful reading.</li>
+      <li><b>Find the question.</b> Note exactly what is being asked (a pet's name, a birthday, a first school).</li>
+      <li><b>Hunt the clue.</b> Read the profile's bio and posts for anything that matches. People give away far more than they realise.</li>
+      <li><b>Join the dots.</b> "Rodney is the best dog ever" answers "What is your pet's name?". That is how accounts get taken over in real life.</li>
+      <li><b>Submit</b> the answer as the flag. <i>Lesson: think about what a photo or a post quietly reveals.</i></li>
+    </ol>
+  </div>
+
   <h2>How to read each kind of task</h2>
   <div class="guide-grid">
     <div class="guide-card"><h3>🔐 Cryptography</h3><ul><li>Name the encoding before decoding (use the table above).</li><li>Layered? Decode one step, re-read, repeat.</li><li>Shifted letters = Caesar; brute force all 25.</li></ul></div>
@@ -115,4 +161,56 @@ window.CTF_WALK_HTML = function () {
   </ul>
   <div class="callout good">Ready to practise? Open the <a href="#" data-goto="board">Challenge board</a> and start with the Warm-Up category, keeping this loop in mind: <b>Read, Recognise, Try the obvious, Use a tool, Check the format.</b></div>
   `;
+};
+
+
+/* Useful websites page: real tools pupils can use when they have internet */
+window.CTF_RES_HTML = function () {
+  function card(url, name, desc) {
+    var host = url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    return '<div class="res-card"><a href="' + url + '" target="_blank" rel="noopener">' + name + '</a>' +
+      '<div class="res-host">' + host + '</div><p>' + desc + '</p></div>';
+  }
+  function group(title, cards) { return '<h2>' + title + '</h2><div class="res-grid">' + cards.join('') + '</div>'; }
+  return '' +
+  '<h1>Useful websites</h1>' +
+  '<p>This practice site works with no internet so it runs on school machines. At the <b>real</b> event you will usually have the internet, and these are the tools people actually use. Learn where they are now so you are fast on the day.</p>' +
+  '<div class="callout warn"><b>Play fair and stay safe.</b> Only ever use these on challenges you have been given permission to solve. Never point them at real websites, school systems or other people\'s accounts &mdash; that is illegal under the Computer Misuse Act 1990. Some events also limit which sites you may use, so check the rules first.</div>' +
+  group('All-in-one toolboxes', [
+    card('https://gchq.github.io/CyberChef/', 'CyberChef', 'The big one. Chain operations (Base64, hex, ROT13, XOR and hundreds more) in a "recipe", exactly like the Decoder on this site. Made by GCHQ.'),
+    card('https://www.dcode.fr/en', 'dCode', 'A huge collection of cipher and puzzle solvers with clear explanations. Great when you are not sure what a cipher is.'),
+    card('https://cryptii.com/', 'Cryptii', 'Clean, visual encoder/decoder you can chain. Good for seeing how a conversion works step by step.')
+  ]) +
+  group('Ciphers and hashes', [
+    card('https://quipqiup.com/', 'quipqiup', 'Automatically solves substitution ciphers and cryptograms. Paste the scrambled text and it guesses the mapping.'),
+    card('https://rumkin.com/tools/cipher/', 'Rumkin Cipher Tools', 'A tidy set of classic ciphers: Caesar, Vigenere, rail fence, Atbash and more.'),
+    card('https://crackstation.net/', 'CrackStation', 'Looks up common password hashes (MD5, SHA1, SHA256) in a giant table. Shows why weak passwords are unsafe.'),
+    card('https://hashes.com/en/decrypt/hash', 'Hashes.com', 'Another hash lookup service. Handy when CrackStation does not have a match.')
+  ]) +
+  group('Images and files (forensics & steganography)', [
+    card('https://www.aperisolve.com/', 'Aperi\'Solve', 'Upload an image and it runs lots of steganography checks at once: layers, strings, metadata and more.'),
+    card('https://georgeom.net/StegOnline/upload', 'StegOnline', 'Explore an image\'s colour channels and bit planes in the browser, like the Image inspector here but more powerful.'),
+    card('https://29a.ch/photo-forensics/', 'Forensically', 'In-browser photo forensics: error-level analysis, noise, clone detection and a metadata viewer.'),
+    card('https://exifdata.com/', 'EXIF Viewer', 'Reads the hidden metadata in a photo, including the camera and sometimes GPS location.')
+  ]) +
+  group('OSINT (finding public information)', [
+    card('https://images.google.com/', 'Google Images', 'Reverse image search: drag a photo in to find where else it appears and what it shows.'),
+    card('https://whatsmyname.app/', 'WhatsMyName', 'Checks a username across hundreds of sites at once &mdash; shows how reused handles link accounts.'),
+    card('https://www.google.com/maps', 'Google Maps', 'Turn coordinates or landmarks into a place, and use Street View to match a photo to a location.')
+  ]) +
+  group('Run code (for programming challenges)', [
+    card('https://dotnetfiddle.net/', 'dotnetfiddle', 'Write and run C# in your browser &mdash; the language you use in class &mdash; with nothing to install.'),
+    card('https://www.programiz.com/csharp-programming/online-compiler/', 'Programiz C# compiler', 'Another quick online C# runner for testing a short loop or calculation.')
+  ]) +
+  group('Keep practising', [
+    card('https://play.picoctf.org/practice', 'picoGym (picoCTF)', 'Hundreds of free beginner-to-intermediate challenges with the same categories as the event. The best next step.'),
+    card('https://overthewire.org/wargames/bandit/', 'OverTheWire: Bandit', 'A gentle, famous introduction to Linux and the command line, one small puzzle at a time.'),
+    card('https://cryptohack.org/', 'CryptoHack', 'Fun, game-like cryptography challenges that start gently and teach as you go.'),
+    card('https://tryhackme.com/', 'TryHackMe', 'Guided cyber-security lessons in the browser. Good for going deeper after the event.')
+  ]) +
+  group('The real events', [
+    card('https://zerodays.ie/', 'ZeroDays CTF', 'The organisers behind the event style this site is based on.'),
+    card('https://cyberschools.ie/', 'Cyber-Schools CTF', 'The secondary-school CTF run by ZeroDays.')
+  ]) +
+  '<div class="callout good">On this practice site, the <a href="#" data-goto="toolkit">Toolkit</a> already covers most of what CyberChef and the hash tools do, so you can get a long way with no internet at all.</div>';
 };

@@ -321,3 +321,11 @@ table.recognise th { background: var(--panel2); color: var(--muted); font-weight
 table.recognise tr:nth-child(even) td { background: rgba(255,255,255,.015); }
 .worked { background: var(--panel); border: 1px solid var(--line2); border-left: 4px solid var(--violet); border-radius: 10px; padding: 14px 18px; margin: 12px 0; }
 .worked pre.data { max-height: none; }
+
+/* resources page */
+.res-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin: 10px 0 4px; }
+.res-card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.res-card a { font-weight: 700; font-size: 1rem; text-decoration: none; }
+.res-card a:hover { text-decoration: underline; }
+.res-host { font-family: var(--mono); font-size: .72rem; color: var(--muted); margin: 2px 0 6px; }
+.res-card p { margin: 0; font-size: .86rem; color: var(--text); }
