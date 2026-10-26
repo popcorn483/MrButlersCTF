@@ -310,3 +310,14 @@ textarea.io { min-height: 120px; resize: vertical; }
 .answer-box .ok-tick { color: var(--green); font-weight: 600; }
 .walk-nudge { border-color: rgba(76,201,255,.4); background: rgba(76,201,255,.07); }
 .walk-nudge .hint-warn { color: var(--cyan); }
+
+/* walkthrough page */
+.walk-steps { padding-left: 20px; }
+.walk-steps li { margin: 8px 0; }
+.table-wrap { overflow-x: auto; }
+table.recognise { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: .9rem; }
+table.recognise th, table.recognise td { border: 1px solid var(--line2); padding: 7px 10px; text-align: left; vertical-align: top; }
+table.recognise th { background: var(--panel2); color: var(--muted); font-weight: 600; }
+table.recognise tr:nth-child(even) td { background: rgba(255,255,255,.015); }
+.worked { background: var(--panel); border: 1px solid var(--line2); border-left: 4px solid var(--violet); border-radius: 10px; padding: 14px 18px; margin: 12px 0; }
+.worked pre.data { max-height: none; }

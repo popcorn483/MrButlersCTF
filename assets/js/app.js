@@ -478,6 +478,7 @@
 
   // ---------- getting started page ----------
   $('#startContent').innerHTML = window.CTF_START_HTML(CATS);
+  if (window.CTF_WALK_HTML) $('#walkContent').innerHTML = window.CTF_WALK_HTML();
 
   // ---------- boot ----------
   renderChips(); renderBoard(); refreshHeader(); renderTeacher();
