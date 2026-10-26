@@ -329,3 +329,21 @@ table.recognise tr:nth-child(even) td { background: rgba(255,255,255,.015); }
 .res-card a:hover { text-decoration: underline; }
 .res-host { font-family: var(--mono); font-size: .72rem; color: var(--muted); margin: 2px 0 6px; }
 .res-card p { margin: 0; font-size: .86rem; color: var(--text); }
+
+/* lessons page */
+.lesson { background: var(--panel); border: 1px solid var(--line2); border-radius: 10px; margin: 8px 0; overflow: hidden; }
+.lesson > summary { cursor: pointer; padding: 12px 16px; font-weight: 600; list-style: none; display: flex; align-items: center; gap: 10px; }
+.lesson > summary::-webkit-details-marker { display: none; }
+.lesson > summary::before { content: "▸"; color: var(--cyan); transition: transform .15s; }
+.lesson[open] > summary::before { transform: rotate(90deg); }
+.lesson[open] > summary { border-bottom: 1px solid var(--line); background: var(--panel2); }
+.lesson-num { font-family: var(--mono); font-size: .72rem; color: var(--bg); background: var(--cyan); padding: 2px 8px; border-radius: 999px; }
+.lesson-body { padding: 14px 18px; }
+.lesson-body ul, .lesson-body ol { padding-left: 20px; }
+.lesson-tip { background: rgba(177,140,255,.08); border-left: 3px solid var(--violet); padding: 8px 12px; border-radius: 0 6px 6px 0; font-size: .9rem; margin: 10px 0 0; }
+.try-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0 4px; }
+.try-label { font-size: .8rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.plan { display: grid; gap: 10px; margin: 10px 0; }
+.plan-week { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--green); border-radius: 8px; padding: 10px 14px; }
+.plan-week b { display: block; font-family: var(--mono); color: var(--green); }
+.plan-week span { font-size: .9rem; color: var(--text); }

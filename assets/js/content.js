@@ -214,3 +214,137 @@ window.CTF_RES_HTML = function () {
   ]) +
   '<div class="callout good">On this practice site, the <a href="#" data-goto="toolkit">Toolkit</a> already covers most of what CyberChef and the hash tools do, so you can get a long way with no internet at all.</div>';
 };
+
+
+/* Lessons & practice: structured mini-lessons that teach each skill and how to practise */
+window.CTF_LESSONS_HTML = function () {
+  function tries(list) {
+    return '<div class="try-row"><span class="try-label">Try it:</span>' +
+      list.map(function (x) { return '<button class="btn small" data-chal="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>';
+  }
+  function lesson(num, title, body) {
+    return '<details class="lesson"><summary><span class="lesson-num">Lesson ' + num + '</span> ' + title + '</summary><div class="lesson-body">' + body + '</div></details>';
+  }
+  var L = '';
+
+  L += '<h1>Lessons &amp; practice</h1>' +
+    '<p>This is the teaching part of the site. The short lessons below each explain one skill from scratch, show a worked example, and send you to challenges to try it. Above them is a guide on <b>how</b> to practise so the time you put in actually sticks.</p>';
+
+  // ---- How to practise ----
+  L += '<h2>How to practise</h2>' +
+    '<div class="callout good"><b>The golden rule: little and often beats one long cram.</b> Three or four 20-minute sessions across a week will teach you far more than one two-hour blast the night before.</div>' +
+    '<h3>1. Follow a path, one skill at a time</h3>' +
+    '<p>Do not jump around randomly. Work through the lessons below in order. Each one builds on the last: number systems make encodings easy, encodings make ciphers easy, and so on. Finish a lesson\'s "Try it" challenges before moving to the next.</p>' +
+    '<h3>2. Keep a notes file</h3>' +
+    '<p>Open a document and, as you solve challenges, write down:</p><ul>' +
+    '<li>What the puzzle <i>looked like</i> (only 0s and 1s, ended in =, dots and dashes...).</li>' +
+    '<li>What it turned out to be, and which tool solved it.</li>' +
+    '<li>Anything that caught you out.</li></ul>' +
+    '<p>This becomes your personal cheat sheet. Re-reading it before the event is the single best revision you can do.</p>' +
+    '<h3>3. Use this site the right way</h3><ul>' +
+    '<li>Start every session in <a href="#" data-goto="board">Warm-Up</a>. It keeps the early wins coming and warms up your pattern-spotting.</li>' +
+    '<li>Stuck? Reveal hints <b>one at a time</b>, and give each one a real go before taking the next.</li>' +
+    '<li>Really stuck? Use the full walkthrough, read it properly, then <b>close it and solve a similar one yourself</b>. Reading a solution is not the same as being able to do it.</li>' +
+    '<li>Download your progress file at the end of each session (<a href="#" data-goto="progress">My progress</a>) so nothing is lost when the school PC logs you off.</li></ul>' +
+    '<h3>4. A three-week run-up to the event</h3>' +
+    '<div class="plan"><div class="plan-week"><b>Week 1 &mdash; Foundations</b><span>Lessons 1&ndash;4. Get comfortable with number systems, Base64 and the Caesar cipher. Aim to clear all of Warm-Up.</span></div>' +
+    '<div class="plan-week"><b>Week 2 &mdash; Breadth</b><span>Lessons 5&ndash;10. Try every category at least once: Web, Forensics, Steganography, OSINT. Find which you enjoy.</span></div>' +
+    '<div class="plan-week"><b>Week 3 &mdash; Speed &amp; teamwork</b><span>Lessons 11&ndash;13 plus timed practice: give yourself 30 minutes and see how many flags you can grab. Agree who covers which category in your team.</span></div></div>' +
+    '<h3>5. When you are stuck (work down this list)</h3>' +
+    '<ol class="walk-steps"><li>Re-read the challenge. What is the title hinting? What is in bold?</li>' +
+    '<li>Ask "what does this data look like?" and check the <a href="#" data-goto="walkthrough">recognition table</a>.</li>' +
+    '<li>Click View HTML in case something is hidden.</li>' +
+    '<li>Try the most likely tool; look at the output; decide the next step.</li>' +
+    '<li>Take one hint. Still stuck after a genuine go? Move on and come back later &mdash; fresh eyes solve a surprising amount.</li></ol>' +
+    '<div class="callout warn"><b>On the day:</b> there are no hints or walkthroughs at the real event. Split the categories across your team, do the easy flags first, keep notes, and watch the clock. Only ever test the challenges you are given &mdash; nothing else.</div>';
+
+  // ---- The lessons ----
+  L += '<h2>The lessons</h2><p class="muted small">Click a lesson to open it.</p>';
+
+  L += lesson(1, 'The CTF mindset',
+    '<p><b>The idea.</b> A CTF challenge always hides a <b>flag</b> like <code>flag{...}</code>. Your whole job is to find it. If what you are looking at is not a flag yet, there is a step left to do. The core skill is not memorising tricks &mdash; it is <b>recognising</b> what kind of puzzle you have, then picking the matching tool.</p>' +
+    '<p><b>The loop to use every time:</b> Read &rarr; Recognise &rarr; Try the obvious &rarr; Use a tool &rarr; Check the format.</p>' +
+    tries([['warm-01', 'Your first flag'], ['warm-02', 'Hidden in plain sight']]) +
+    '<p class="lesson-tip">Tip: flags here are not case-sensitive, but they must keep the <code>flag{ }</code> wrapper.</p>');
+
+  L += lesson(2, 'Number systems: binary, hex and ASCII',
+    '<p><b>The idea.</b> Computers store letters as numbers. <b>ASCII</b> is the code: capital A is 65, lower-case a is 97. Those numbers can be written in different <b>bases</b>:</p>' +
+    '<ul><li><b>Binary</b> (base 2): only 0 and 1. Each letter is 8 bits, e.g. <code>01100110</code> = 102 = f.</li>' +
+    '<li><b>Hex</b> (base 16): digits 0-9 then a-f. Two digits per letter, e.g. <code>66</code> = 102 = f.</li>' +
+    '<li><b>Decimal</b>: the ASCII numbers written normally, e.g. <code>102 108 97 103</code>.</li></ul>' +
+    '<p><b>Worked example.</b> <code>01100110 01101100</code> &rarr; split into bytes &rarr; 102 and 108 &rarr; f and l. The Decoder\'s From Binary does this instantly.</p>' +
+    tries([['warm-04', 'Ones and zeros'], ['warm-05', 'Hex marks the spot'], ['warm-07', 'By the numbers']]) +
+    '<p class="lesson-tip">Tip: only 0s and 1s = binary. Only 0-9 and a-f = hex. Plain numbers in small groups = ASCII codes.</p>');
+
+  L += lesson(3, 'Base64 and encodings',
+    '<p><b>The idea.</b> <b>Base64</b> turns any data into letters, numbers, <code>+</code> and <code>/</code>, often ending in <code>=</code>. It is an <b>encoding</b>, not encryption: there is no key and anyone can reverse it. It is everywhere &mdash; in cookies, tokens, config files and links.</p>' +
+    '<p><b>Worked example.</b> <code>ZmxhZ3toaQ==</code> ends in <code>==</code>, a Base64 giveaway. From Base64 gives <code>flag{hi}</code>.</p>' +
+    tries([['warm-03', 'Base64 basics'], ['warm-13', 'Web address code'], ['warm-12', 'Wrapped twice']]) +
+    '<p class="lesson-tip">Tip: if text ends in <code>=</code> or <code>==</code>, try From Base64 first.</p>');
+
+  L += lesson(4, 'The Caesar cipher and friends',
+    '<p><b>The idea.</b> A <b>Caesar cipher</b> shifts every letter the same number of places. Shift "flag" forward 13 and you get "synt". To break it when you do not know the shift, try all 25 &mdash; that is <b>brute force</b>.</p>' +
+    '<ul><li><b>ROT13</b> is just a Caesar shift of 13 (doing it twice returns the original).</li>' +
+    '<li><b>Atbash</b> flips the alphabet: A becomes Z, B becomes Y.</li>' +
+    '<li><b>Morse</b> uses dots and dashes; <b>A1Z26</b> uses numbers 1-26 for letters.</li></ul>' +
+    '<p><b>Worked example.</b> <code>iodj{...}</code> looks like a shifted <code>flag{...}</code>. Caesar brute force lists all 25 shifts; the readable one is the answer.</p>' +
+    tries([['cry-01', 'Half way round'], ['cry-02', "Caesar's salad"], ['cry-04', 'Mirror, mirror'], ['cry-05', 'Dot dot dash'], ['cry-06', 'A is for 1']]) +
+    '<p class="lesson-tip">Tip: words that look almost right but scrambled usually mean a Caesar/ROT shift. Spot <code>synt</code> = <code>flag</code>.</p>');
+
+  L += lesson(5, 'Keyword ciphers and rail fence',
+    '<p><b>The idea.</b> The <b>Vigenere</b> cipher is a Caesar where the shift changes every letter, following a repeating <b>keyword</b>. You need the key to decode. The <b>rail fence</b> cipher writes the message in a zig-zag across several lines, then reads the lines in order.</p>' +
+    '<p><b>Worked example.</b> With the keyword SCHOOL, each letter of SCHOOL says how far to shift, repeating across the message. The Decoder\'s Vigenere decode does it once you type the key.</p>' +
+    tries([['cry-07', 'The school key'], ['cry-08', 'Zig zag']]) +
+    '<p class="lesson-tip">Tip: if a cipher names a keyword, it is almost always Vigenere. No key given? Sometimes the known start <code>flag</code> lets you work it out.</p>');
+
+  L += lesson(6, 'Layered challenges',
+    '<p><b>The idea.</b> Harder crypto stacks several steps. The method never changes: undo <b>one</b> layer, look at the new output, name it, undo the next. Work in the <b>reverse</b> of the order they were applied.</p>' +
+    '<p><b>Worked example.</b> Base64 that decodes to hex that decodes to shifted text: From Base64 &rarr; From Hex &rarr; Caesar brute force. After each step you ask again: "what is this now?"</p>' +
+    tries([['cry-03', 'Layer cake'], ['cry-11', 'Undo in reverse']]) +
+    '<p class="lesson-tip">Tip: never try to see the whole solution at once. One layer at a time.</p>');
+
+  L += lesson(7, 'Web: reading the page',
+    '<p><b>The idea.</b> Anything your browser can see, you can see. Flags hide in the page source, HTML comments, JavaScript, hidden form fields, cookies and response headers. Inspect Element is blocked on school PCs, so use the <b>View HTML</b> button instead.</p>' +
+    '<p><b>Worked example.</b> A login page checks the password in JavaScript. If the check runs in the browser, the correct password is written in the code &mdash; just read it.</p>' +
+    tries([['web-01', 'Robots only'], ['web-02', 'Password in the page'], ['web-03', 'Have a cookie']]) +
+    '<p class="lesson-tip">Tip: always click View HTML first, then check comments, scripts and cookies.</p>');
+
+  L += lesson(8, 'Forensics: files and logs',
+    '<p><b>The idea.</b> A file\'s name can lie; its first few bytes (the <b>magic number</b>) tell you what it really is. Pull readable text out with the <b>Strings</b> list, and read <b>logs</b> for patterns like one address failing over and over.</p>' +
+    '<p><b>Worked example.</b> A file called notes.txt starts with bytes <code>89 50 4E 47</code> &mdash; that is PNG, so it is really an image. Rename it to .png and the flag is inside.</p>' +
+    tries([['for-01', 'Who is knocking?'], ['for-02', 'Wrong name tag'], ['for-03', 'Needle in a haystack']]) +
+    '<p class="lesson-tip">Tip: open mystery files in the Hex viewer and read both the magic number and the Strings list.</p>');
+
+  L += lesson(9, 'Steganography: hidden in images',
+    '<p><b>The idea.</b> Steganography hides data inside a picture. Check the easy places first (<b>metadata</b> and strings), then the pixels: single colour channels, the <b>lowest bit</b> of each colour, or exaggerating tiny differences the eye cannot see.</p>' +
+    '<p><b>Worked example.</b> A "plain" dark image has text drawn one shade off the background. The Image inspector\'s "exaggerate" view makes it pop.</p>' +
+    tries([['steg-01', 'Night sky'], ['steg-02', 'Picture properties'], ['steg-03', 'Lowest bit']]) +
+    '<p class="lesson-tip">Tip: work from the outside in &mdash; metadata, then strings, then the pixels.</p>');
+
+  L += lesson(10, 'OSINT: public information',
+    '<p><b>The idea.</b> OSINT (Open Source Intelligence) means finding answers from information that is already public: a photo, a bio, a username, map coordinates. No decoding &mdash; just careful reading and joining the dots.</p>' +
+    '<p><b>Worked example.</b> A profile\'s reset question is "first pet\'s name", and a post says "my dog Rodney". The answer was handed over without anyone realising. That is how real accounts get taken over.</p>' +
+    tries([['osint-01', 'What three words'], ['osint-02', 'Oversharing']]) +
+    '<p class="lesson-tip">Tip: think about what a photo or a post quietly reveals &mdash; locations, dates, names.</p>');
+
+  L += lesson(11, 'Reverse engineering &amp; C#',
+    '<p><b>The idea.</b> Reverse engineering means reading code and working backwards to the input it wants. Write down what each line does, then undo the steps in <b>reverse order</b>. You do not always need to run the code &mdash; often you can trace it by hand.</p>' +
+    '<p><b>Worked example.</b> A function does <code>x = x + 3; x = x * 2;</code> and returns 30. Undo in reverse: 30 / 2 = 15, then 15 - 3 = 12. The input was 12.</p>' +
+    tries([['rev-01', 'Work backwards'], ['rev-02', 'Trace the code']]) +
+    '<p class="lesson-tip">Tip: these use C#, the language you already learn. Read the loop, then do the opposite in the opposite order.</p>');
+
+  L += lesson(12, 'Networking basics',
+    '<p><b>The idea.</b> Computers talk through numbered <b>ports</b>, and each service has its own: 22 SSH, 53 DNS, 80 HTTP, 443 HTTPS, 21 FTP, 23 Telnet. Old protocols like HTTP and Telnet send data in plain text, so anyone watching can read passwords.</p>' +
+    '<p><b>Worked example.</b> A captured packet shows a login sent over plain HTTP: the password is right there in the form data. HTTPS would have encrypted it.</p>' +
+    tries([['net-01', 'Know your ports'], ['net-02', 'Listening in']]) +
+    '<p class="lesson-tip">Tip: learn the common port numbers &mdash; they come up again and again.</p>');
+
+  L += lesson(13, 'Online safety',
+    '<p><b>The idea.</b> Many challenges (and real life) test whether you can spot a trick: a faked sender address, a look-alike link, a weak password, an app asking for too much. The real website name is the part just before the first single slash, and a long passphrase beats a short password with symbols.</p>' +
+    '<p><b>Worked example.</b> <code>apple-verify-login.secure-check.ru</code> is not Apple &mdash; the real domain is <code>secure-check.ru</code>. Always check what comes just before the first slash.</p>' +
+    tries([['safe-01', 'Spot the phish'], ['safe-02', 'Strong or weak']]) +
+    '<p class="lesson-tip">Tip: slow down on anything urgent or too-good-to-be-true. That urgency is the trick.</p>');
+
+  L += '<div class="callout good">Finished the lessons? Put them together on the <a href="#" data-goto="board">Challenge board</a>, and when you have internet, the <a href="#" data-goto="resources">Useful sites</a> page lists the real tools for going further.</div>';
+  return L;
+};

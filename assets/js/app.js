@@ -78,7 +78,9 @@
   $$('.tab').forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.view); }); });
   document.addEventListener('click', function (e) {
     var g = e.target.closest('[data-goto]');
-    if (g) { e.preventDefault(); show(g.dataset.goto); if (g.dataset.anchor) { var el = document.getElementById(g.dataset.anchor); if (el) el.scrollIntoView(); } }
+    if (g) { e.preventDefault(); show(g.dataset.goto); if (g.dataset.anchor) { var el = document.getElementById(g.dataset.anchor); if (el) el.scrollIntoView(); } return; }
+    var c = e.target.closest('[data-chal]');
+    if (c) { e.preventDefault(); if (BY_ID[c.dataset.chal]) openChal(c.dataset.chal); }
   });
 
   // ---------- filters ----------
@@ -481,6 +483,7 @@
   $('#startContent').innerHTML = window.CTF_START_HTML(CATS);
   if (window.CTF_WALK_HTML) $('#walkContent').innerHTML = window.CTF_WALK_HTML();
   if (window.CTF_RES_HTML) $('#resContent').innerHTML = window.CTF_RES_HTML();
+  if (window.CTF_LESSONS_HTML) $('#lessonsContent').innerHTML = window.CTF_LESSONS_HTML();
 
   // ---------- boot ----------
   renderChips(); renderBoard(); refreshHeader(); renderTeacher();
