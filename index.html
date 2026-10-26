@@ -26,6 +26,7 @@
     <button class="tab" data-view="walkthrough">Walkthrough</button>
     <button class="tab" data-view="toolkit">Toolkit</button>
     <button class="tab" data-view="resources">Useful sites</button>
+    <button class="tab" data-view="reference">Reference</button>
     <button class="tab" data-view="progress">My progress</button>
     <button class="tab" data-view="teacher">Teacher</button>
   </nav>
@@ -57,6 +58,7 @@
       <div class="chip-row">
         <label class="search"><span class="sr">Search</span><input id="searchBox" type="search" placeholder="Search challenges…"></label>
         <label class="toggle"><input type="checkbox" id="hideSolved"> Hide solved</label>
+        <button class="chip" id="randomBtn" title="Open a random challenge you haven't solved">🎲 Surprise me</button>
       </div>
     </div>
 
@@ -81,6 +83,11 @@
   <!-- ============ RESOURCES ============ -->
   <section class="view" id="view-resources">
     <div class="prose wide" id="resContent"></div>
+  </section>
+
+  <!-- ============ REFERENCE ============ -->
+  <section class="view" id="view-reference">
+    <div class="prose wide" id="refContent"></div>
   </section>
 
   <!-- ============ TOOLKIT ============ -->
@@ -135,7 +142,8 @@
         <label class="btn primary" for="teacherFiles">Load pupil progress files</label>
         <input type="file" id="teacherFiles" accept=".json,application/json" multiple hidden>
         <button class="btn" id="teacherClear">Clear</button>
-        <button class="btn" id="teacherCsv">⬇ Export CSV</button>
+        <button class="btn" id="teacherCsv">⬇ Leaderboard CSV</button>
+        <button class="btn" id="challengeListCsv">⬇ Challenge list (no answers)</button>
       </div>
       <p class="muted small">Each solve carries a proof code that only a real flag submission produces, so hand-edited files show up as <span class="badge bad">unverified</span>. Challenges solved after the pupil clicked <b>Show answer</b> count as flags but score 0 points.</p>
       <div id="teacherMsg" class="notice" hidden></div>

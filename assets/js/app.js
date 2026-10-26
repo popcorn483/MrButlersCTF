@@ -520,6 +520,30 @@
   if (window.CTF_RES_HTML) $('#resContent').innerHTML = window.CTF_RES_HTML();
   if (window.CTF_LESSONS_HTML) $('#lessonsContent').innerHTML = window.CTF_LESSONS_HTML();
   if (window.CTF_TOOLS_HELP_HTML) { var tg = document.getElementById('toolGuideBody'); if (tg) tg.innerHTML = window.CTF_TOOLS_HELP_HTML(); }
+  if (window.CTF_REFERENCE_HTML) $('#refContent').innerHTML = window.CTF_REFERENCE_HTML();
+
+  // Surprise me: open a random unsolved challenge (any if all solved)
+  var rb = document.getElementById('randomBtn');
+  if (rb) rb.addEventListener('click', function () {
+    var pool = CH.filter(function (c) { return !S.solved[c.id]; });
+    if (!pool.length) pool = CH;
+    openChal(pool[Math.floor(Math.random() * pool.length)].id);
+  });
+  // Teacher: challenge list CSV (no answers)
+  var clc = document.getElementById('challengeListCsv');
+  if (clc) clc.addEventListener('click', function () {
+    var lines = [['ID', 'Title', 'Category', 'Difficulty', 'Points'].join(',')];
+    CH.forEach(function (c) {
+      var cat = CATS.filter(function (x) { return x.id === c.cat; })[0];
+      lines.push([c.id, '"' + c.title.replace(/"/g, '""') + '"', cat.name, TIERS[c.tier].name, c.pts].join(','));
+    });
+    download('MrButlersCTF-challenge-list.csv', lines.join('\n'), 'text/csv');
+    toast('Challenge list downloaded');
+  });
+  // print action (Reference page)
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('[data-action="print"]')) { e.preventDefault(); window.print(); }
+  });
 
   // ---------- boot ----------
   renderChips(); renderBoard(); refreshHeader(); renderTeacher();

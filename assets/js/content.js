@@ -382,3 +382,77 @@ window.CTF_TOOLS_HELP_HTML = function () {
       '<p class="tg-when"><b>When to use it:</b> ' + t[3] + '</p></div>';
   }).join('');
 };
+
+
+/* Reference: glossary, cheat sheets and FAQ — printable as a revision handout */
+window.CTF_REFERENCE_HTML = function () {
+  var recog = [
+    ['Only 0 and 1 (groups of 8)', 'Binary', 'Decoder, From Binary'],
+    ['Only 0-9 and a-f', 'Hexadecimal', 'Decoder, From Hex'],
+    ['Letters, numbers, + /, ends in =', 'Base64', 'Decoder, From Base64'],
+    ['Shifted-looking words (synt = flag)', 'Caesar / ROT', 'Decoder, Caesar brute force'],
+    ['Dots and dashes', 'Morse code', 'Decoder, From Morse'],
+    ['Numbers 1-26 with dashes', 'A1Z26', 'Decoder, A1Z26 decode'],
+    ['Small groups of numbers (102 108)', 'ASCII codes', 'Decoder, From Decimal'],
+    ['32 / 40 / 64-character hex string', 'A hash (MD5/SHA)', 'Hashes tool, crack with wordlist'],
+    ['A web page or login box', 'Web', 'View HTML; comments, scripts, cookies'],
+    ['A file or odd extension', 'Forensics', 'Hex viewer; magic bytes and Strings'],
+    ['A normal-looking picture', 'Steganography', 'Image inspector; channels and lowest bit'],
+    ['A profile, photo or clue', 'OSINT', 'Read public details; join the dots']
+  ];
+  var ports = [['21', 'FTP', 'File transfer (insecure)'], ['22', 'SSH', 'Secure login'], ['23', 'Telnet', 'Old remote login (insecure)'],
+    ['25', 'SMTP', 'Sending email'], ['53', 'DNS', 'Name lookups'], ['80', 'HTTP', 'Web (not encrypted)'],
+    ['443', 'HTTPS', 'Secure web (encrypted)'], ['3389', 'RDP', 'Remote desktop']];
+  var ciphers = [
+    ['Base64', 'Ends in =, uses + /', 'An encoding, no key — anyone can reverse'],
+    ['Hex', 'Only 0-9 a-f, pairs of digits', 'Two digits per character'],
+    ['Binary', 'Only 0 and 1, 8 per character', 'Base 2'],
+    ['Caesar / ROT', 'All letters shifted the same amount', 'Try all 25 shifts (ROT13 = shift 13)'],
+    ['Atbash', 'A becomes Z, B becomes Y', 'The alphabet mirrored'],
+    ['Vigenere', 'Named a keyword', 'A Caesar whose shift changes per letter'],
+    ['Rail fence', 'Letters zig-zag across rows', 'Read the zig-zag back'],
+    ['Morse', 'Dots and dashes, / between words', 'Dots and dashes to letters'],
+    ['A1Z26', 'Numbers 1-26', 'Each number is a letter']
+  ];
+  var glossary = [
+    ['Flag', 'The secret you are hunting, written like flag{...}.'],
+    ['CTF', 'Capture The Flag — a cyber security puzzle competition.'],
+    ['Jeopardy CTF', 'The common style: challenges in categories, each worth points.'],
+    ['Encoding', 'A reversible way of writing data (Base64, hex). No key needed.'],
+    ['Encryption', 'Scrambling data with a key, so you need the key to read it.'],
+    ['Cipher', 'A method of encryption, like Caesar or Vigenere.'],
+    ['Hash', 'A one-way fingerprint of data. You cannot reverse it, only guess and check.'],
+    ['Brute force', 'Trying every possibility until one works (e.g. all 25 Caesar shifts).'],
+    ['Payload', 'The useful data part — for example the middle of a login token.'],
+    ['Metadata', 'Hidden data carried inside a file, like a photo\'s camera or comment.'],
+    ['Magic number', 'The first bytes of a file that reveal its true type.'],
+    ['Steganography', 'Hiding a message inside something else, like an image.'],
+    ['OSINT', 'Open Source Intelligence — facts found from public information.'],
+    ['Port', 'A numbered channel a network service uses (80 = web, 22 = SSH).'],
+    ['Plaintext', 'Readable, unencrypted data — what you are trying to recover.']
+  ];
+  var faq = [
+    ['Is the flag case-sensitive?', 'No — but you must keep the flag{ } wrapper.'],
+    ['How do I save my progress?', 'It saves automatically in this browser. At the end of a session, go to My progress and download your progress file, then load it next time (school PCs can wipe browser data).'],
+    ['Inspect Element is blocked. How do I see a page\'s code?', 'Use the View HTML button on web challenges, or the file viewer. They do the same job.'],
+    ['I got the right word but it says wrong.', 'Wrap it as flag{word}, and check capitals and underscores.'],
+    ['Can I use hints?', 'Yes! While practising, hints are there to help you learn. There are none at the real event, so try first.'],
+    ['What if the site is blocked at school?', 'Ask your teacher — it is a plain web page with no logins or downloads, designed to work on C2k.'],
+    ['Do revealed answers count?', 'They tick the challenge off but score 0 points, so the leaderboard stays fair.']
+  ];
+  function table(headers, rows, cls) {
+    return '<div class="table-wrap"><table class="' + (cls || 'recognise') + '"><thead><tr>' +
+      headers.map(function (h) { return '<th>' + h + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      rows.map(function (r) { return '<tr>' + r.map(function (c) { return '<td>' + c + '</td>'; }).join('') + '</tr>'; }).join('') +
+      '</tbody></table></div>';
+  }
+  return '<div class="ref-head"><h1>Reference &amp; cheat sheet</h1>' +
+    '<button class="btn" data-action="print">🖨 Print this page</button></div>' +
+    '<p>A quick-reference you can keep open while you solve, or print as a one-page revision sheet. Flags always look like <code>flag{...}</code>.</p>' +
+    '<h2>Spot it fast</h2><p>What the data looks like, what it probably is, and the tool to use.</p>' + table(['If you see...', 'It is probably...', 'Use'], recog) +
+    '<h2>Encodings &amp; ciphers at a glance</h2>' + table(['Name', 'How to spot it', 'What it is'], ciphers) +
+    '<h2>Common ports</h2>' + table(['Port', 'Service', 'What it is for'], ports) +
+    '<h2>Glossary</h2><dl class="glossary">' + glossary.map(function (g) { return '<dt>' + g[0] + '</dt><dd>' + g[1] + '</dd>'; }).join('') + '</dl>' +
+    '<h2>Frequently asked questions</h2><dl class="faq">' + faq.map(function (q) { return '<dt>' + q[0] + '</dt><dd>' + q[1] + '</dd>'; }).join('') + '</dl>' +
+    '<div class="callout good no-print">Tip: print this page and keep it beside you while you practise. On the day, you will know it by heart.</div>';
+};
