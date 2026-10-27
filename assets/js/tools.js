@@ -62,6 +62,7 @@
   ];
   var OP_BY = {}; OPS.forEach(function (o) { if (o.id) OP_BY[o.id] = o; });
   var recipe = [];
+  var lastDecIn = ''; // remembered decoder input so switching tabs doesn't lose it
 
   function tool_decoder(payload) {
     panel.innerHTML = '<div class="tool-cols"><div><span class="field-label">Operations (click to add)</span><div class="ops" id="opsList">' +
@@ -70,7 +71,8 @@
       '<span class="field-label">Recipe</span><div class="recipe" id="recipe"></div>' +
       '<span class="field-label">Output</span><div class="out-box" id="decOut"></div>' +
       '<div class="row"><button class="btn small" id="decCopy">Copy output</button><button class="btn small" id="decMove">Output → Input</button><button class="btn small" id="decClear">Clear recipe</button></div></div></div>';
-    if (typeof payload === 'string') { $('#decIn').value = payload; recipe = []; }
+    if (typeof payload === 'string') { $('#decIn').value = payload; lastDecIn = payload; recipe = []; }
+    else { $('#decIn').value = lastDecIn; }
     $('#opsList').addEventListener('click', function (e) { var b = e.target.closest('[data-op]'); if (!b) return; var o = OP_BY[b.dataset.op]; recipe.push({ id: o.id, arg: o.def || '' }); drawRecipe(); });
     $('#decIn').addEventListener('input', runRecipe);
     $('#decCopy').addEventListener('click', function () { window.CTFCopy($('#decOut').textContent); });
@@ -91,6 +93,7 @@
   }
   function runRecipe() {
     var s = $('#decIn').value, out = $('#decOut');
+    lastDecIn = s;
     try {
       recipe.forEach(function (r) { s = OP_BY[r.id].f(s, r.arg); });
       out.style.borderColor = ''; out.textContent = s;

@@ -82,9 +82,27 @@
     if (view === 'progress') renderProgress();
     if (view === 'toolkit' && window.Toolkit) Toolkit.ensure();
     if (view === 'test' && window.TestArea) TestArea.enter();
+    if (view !== 'toolkit') returnTo = null;
+    updateToolBack();
     if (window.CTFCloseNav) window.CTFCloseNav();
     window.scrollTo(0, 0);
   }
+  var returnTo = null; // {view, id, label} — where "Back to challenge" goes from the Toolkit
+  function updateToolBack() {
+    var bar = document.getElementById('toolBack'); if (!bar) return;
+    var onToolkit = document.getElementById('view-toolkit').classList.contains('active');
+    if (returnTo && onToolkit) { bar.hidden = false; var l = bar.querySelector('.tb-label'); if (l) l.textContent = '← Back to: ' + returnTo.label; }
+    else bar.hidden = true;
+  }
+  window.CTFReturn = { set: function (view, id, label) { returnTo = { view: view, id: id, label: label }; } };
+  (function () {
+    var btn = document.getElementById('toolBackBtn');
+    if (btn) btn.addEventListener('click', function () {
+      var r = returnTo; if (!r) { show('board'); return; }
+      if (r.view === 'test' && window.TestArea && TestArea.open) { show('test'); TestArea.open(r.id); }
+      else { show('board'); openChal(r.id); }
+    });
+  })();
   window.CTFShow = show;
   $$('.tab[data-view]').forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.view); }); });
   $$('.tab-menu-item').forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.view); }); });
@@ -261,8 +279,8 @@
         var b = e.target.closest('button'); if (!b) return;
         var text = pre.textContent;
         if (b.dataset.act === 'copy') { copyText(text); }
-        if (b.dataset.act === 'dec') { closeModal($('#chalModal')); show('toolkit'); Toolkit.open('decoder', text); }
-        if (b.dataset.act === 'freq') { closeModal($('#chalModal')); show('toolkit'); Toolkit.open('freq', text); }
+        if (b.dataset.act === 'dec') { if (current) CTFReturn.set('board', current.id, current.title); closeModal($('#chalModal')); show('toolkit'); Toolkit.open('decoder', text); }
+        if (b.dataset.act === 'freq') { if (current) CTFReturn.set('board', current.id, current.title); closeModal($('#chalModal')); show('toolkit'); Toolkit.open('freq', text); }
       });
     });
   }
@@ -289,8 +307,8 @@
         var act = b.dataset.f;
         if (act === 'view') { showText(f.name, f.text); }
         if (act === 'dl') { if (f.url) { var a = document.createElement('a'); a.href = f.url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); } else download(f.name, f.text, 'text/plain'); }
-        if (act === 'hex') { closeModal($('#chalModal')); show('toolkit'); Toolkit.open('hex', { file: f }); }
-        if (act === 'img') { closeModal($('#chalModal')); show('toolkit'); Toolkit.open('image', { file: f }); }
+        if (act === 'hex') { CTFReturn.set('board', c.id, c.title); closeModal($('#chalModal')); show('toolkit'); Toolkit.open('hex', { file: f }); }
+        if (act === 'img') { CTFReturn.set('board', c.id, c.title); closeModal($('#chalModal')); show('toolkit'); Toolkit.open('image', { file: f }); }
       });
       wrap.appendChild(row);
     });

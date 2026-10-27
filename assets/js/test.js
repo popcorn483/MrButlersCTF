@@ -162,7 +162,7 @@
       tools.addEventListener('click', function (e) {
         var b = e.target.closest('button'); if (!b) return;
         if (b.dataset.a === 'copy') window.CTFCopy(pre.textContent);
-        if (b.dataset.a === 'dec') { window.CTFModal.close('#testModal'); window.CTFShow('toolkit'); window.Toolkit.open('decoder', pre.textContent); }
+        if (b.dataset.a === 'dec') { if (current && window.CTFReturn) window.CTFReturn.set('test', current.id, current.title); window.CTFModal.close('#testModal'); window.CTFShow('toolkit'); window.Toolkit.open('decoder', pre.textContent); }
       });
     });
   }
@@ -179,8 +179,8 @@
       row.addEventListener('click', function (e) {
         var b = e.target.closest('button'); if (!b) return;
         if (b.dataset.f === 'view') window.CTFShowSource(f.name, f.text);
-        if (b.dataset.f === 'hex') { window.CTFModal.close('#testModal'); window.CTFShow('toolkit'); window.Toolkit.open('hex', { file: f }); }
-        if (b.dataset.f === 'img') { window.CTFModal.close('#testModal'); window.CTFShow('toolkit'); window.Toolkit.open('image', { file: f }); }
+        if (b.dataset.f === 'hex') { if (window.CTFReturn) window.CTFReturn.set('test', c.id, c.title); window.CTFModal.close('#testModal'); window.CTFShow('toolkit'); window.Toolkit.open('hex', { file: f }); }
+        if (b.dataset.f === 'img') { if (window.CTFReturn) window.CTFReturn.set('test', c.id, c.title); window.CTFModal.close('#testModal'); window.CTFShow('toolkit'); window.Toolkit.open('image', { file: f }); }
       });
       wrap.appendChild(row);
     });
@@ -294,5 +294,5 @@
     });
   }
 
-  window.TestArea = { enter: enter, isLive: isLive };
+  window.TestArea = { enter: enter, isLive: isLive, open: openTest };
 })();
