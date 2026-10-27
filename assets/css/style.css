@@ -465,8 +465,16 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted); }
 
 /* mobile hamburger nav */
 .hamburger { display: none; }
+/* drawer-only extras: hidden on desktop, re-shown inside the mobile query below */
+.nav-head, .nav-extra { display: none; }
 @media (max-width: 760px) {
-  .topbar { position: sticky; flex-wrap: wrap; row-gap: 8px; }
+  /* the closed drawer parks off the right edge; stop it widening the page */
+  html, body { overflow-x: hidden; }
+  /* backdrop-filter would make .topbar the containing block for the fixed drawer,
+     trapping it at bar height — drop it on phone so the drawer spans the viewport */
+  .topbar { position: sticky; flex-wrap: wrap; row-gap: 8px; backdrop-filter: none; }
+  /* lift the whole bar (which contains the drawer) above the backdrop when open */
+  body.nav-open .topbar { z-index: 65; }
   .hamburger { display: inline-flex; flex-direction: column; justify-content: center; gap: 5px;
     width: 42px; height: 38px; margin-left: auto; order: 2;
     background: var(--panel); border: 1px solid var(--line2); border-radius: 9px; cursor: pointer; padding: 0 9px; }
@@ -474,18 +482,34 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted); }
   body.nav-open .hamburger span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
   body.nav-open .hamburger span:nth-child(2) { opacity: 0; }
   body.nav-open .hamburger span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+  .hamburger { z-index: 61; }
   .brand { order: 1; }
-  .player { order: 3; width: 100%; text-align: left; display: none; }
-  body.nav-open .player { display: block; order: 5; padding-top: 6px; border-top: 1px solid var(--line); }
-  .tabs { order: 4; flex: 0 0 100%; width: 100%; flex-direction: column; align-items: stretch; gap: 2px;
-    max-height: 0; overflow: hidden; transition: max-height .25s ease; }
-  body.nav-open .tabs { max-height: 80vh; overflow: auto; margin-top: 4px; }
+  .player { display: none; }
+  /* right-side slide-in drawer */
+  body.nav-open::before { content: ""; position: fixed; inset: 0; background: rgba(2,6,12,.6); z-index: 55; }
+  .tabs { position: fixed; top: 0; right: 0; height: 100%; width: min(84vw, 330px);
+    flex-direction: column; align-items: stretch; gap: 2px;
+    background: var(--bg2); border-left: 1px solid var(--line2); box-shadow: -14px 0 44px rgba(0,0,0,.55);
+    padding: 14px 14px calc(16px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(100%); transition: transform .25s ease; overflow-y: auto; z-index: 60; }
+  body.nav-open .tabs { transform: translateX(0); }
   .tabs .tab { text-align: left; padding: 11px 14px; border-radius: 8px; width: 100%; }
   .tab-group { width: 100%; }
   #learnToggle { width: 100%; text-align: left; }
   .tab-menu { position: static; box-shadow: none; border: 0; border-left: 2px solid var(--line2);
     border-radius: 0; margin: 2px 0 2px 10px; padding: 2px 0 2px 4px; min-width: 0; }
   .tab-menu-item { padding: 10px 12px; }
+  .nav-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .nav-head span { font-family: var(--mono); color: var(--muted); font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; }
+  .nav-close { background: var(--panel); border: 1px solid var(--line2); color: var(--text); width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 1rem; }
+  .nav-extra { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .nav-sep { font-family: var(--mono); font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .nav-action { background: var(--panel) !important; border: 1px solid var(--line2) !important; }
+  .nav-mode { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .nav-sub { font-family: var(--mono); font-size: .72rem; color: var(--muted); min-width: 64px; }
+  .nav-check { display: flex; align-items: center; gap: 8px; color: var(--text); padding: 8px 2px; font-size: .92rem; cursor: pointer; }
+  .nav-diff { display: flex; flex-direction: column; gap: 6px; }
+  #navTierChips { display: flex; flex-wrap: wrap; gap: 6px; }
 }
 
 /* tutorial-used markers */
@@ -525,18 +549,16 @@ td.tut-cell { color: var(--cyan); font-weight: 700; }
   .board-intro { margin-bottom: 10px; }
   .rank-card { display: none; }                         /* rank lives on My progress */
   .board-intro h1 { font-size: 1.3rem; margin-bottom: 0; }
-  .mode-desc { display: none; }                         /* keep the toggle, drop the caption */
-  .mode-bar { gap: 8px; margin: 2px 0 10px; }
-  .mode-btn { padding: 7px 12px; font-size: .85rem; }
-  /* compact recommended-next card */
-  .recommend-card { padding: 10px 12px; gap: 8px; margin: 0 0 12px; }
-  .recommend-card .btn { padding: 8px 12px; font-size: .85rem; }
-  .rec-title { font-size: 1rem; }
-  .rec-why { font-size: .8rem; }
-  /* difficulty chips hidden until the Difficulty toggle is tapped */
+  /* board controls now live in the hamburger drawer on phone */
+  .mode-bar { display: none; }
+  #recommend { display: none; }
   #tierChips { display: none; }
-  body.filters-open #tierChips { display: flex; margin-top: 8px; }
+  .filters .toggle { display: none; }                   /* hide-solved → drawer */
+  #randomBtn { display: none; }                         /* surprise me → drawer */
   .filters { margin: 8px 0 14px; gap: 8px; }
+  .search { width: 100%; }
   .search input { flex: 1; width: auto; min-width: 0; }
   .filters .chip-row:first-child { flex-wrap: wrap; }
+  /* show the drawer-only board options */
+  .nav-extra { display: flex; }
 }

@@ -127,6 +127,8 @@
     if (!e.target.closest('#mainNav') && !e.target.closest('#hamburger')) closeNav();
   });
   window.CTFCloseNav = closeNav;
+  var navCloseBtn = document.getElementById('navClose');
+  if (navCloseBtn) navCloseBtn.addEventListener('click', function (e) { e.stopPropagation(); closeNav(); });
   document.addEventListener('click', function (e) {
     var g = e.target.closest('[data-goto]');
     if (g) { e.preventDefault(); show(g.dataset.goto); if (g.dataset.anchor) { var el = document.getElementById(g.dataset.anchor); if (el) el.scrollIntoView(); } return; }
@@ -137,18 +139,27 @@
   // ---------- filters ----------
   var F = { tiers: { 1: true, 2: true, 3: true, 4: true, 5: true }, q: '', hide: false };
   function renderChips() {
-    var box = $('#tierChips'); box.innerHTML = '';
-    for (var t = 1; t <= 5; t++) {
-      var b = document.createElement('button');
-      b.className = 'chip ' + TIERS[t].cls + (F.tiers[t] ? ' on' : '');
-      b.innerHTML = '<span class="dot" style="background:var(--tc)"></span>' + TIERS[t].name;
-      b.dataset.t = t;
-      b.addEventListener('click', function () { var k = this.dataset.t; F.tiers[k] = !F.tiers[k]; renderChips(); renderBoard(); });
-      box.appendChild(b);
-    }
+    ['#tierChips', '#navTierChips'].forEach(function (sel) {
+      var box = document.querySelector(sel); if (!box) return;
+      box.innerHTML = '';
+      for (var t = 1; t <= 5; t++) {
+        var b = document.createElement('button');
+        b.className = 'chip ' + TIERS[t].cls + (F.tiers[t] ? ' on' : '');
+        b.innerHTML = '<span class="dot" style="background:var(--tc)"></span>' + TIERS[t].name;
+        b.dataset.t = t;
+        b.addEventListener('click', function () { var k = this.dataset.t; F.tiers[k] = !F.tiers[k]; renderChips(); renderBoard(); });
+        box.appendChild(b);
+      }
+    });
+  }
+  function setHideSolved(val) {
+    F.hide = val;
+    var a = document.getElementById('hideSolved'), bb = document.getElementById('navHideSolved');
+    if (a) a.checked = val; if (bb) bb.checked = val;
+    renderBoard();
   }
   $('#searchBox').addEventListener('input', function () { F.q = this.value.toLowerCase(); renderBoard(); });
-  $('#hideSolved').addEventListener('change', function () { F.hide = this.checked; renderBoard(); });
+  $('#hideSolved').addEventListener('change', function () { setHideSolved(this.checked); });
 
   // ---------- board ----------
   function renderBoard() {
@@ -181,17 +192,26 @@
     if (!shown) board.innerHTML = '<div class="empty">No challenges match those filters.</div>';
     renderRecommend();
   }
-  function renderRecommend() {
-    var box = document.getElementById('recommend'); if (!box) return;
+  function nextRecommended() {
     var unsolved = CH.filter(function (c) { return !S.solved[c.id]; });
-    var n = solvedCount();
-    if (!unsolved.length) {
-      box.innerHTML = '<div class="recommend-card done"><div class="rec-left"><div class="rec-label">🏆 All done</div><div class="rec-title">You have solved every challenge!</div><div class="rec-why">Incredible work. Try the Test area to see how you do under real conditions.</div></div><button class="btn primary" data-goto="test">Go to Test area</button></div>';
-      return;
-    }
+    if (!unsolved.length) return null;
     var catIdx = {}; CATS.forEach(function (c, i) { catIdx[c.id] = i; });
     unsolved.sort(function (a, b) { return a.tier - b.tier || catIdx[a.cat] - catIdx[b.cat] || a.id.localeCompare(b.id); });
-    var pick = unsolved[0];
+    return unsolved[0];
+  }
+  function openRecommended() {
+    var pick = nextRecommended();
+    if (pick) { show('board'); openChal(pick.id); }
+    else { show('test'); }
+  }
+  function renderRecommend() {
+    var box = document.getElementById('recommend'); if (!box) return;
+    var n = solvedCount();
+    var pick = nextRecommended();
+    if (!pick) {
+      box.innerHTML = '<div class="recommend-card done"><div class="rec-left"><div class="rec-label">🏆 All done</div><div class="rec-title">You have solved every challenge!</div><div class="rec-why">Incredible work. Try the Test area to see how you do under real conditions.</div></div><button class="btn primary" data-goto="test">Go to Test area</button></div>';
+      updateNavContinue(); return;
+    }
     var cat = CATS.filter(function (x) { return x.id === pick.cat; })[0];
     var why = n === 0 ? 'A gentle place to begin — this is your first flag.' :
       (pick.tier <= 1 ? 'A quick Beginner win to keep your streak going.' :
@@ -202,6 +222,13 @@
       '<button class="btn primary" data-rec="' + pick.id + '">Open this one</button></div>';
     var btn = box.querySelector('[data-rec]');
     if (btn) btn.addEventListener('click', function () { openChal(pick.id); });
+    updateNavContinue();
+  }
+  function updateNavContinue() {
+    var el = document.getElementById('navContinue'); if (!el) return;
+    var pick = nextRecommended();
+    var started = solvedCount() > 0;
+    el.textContent = pick ? (started ? '▶ Continue where you left off' : '▶ Start your first challenge') : '🏆 All done — try the Test area';
   }
   document.addEventListener('click', function (e) {
     var g = e.target.closest('[data-guide]');
@@ -373,6 +400,7 @@
     if (m !== 'real' && m !== 'tutorial') return;
     viewMode = m; try { localStorage.setItem(MODE_KEY, m); } catch (e) { }
     updateModeUI(); renderBoard();
+    if (window.CTFCloseNav) window.CTFCloseNav();
     if (current && !$('#chalModal').hidden) { renderActions(current); renderHints(current); renderAnswer(current); }
   }
   $$('.mode-btn').forEach(function (b) { b.addEventListener('click', function () { setMode(b.dataset.mode); }); });
@@ -664,18 +692,16 @@
   if (window.CTF_REFERENCE_HTML) $('#refContent').innerHTML = window.CTF_REFERENCE_HTML();
 
   // Surprise me: open a random unsolved challenge (any if all solved)
-  var ft = document.getElementById('filtToggle');
-  if (ft) ft.addEventListener('click', function () {
-    var open = document.body.classList.toggle('filters-open');
-    ft.setAttribute('aria-expanded', open ? 'true' : 'false');
-    ft.textContent = open ? 'Difficulty ▴' : 'Difficulty ▾';
-  });
-  var rb = document.getElementById('randomBtn');
-  if (rb) rb.addEventListener('click', function () {
+  function surprise() {
     var pool = CH.filter(function (c) { return !S.solved[c.id]; });
     if (!pool.length) pool = CH;
-    openChal(pool[Math.floor(Math.random() * pool.length)].id);
-  });
+    if (window.CTFCloseNav) window.CTFCloseNav();
+    show('board'); openChal(pool[Math.floor(Math.random() * pool.length)].id);
+  }
+  var rb = document.getElementById('randomBtn'); if (rb) rb.addEventListener('click', surprise);
+  var ns = document.getElementById('navSurprise'); if (ns) ns.addEventListener('click', surprise);
+  var nc = document.getElementById('navContinue'); if (nc) nc.addEventListener('click', function () { if (window.CTFCloseNav) window.CTFCloseNav(); openRecommended(); });
+  var nhs = document.getElementById('navHideSolved'); if (nhs) nhs.addEventListener('change', function () { setHideSolved(this.checked); });
   // Teacher: challenge list CSV (no answers)
   var clc = document.getElementById('challengeListCsv');
   if (clc) clc.addEventListener('click', function () {

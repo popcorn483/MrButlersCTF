@@ -23,6 +23,7 @@
     <span></span><span></span><span></span>
   </button>
   <nav class="tabs" id="mainNav" aria-label="Main">
+    <div class="nav-head"><span>Menu</span><button class="nav-close" id="navClose" aria-label="Close menu">✕</button></div>
     <button class="tab active" data-view="board">Challenges</button>
     <div class="tab-group">
       <button class="tab" id="learnToggle" aria-haspopup="true" aria-expanded="false">Learn ▾</button>
@@ -38,6 +39,21 @@
     <button class="tab tab-test" data-view="test">🔒 Test area</button>
     <button class="tab" data-view="progress">My progress</button>
     <button class="tab" data-view="teacher">Teacher</button>
+
+    <div class="nav-extra" id="navExtra">
+      <div class="nav-sep">Board options</div>
+      <button class="tab nav-action" id="navContinue">▶ Continue where you left off</button>
+      <button class="tab nav-action" id="navSurprise">🎲 Surprise me</button>
+      <div class="nav-mode">
+        <span class="nav-sub">View</span>
+        <div class="mode-seg">
+          <button class="mode-btn" data-mode="real">🎯 Real event</button>
+          <button class="mode-btn" data-mode="tutorial">📘 Tutorial</button>
+        </div>
+      </div>
+      <label class="nav-check"><input type="checkbox" id="navHideSolved"> Hide solved challenges</label>
+      <div class="nav-diff"><span class="nav-sub">Difficulty</span><div class="chip-row" id="navTierChips"></div></div>
+    </div>
   </nav>
   <div class="player" id="playerBox">
     <button class="player-name" id="playerName" title="Change your name">Set your name</button>
@@ -76,7 +92,6 @@
     <div class="filters" role="group" aria-label="Filters">
       <div class="chip-row">
         <label class="search"><span class="sr">Search</span><input id="searchBox" type="search" placeholder="Search challenges…"></label>
-        <button class="chip phone-only" id="filtToggle" aria-expanded="false" aria-controls="tierChips">Difficulty ▾</button>
         <label class="toggle"><input type="checkbox" id="hideSolved"> Hide solved</label>
         <button class="chip" id="randomBtn" title="Open a random challenge you haven't solved">🎲 Surprise me</button>
       </div>
