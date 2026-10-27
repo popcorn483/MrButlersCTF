@@ -75,6 +75,7 @@
   function show(view) {
     $$('.tab').forEach(function (t) { t.classList.toggle('active', t.dataset.view === view); });
     $$('.view').forEach(function (v) { v.classList.toggle('active', v.id === 'view-' + view); });
+    document.body.classList.toggle('view-board', view === 'board'); // drawer board-options only on the board
     var lt = document.getElementById('learnToggle');
     if (lt) lt.classList.toggle('active', LEARN_VIEWS.indexOf(view) >= 0);
     closeLearnMenu();
@@ -104,6 +105,7 @@
     });
   })();
   window.CTFShow = show;
+  document.body.classList.toggle('view-board', document.getElementById('view-board').classList.contains('active'));
   $$('.tab[data-view]').forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.view); }); });
   $$('.tab-menu-item').forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.view); }); });
   var learnToggle = document.getElementById('learnToggle');
