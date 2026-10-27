@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teacher Area · Mr Butler's CTF</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b1220'/%3E%3Cpath d='M16 6a5 5 0 0 0-5 5v3H9v12h14V14h-2v-3a5 5 0 0 0-5-5zm-3 8v-3a3 3 0 0 1 6 0v3z' fill='%23ffbf47'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  .teacher-wrap { max-width: 920px; margin: 0 auto; padding: 28px max(16px, env(safe-area-inset-left, 0px)) 48px; }
+  .gate { max-width: 440px; margin: 6vh auto; background: var(--panel); border: 1px solid var(--line2); border-radius: 14px; padding: 26px; text-align: center; }
+  .gate .lock { font-size: 2.6rem; }
+  .gate h1 { font-family: var(--mono); font-size: 1.5rem; margin: 10px 0 4px; }
+  .gate p { color: var(--muted); }
+  .gate form { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+  .gate input { background: var(--bg); border: 1px solid var(--line2); color: var(--text); font-family: var(--mono); padding: 11px 13px; border-radius: 9px; font-size: 1rem; }
+  .gate .msg { min-height: 1.3em; color: var(--red); font-size: .9rem; }
+  .keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 16px 0; }
+  .key { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .key.star { border-color: var(--amber); }
+  .key .kl { font-family: var(--mono); font-size: .7rem; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
+  .key .kv { font-family: var(--mono); font-size: 1.1rem; font-weight: 600; margin-top: 6px; word-break: break-word; }
+  .key.star .kv { color: var(--amber); font-size: 1.4rem; }
+  .key a.kv { color: var(--cyan); text-decoration: none; }
+  .dlrow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 10px 0 20px; }
+  .ab-controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+  .ab-controls input, .ab-controls select { font-family: var(--mono); font-size: .9rem; background: var(--bg); color: var(--text); border: 1px solid var(--line2); border-radius: 8px; padding: 9px 11px; }
+  .ab-controls input { flex: 1; min-width: 160px; }
+  .ab-count { font-family: var(--mono); font-size: .78rem; color: var(--muted); margin-bottom: 8px; }
+  .ab-cat-h { font-family: var(--mono); font-size: 1rem; color: var(--green); margin: 18px 0 6px; }
+  .ab-item { border: 1px solid var(--line); border-radius: 9px; margin: 6px 0; overflow: hidden; }
+  .ab-item > summary { cursor: pointer; list-style: none; padding: 10px 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ab-item > summary::-webkit-details-marker { display: none; }
+  .ab-item > summary::before { content: "+"; font-family: var(--mono); color: var(--cyan); width: 14px; }
+  .ab-item[open] > summary::before { content: "\2013"; }
+  .ab-item[open] > summary { background: var(--panel2); border-bottom: 1px solid var(--line); }
+  .ab-title { font-weight: 600; }
+  .ab-meta { font-family: var(--mono); font-size: .72rem; color: var(--muted); margin-left: auto; }
+  .ab-flag { font-family: var(--mono); font-size: .76rem; color: var(--green); background: rgba(57,255,158,.1); border: 1px solid rgba(57,255,158,.3); border-radius: 5px; padding: 1px 7px; }
+  .ab-body { padding: 10px 14px; }
+  .ab-body pre, .ab-body pre.data { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; white-space: pre-wrap; word-break: break-all; font-family: var(--mono); font-size: .82rem; overflow-x: auto; }
+  .ab-h { font-family: var(--mono); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; margin: 10px 0 2px; }
+  .ab-h.how { color: var(--cyan); } .ab-h.sol { color: var(--amber); }
+  .ab-body ol { margin: 2px 0 2px 18px; } .ab-body li { margin: 3px 0; }
+  .ab-flagline code { background: rgba(57,255,158,.1); color: var(--green); }
+  .warnbox { background: rgba(255,92,122,.08); border: 1px solid rgba(255,92,122,.4); border-radius: 10px; padding: 12px 16px; margin: 14px 0; }
+  .warnbox b { color: var(--red); }
+</style>
+</head>
+<body>
+
+<div id="gate" class="gate">
+  <div class="lock">🔒</div>
+  <h1>Teacher Area</h1>
+  <p>Enter the staff password to see the answer book and download the solutions PDF.</p>
+  <form id="gateForm" autocomplete="off">
+    <input id="pw" type="password" placeholder="Staff password" autocomplete="current-password">
+    <button class="btn primary big" type="submit">Unlock</button>
+  </form>
+  <div class="msg" id="msg"></div>
+  <p class="small muted">Everything here is encrypted — the password is the only way to read it, even for someone with the site's files.</p>
+  <p class="small"><a class="linkish" href="index.html">← Back to the CTF site</a></p>
+</div>
+
+<div id="content" class="teacher-wrap" hidden>
+  <div class="masthead" style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+    <span style="font-size:26px;color:var(--amber)">🔑</span>
+    <div><div style="font-family:var(--mono);font-weight:700;letter-spacing:.06em;color:var(--amber)">TEACHER AREA</div>
+    <div class="small muted">Mr Butler's CTF · staff only</div></div>
+    <a class="btn small" href="index.html" style="margin-left:auto">← CTF site</a>
+  </div>
+  <h1 style="font-family:var(--mono)">Keys & answers</h1>
+
+  <div class="keys" id="keys"></div>
+
+  <div class="dlrow">
+    <button class="btn primary" id="dlPdf">⬇ Download solutions PDF</button>
+    <span class="muted small">All 203 challenges with how-to-complete and flags.</span>
+  </div>
+
+  <div class="warnbox"><b>Staff only.</b> This page holds every flag and solution. Keep the password to staff and don't leave this page open in front of pupils.</div>
+
+  <h2 style="font-family:var(--mono)">Answer book</h2>
+  <div class="ab-controls">
+    <input id="abSearch" type="search" placeholder="Search by title, id or flag…" autocomplete="off">
+    <select id="abCat"><option value="">All categories</option></select>
+  </div>
+  <div class="ab-count" id="abCount"></div>
+  <div id="abList"></div>
+</div>
+
+<script>
+(function () {
+  var $ = function (s) { return document.querySelector(s); };
+  function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+  var DATA = null;
+
+  $('#gateForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    unlock($('#pw').value);
+  });
+
+  function bin(s) { return Uint8Array.from(atob(s), function (c) { return c.charCodeAt(0); }); }
+
+  async function unlock(password) {
+    var msg = $('#msg'); msg.textContent = 'Unlocking…'; msg.style.color = 'var(--muted)';
+    if (!(window.crypto && crypto.subtle)) { msg.textContent = 'This browser cannot decrypt here (needs HTTPS).'; msg.style.color = 'var(--red)'; return; }
+    var vault;
+    try { vault = await (await fetch('assets/teacher/vault.json', { cache: 'no-store' })).json(); }
+    catch (err) { msg.textContent = 'Could not load the data file.'; msg.style.color = 'var(--red)'; return; }
+    try {
+      var te = new TextEncoder(), td = new TextDecoder();
+      var km = await crypto.subtle.importKey('raw', te.encode(password), 'PBKDF2', false, ['deriveKey']);
+      var key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: bin(vault.salt), iterations: vault.it, hash: 'SHA-256' }, km, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+      var pt = td.decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bin(vault.iv) }, key, bin(vault.ct)));
+      DATA = JSON.parse(pt);
+    } catch (err) {
+      msg.textContent = '✗ Wrong password. Try again.'; msg.style.color = 'var(--red)'; return;
+    }
+    $('#gate').hidden = true; $('#content').hidden = false;
+    render();
+  }
+
+  function render() {
+    var info = DATA.info;
+    $('#keys').innerHTML =
+      '<div class="key star"><div class="kl">🔑 Test area password</div><div class="kv">' + esc(info.testPassword) + '</div></div>' +
+      '<div class="key"><div class="kl">⏱️ Test length</div><div class="kv">' + info.testMinutes + ' minutes</div></div>' +
+      '<div class="key"><div class="kl">🌐 Live site</div><a class="kv" href="' + info.siteUrl + '" target="_blank" rel="noopener">' + info.siteUrl.replace(/^https?:\/\//, '') + '</a></div>' +
+      '<div class="key"><div class="kl">📦 Repository</div><a class="kv" href="' + info.repoUrl + '" target="_blank" rel="noopener">' + info.repoUrl.replace(/^https?:\/\//, '') + '</a></div>';
+
+    var catName = {}; DATA.cats.forEach(function (c) {
+      catName[c.id] = c.icon + ' ' + c.name;
+      var o = document.createElement('option'); o.value = c.id; o.textContent = c.icon + ' ' + c.name; $('#abCat').appendChild(o);
+    });
+    function item(c) {
+      var how = '<ol>' + c.how.map(function (h) { return '<li>' + h + '</li>'; }).join('') + '</ol>';
+      return '<details class="ab-item"><summary><span class="ab-title">' + esc(c.t) + '</span>' +
+        '<span class="ab-flag">' + esc(c.flag) + '</span>' +
+        '<span class="ab-meta">' + c.ic + ' ' + esc(c.cn) + ' · ' + c.tr + ' · ' + c.pts + ' pts · ' + c.id + '</span></summary>' +
+        '<div class="ab-body"><div>' + c.desc + '</div>' +
+        '<div class="ab-h how">How to complete it</div>' + how +
+        '<div class="ab-h sol">Solution</div><p>' + esc(c.sol) + '</p>' +
+        '<p class="ab-flagline">Flag: <code>' + esc(c.flag) + '</code></p></div></details>';
+    }
+    function draw() {
+      var q = ($('#abSearch').value || '').toLowerCase(), cat = $('#abCat').value;
+      var items = DATA.ch.filter(function (c) {
+        if (cat && c.cat !== cat) return false;
+        if (q && (c.t + ' ' + c.id + ' ' + c.flag + ' ' + c.cn).toLowerCase().indexOf(q) < 0) return false;
+        return true;
+      });
+      $('#abCount').textContent = items.length + ' of ' + DATA.ch.length + ' challenges';
+      var html = '', cur = null;
+      items.forEach(function (c) { if (c.cat !== cur) { cur = c.cat; html += '<div class="ab-cat-h">' + catName[c.cat] + '</div>'; } html += item(c); });
+      $('#abList').innerHTML = html || '<p class="muted">No matches.</p>';
+    }
+    $('#abSearch').addEventListener('input', draw);
+    $('#abCat').addEventListener('change', draw);
+    draw();
+
+    $('#dlPdf').addEventListener('click', function () {
+      try {
+        var bytes = bin(DATA.pdf);
+        var blob = new Blob([bytes], { type: 'application/pdf' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a'); a.href = url; a.download = 'MrButlersCTF-all-challenges.pdf';
+        document.body.appendChild(a); a.click();
+        setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
+      } catch (e) { alert('Could not prepare the PDF: ' + e.message); }
+    });
+  }
+})();
+</script>
+</body>
+</html>
