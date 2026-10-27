@@ -504,3 +504,14 @@ td.tut-cell { color: var(--cyan); font-weight: 700; }
   background: rgba(57,255,158,.07); border: 1px solid rgba(57,255,158,.35); border-radius: 10px; padding: 8px 12px; }
 .tool-back .tb-hint { color: var(--muted); font-size: .85rem; }
 .tool-back[hidden] { display: none !important; }
+
+/* view-mode toggle (Real event / Tutorial) */
+.mode-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 14px; }
+.mode-label { font-family: var(--mono); font-size: .72rem; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
+.mode-seg { display: inline-flex; background: var(--panel); border: 1px solid var(--line2); border-radius: 999px; padding: 3px; }
+.mode-btn { background: none; border: 0; color: var(--muted); font-weight: 600; font-size: .88rem; padding: 6px 14px; border-radius: 999px; cursor: pointer; }
+.mode-btn:hover { color: var(--text); }
+.mode-btn.on[data-mode="real"] { background: var(--amber); color: #1a1205; }
+.mode-btn.on[data-mode="tutorial"] { background: var(--cyan); color: #04121c; }
+.mode-desc { color: var(--muted); font-size: .85rem; }
+@media (max-width: 560px) { .mode-desc { flex-basis: 100%; } }

@@ -328,7 +328,7 @@
     v.title = 'Inspect Element is blocked on school PCs, so use this to see the raw HTML of the challenge text.';
     v.addEventListener('click', function () { showSource('View HTML: ' + c.title, c.desc); });
     box.appendChild(v);
-    if (!testLive()) {
+    if (!assistOff()) {
       var t = document.createElement('button'); t.className = 'btn' + (S.tut && S.tut[c.id] ? ' tut-done' : '');
       t.textContent = (S.tut && S.tut[c.id]) ? '📘 How to complete this (used)' : '📘 How to complete this';
       t.title = 'A step-by-step tutorial of the method — without giving away the flag.';
@@ -357,9 +357,29 @@
   }
 
   function testLive() { return window.TestArea && TestArea.isLive && TestArea.isLive(); }
+  // ---------- view mode: 'real' (no assistance, default) or 'tutorial' (full help) ----------
+  var MODE_KEY = 'mbctf-mode', viewMode = 'real';
+  try { var _m = localStorage.getItem(MODE_KEY); if (_m === 'tutorial' || _m === 'real') viewMode = _m; } catch (e) { }
+  function assistOff() { return testLive() || viewMode === 'real'; }
+  function updateModeUI() {
+    $$('.mode-btn').forEach(function (b) { var on = b.dataset.mode === viewMode; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+    var d = document.getElementById('modeDesc');
+    if (d) d.textContent = viewMode === 'real'
+      ? 'Like the day — no hints or walkthroughs. View HTML still works.'
+      : 'Full help — hints, walkthroughs and the How-to-complete tutorial.';
+    document.body.classList.toggle('mode-real', viewMode === 'real');
+  }
+  function setMode(m) {
+    if (m !== 'real' && m !== 'tutorial') return;
+    viewMode = m; try { localStorage.setItem(MODE_KEY, m); } catch (e) { }
+    updateModeUI(); renderBoard();
+    if (current && !$('#chalModal').hidden) { renderActions(current); renderHints(current); renderAnswer(current); }
+  }
+  $$('.mode-btn').forEach(function (b) { b.addEventListener('click', function () { setMode(b.dataset.mode); }); });
   function renderHints(c) {
     var box = $('#chalHints'); box.innerHTML = '';
     if (testLive()) { box.innerHTML = '<div class="hint-box" style="border-color:var(--red)"><div class="hint-warn" style="color:var(--red)">🔒 Assistance is off during a test</div>Hints and walkthroughs are hidden while a test is running — just like the real event. They come back when the test ends.</div>'; return; }
+    if (viewMode === 'real') { box.innerHTML = '<div class="hint-box" style="border-color:var(--amber)"><div class="hint-warn">🎯 Real-event view</div>No hints or walkthroughs here — this is how the real competition feels. Switch to <b>Tutorial</b> view at the top of the board if you would like help.</div>'; return; }
     if (!c.hints || !c.hints.length) return;
     var used = S.hints[c.id] || 0;
     for (var i = 0; i < used && i < c.hints.length; i++) {
@@ -389,7 +409,7 @@
     var box = document.getElementById('chalAnswer');
     if (!box) { box = document.createElement('div'); box.id = 'chalAnswer'; box.className = 'hints'; $('#flagMsg').after(box); }
     box.innerHTML = '';
-    if (testLive() && !S.revealed[c.id]) return;
+    if (assistOff()) return;
     var tries = (S.tries && S.tries[c.id]) || 0;
     if (S.revealed[c.id]) {
       var mine = lastTry[c.id];
@@ -667,7 +687,7 @@
   });
 
   // ---------- boot ----------
-  renderChips(); renderBoard(); refreshHeader(); renderTeacher();
+  renderChips(); renderBoard(); refreshHeader(); renderTeacher(); updateModeUI();
   if (!S.name) setTimeout(function () { var w = $('#playerName'); w.style.color = 'var(--amber)'; }, 300);
   var hash = location.hash.replace('#', '');
   if (BY_ID[hash]) openChal(hash);
