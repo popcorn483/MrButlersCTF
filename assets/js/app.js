@@ -664,6 +664,12 @@
   if (window.CTF_REFERENCE_HTML) $('#refContent').innerHTML = window.CTF_REFERENCE_HTML();
 
   // Surprise me: open a random unsolved challenge (any if all solved)
+  var ft = document.getElementById('filtToggle');
+  if (ft) ft.addEventListener('click', function () {
+    var open = document.body.classList.toggle('filters-open');
+    ft.setAttribute('aria-expanded', open ? 'true' : 'false');
+    ft.textContent = open ? 'Difficulty ▴' : 'Difficulty ▾';
+  });
   var rb = document.getElementById('randomBtn');
   if (rb) rb.addEventListener('click', function () {
     var pool = CH.filter(function (c) { return !S.solved[c.id]; });

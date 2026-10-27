@@ -74,12 +74,13 @@
     <div id="recommend"></div>
 
     <div class="filters" role="group" aria-label="Filters">
-      <div class="chip-row" id="tierChips"></div>
       <div class="chip-row">
         <label class="search"><span class="sr">Search</span><input id="searchBox" type="search" placeholder="Search challenges…"></label>
+        <button class="chip phone-only" id="filtToggle" aria-expanded="false" aria-controls="tierChips">Difficulty ▾</button>
         <label class="toggle"><input type="checkbox" id="hideSolved"> Hide solved</label>
         <button class="chip" id="randomBtn" title="Open a random challenge you haven't solved">🎲 Surprise me</button>
       </div>
+      <div class="chip-row" id="tierChips"></div>
     </div>
 
     <div id="board" class="board"></div>
