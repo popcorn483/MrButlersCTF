@@ -40,7 +40,7 @@
   window.CTFUtil = { esc: esc, toast: toast, download: download, $: $, $$: $$ };
 
   // ---------- state ----------
-  function blankState() { return { v: 1, pid: randId(), name: '', solved: {}, hints: {}, revealed: {}, tries: {}, wrong: 0, created: Date.now() }; }
+  function blankState() { return { v: 1, pid: randId(), name: '', solved: {}, hints: {}, revealed: {}, tries: {}, tut: {}, wrong: 0, created: Date.now() }; }
   var S = blankState();
   try { var raw = localStorage.getItem(STORE_KEY); if (raw) S = Object.assign(blankState(), JSON.parse(raw)); } catch (e) { /* storage blocked */ }
   function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { } }
@@ -153,8 +153,8 @@
       var tiles = $('.tiles', sec);
       list.forEach(function (c) {
         var b = document.createElement('button');
-        b.className = 'tile ' + TIERS[c.tier].cls + (S.solved[c.id] ? ' solved' : '');
-        b.innerHTML = '<div class="tile-title">' + esc(c.title) + '</div><div class="tile-foot"><span>' + TIERS[c.tier].name + '</span><span class="tile-pts">' + c.pts + '</span></div>';
+        b.className = 'tile ' + TIERS[c.tier].cls + (S.solved[c.id] ? ' solved' : '') + (S.tut && S.tut[c.id] ? ' tut-used' : '');
+        b.innerHTML = (S.tut && S.tut[c.id] ? '<span class="tut-mark" title="Tutorial used">📘</span>' : '') + '<div class="tile-title">' + esc(c.title) + '</div><div class="tile-foot"><span>' + TIERS[c.tier].name + '</span><span class="tile-pts">' + c.pts + '</span></div>';
         b.addEventListener('click', function () { openChal(c.id); });
         tiles.appendChild(b); shown++;
       });
@@ -311,8 +311,8 @@
     v.addEventListener('click', function () { showSource('View HTML: ' + c.title, c.desc); });
     box.appendChild(v);
     if (!testLive()) {
-      var t = document.createElement('button'); t.className = 'btn';
-      t.textContent = '📘 How to complete this';
+      var t = document.createElement('button'); t.className = 'btn' + (S.tut && S.tut[c.id] ? ' tut-done' : '');
+      t.textContent = (S.tut && S.tut[c.id]) ? '📘 How to complete this (used)' : '📘 How to complete this';
       t.title = 'A step-by-step tutorial of the method — without giving away the flag.';
       t.addEventListener('click', function () { toggleTutorial(c, t); });
       box.appendChild(t);
@@ -328,7 +328,7 @@
   function toggleTutorial(c, btn) {
     var box = document.getElementById('chalTutorial');
     if (box) { box.remove(); if (btn) btn.classList.remove('on'); return; }
-    if (!S.tut) S.tut = {}; S.tut[c.id] = (S.tut[c.id] || 0) + 1; save();
+    if (!S.tut) S.tut = {}; S.tut[c.id] = (S.tut[c.id] || 0) + 1; save(); renderBoard();
     box = document.createElement('div'); box.id = 'chalTutorial'; box.className = 'hint-box tutorial-box';
     box.innerHTML = '<div class="hint-warn" style="color:var(--cyan)">📘 How to complete this</div>' +
       '<ol class="walk">' + tutorialSteps(c).map(function (s) { return '<li>' + s + '</li>'; }).join('') + '</ol>' +
@@ -459,7 +459,7 @@
 
   // ---------- progress ----------
   function renderProgress() {
-    var sc = score(), n = solvedCount(), hintsUsed = Object.keys(S.hints).reduce(function (s, k) { return s + S.hints[k]; }, 0), revCount = Object.keys(S.revealed || {}).length;
+    var sc = score(), n = solvedCount(), hintsUsed = Object.keys(S.hints).reduce(function (s, k) { return s + S.hints[k]; }, 0), revCount = Object.keys(S.revealed || {}).length, tutCount = Object.keys(S.tut || {}).filter(function (id) { return BY_ID[id]; }).length;
     var tierDone = [0, 0, 0, 0, 0, 0];
     Object.keys(S.solved).forEach(function (id) { if (BY_ID[id]) tierDone[BY_ID[id].tier]++; });
     var enc;
@@ -475,6 +475,7 @@
       '<div class="stat"><b>' + sc + '</b><span>points of ' + TOTAL_PTS + '</span></div>' +
       '<div class="stat"><b>' + n + '</b><span>flags of ' + CH.length + '</span></div>' +
       '<div class="stat"><b>' + hintsUsed + '</b><span>hints used</span></div>' +
+      '<div class="stat"><b>' + tutCount + '</b><span>tutorials used</span></div>' +
       '<div class="stat"><b>' + S.wrong + '</b><span>wrong guesses</span></div>' +
       '<div class="stat"><b>' + revCount + '</b><span>answers revealed</span></div>' +
       [1, 2, 3, 4, 5].map(function (t) {
@@ -493,7 +494,7 @@
   }
 
   function makeExport() {
-    var payload = { app: 'MrButlersCTF', v: 1, pid: S.pid, name: S.name, exported: Date.now(), score: score(), solved: S.solved, hints: S.hints, revealed: S.revealed, tries: S.tries, wrong: S.wrong, created: S.created };
+    var payload = { app: 'MrButlersCTF', v: 1, pid: S.pid, name: S.name, exported: Date.now(), score: score(), solved: S.solved, hints: S.hints, revealed: S.revealed, tries: S.tries, tut: S.tut, wrong: S.wrong, created: S.created };
     var body = JSON.stringify(payload);
     return JSON.stringify({ data: payload, check: sha256(body + SALT) }, null, 1);
   }
@@ -525,6 +526,7 @@
         Object.keys(d.solved || {}).forEach(function (id) { if (!S.solved[id]) { S.solved[id] = { t: d.solved[id].t, p: '', h: d.solved[id].h || 0, r: d.solved[id].r || 0, m: 1 }; added++; } });
       }
       Object.keys(d.hints || {}).forEach(function (id) { S.hints[id] = Math.max(S.hints[id] || 0, d.hints[id]); });
+      if (!S.tut) S.tut = {}; Object.keys(d.tut || {}).forEach(function (id) { S.tut[id] = Math.max(S.tut[id] || 0, d.tut[id]); });
       Object.keys(d.revealed || {}).forEach(function (id) { if (!S.revealed[id]) S.revealed[id] = d.revealed[id]; });
       if (!S.tries) S.tries = {}; Object.keys(d.tries || {}).forEach(function (id) { S.tries[id] = Math.max(S.tries[id] || 0, d.tries[id]); });
       S.wrong = Math.max(S.wrong, d.wrong || 0);
@@ -570,7 +572,22 @@
       if (!s.r) pts += c.pts; n++; tiers[c.tier]++; last = Math.max(last, s.t);
     });
     var hints = Object.keys(d.hints || {}).reduce(function (s, k) { return s + d.hints[k]; }, 0), rev = Object.keys(d.revealed || {}).length;
-    return { name: d.name || '(no name)', pts: pts, n: n, unv: unv, rev: rev, tiers: tiers, hints: hints, last: last, ok: r.ok, file: r.file };
+    var tutIds = Object.keys(d.tut || {}).filter(function (id) { return BY_ID[id]; });
+    return { name: d.name || '(no name)', pts: pts, n: n, unv: unv, rev: rev, tiers: tiers, hints: hints, tut: tutIds.length, tutIds: tutIds, last: last, ok: r.ok, file: r.file };
+  }
+  function struggleSummary() {
+    var count = {};
+    T.rows.forEach(function (r) {
+      Object.keys(r.data.tut || {}).forEach(function (id) { if (BY_ID[id]) count[id] = (count[id] || 0) + 1; });
+    });
+    var ids = Object.keys(count).sort(function (a, b) { return count[b] - count[a]; });
+    if (!ids.length) return '';
+    var rows = ids.slice(0, 15).map(function (id) {
+      var c = BY_ID[id], cat = CATS.filter(function (x) { return x.id === c.cat; })[0];
+      return '<div class="struggle-row"><span class="struggle-n">' + count[id] + '</span><span>' + esc(c.title) + '</span>' +
+        '<span class="muted small">' + cat.icon + ' ' + esc(cat.name) + ' · ' + TIERS[c.tier].name + '</span></div>';
+    }).join('');
+    return '<h2>Where pupils needed the tutorial</h2><p class="muted small">How many pupils opened the “How to complete this” tutorial on each challenge — your class’s trickiest topics, most pupils first.</p><div class="struggle-list">' + rows + '</div>';
   }
   function renderTeacher() {
     var box = $('#teacherTable');
@@ -580,22 +597,22 @@
     rows.sort(function (a, b) { return k === 'name' ? a.name.localeCompare(b.name) : (b[k] - a[k]) || (a.last - b.last); });
     box.innerHTML = '<table class="lb"><thead><tr><th>#</th><th data-k="name">Name</th><th data-k="pts">Points</th><th data-k="n">Flags</th>' +
       [1, 2, 3, 4, 5].map(function (t) { return '<th>' + TIERS[t].name + '</th>'; }).join('') +
-      '<th data-k="hints">Hints</th><th data-k="rev">Answers revealed</th><th>Last solve</th><th>File</th></tr></thead><tbody>' +
+      '<th data-k="hints">Hints</th><th data-k="tut">Tutorials</th><th data-k="rev">Answers revealed</th><th>Last solve</th><th>File</th></tr></thead><tbody>' +
       rows.map(function (r, i) {
         return '<tr><td class="num">' + (i + 1) + '</td><td>' + esc(r.name) + '</td><td class="num">' + r.pts + '</td><td class="num">' + r.n + '</td>' +
           [1, 2, 3, 4, 5].map(function (t) { return '<td class="num">' + r.tiers[t] + '</td>'; }).join('') +
-          '<td class="num">' + r.hints + '</td><td class="num">' + r.rev + '</td><td class="num">' + (r.last ? fmtDate(r.last) : '-') + '</td><td>' +
+          '<td class="num">' + r.hints + '</td><td class="num' + (r.tut ? ' tut-cell' : '') + '">' + r.tut + '</td><td class="num">' + r.rev + '</td><td class="num">' + (r.last ? fmtDate(r.last) : '-') + '</td><td>' +
           (r.ok ? '<span class="badge good">ok</span>' : '<span class="badge bad">edited</span>') +
           (r.unv ? ' <span class="badge bad">' + r.unv + ' unverified</span>' : '') + '</td></tr>';
-      }).join('') + '</tbody></table>';
+      }).join('') + '</tbody></table>' + struggleSummary();
     $$('th[data-k]', box).forEach(function (th) { th.addEventListener('click', function () { T.sort = th.dataset.k === 'pts' ? 'pts' : th.dataset.k; renderTeacher(); }); });
     T.lastRows = rows;
   }
   $('#teacherCsv').addEventListener('click', function () {
     if (!T.lastRows) return toast('Load some files first');
-    var lines = [['Rank', 'Name', 'Points', 'Flags', 'Beginner', 'Easy', 'Medium', 'Hard', 'Expert', 'Hints', 'Answers revealed', 'Unverified', 'Last solve'].join(',')];
+    var lines = [['Rank', 'Name', 'Points', 'Flags', 'Beginner', 'Easy', 'Medium', 'Hard', 'Expert', 'Hints', 'Tutorials used', 'Answers revealed', 'Unverified', 'Last solve'].join(',')];
     T.lastRows.forEach(function (r, i) {
-      lines.push([i + 1, '"' + r.name.replace(/"/g, '""') + '"', r.pts, r.n, r.tiers[1], r.tiers[2], r.tiers[3], r.tiers[4], r.tiers[5], r.hints, r.rev, r.unv, r.last ? new Date(r.last).toISOString() : ''].join(','));
+      lines.push([i + 1, '"' + r.name.replace(/"/g, '""') + '"', r.pts, r.n, r.tiers[1], r.tiers[2], r.tiers[3], r.tiers[4], r.tiers[5], r.hints, r.tut, r.rev, r.unv, r.last ? new Date(r.last).toISOString() : ''].join(','));
     });
     download('MrButlersCTF-leaderboard.csv', lines.join('\n'), 'text/csv');
   });
