@@ -462,3 +462,28 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted); }
 .tutorial-box .walk { margin: 6px 0 6px 18px; }
 .tutorial-box .walk li { margin: 5px 0; }
 .btn.on { border-color: var(--cyan); color: var(--cyan); }
+
+/* mobile hamburger nav */
+.hamburger { display: none; }
+@media (max-width: 760px) {
+  .topbar { position: sticky; flex-wrap: wrap; row-gap: 8px; }
+  .hamburger { display: inline-flex; flex-direction: column; justify-content: center; gap: 5px;
+    width: 42px; height: 38px; margin-left: auto; order: 2;
+    background: var(--panel); border: 1px solid var(--line2); border-radius: 9px; cursor: pointer; padding: 0 9px; }
+  .hamburger span { display: block; height: 2px; width: 100%; background: var(--green); border-radius: 2px; transition: transform .2s, opacity .2s; }
+  body.nav-open .hamburger span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  body.nav-open .hamburger span:nth-child(2) { opacity: 0; }
+  body.nav-open .hamburger span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+  .brand { order: 1; }
+  .player { order: 3; width: 100%; text-align: left; display: none; }
+  body.nav-open .player { display: block; order: 5; padding-top: 6px; border-top: 1px solid var(--line); }
+  .tabs { order: 4; flex: 0 0 100%; width: 100%; flex-direction: column; align-items: stretch; gap: 2px;
+    max-height: 0; overflow: hidden; transition: max-height .25s ease; }
+  body.nav-open .tabs { max-height: 80vh; overflow: auto; margin-top: 4px; }
+  .tabs .tab { text-align: left; padding: 11px 14px; border-radius: 8px; width: 100%; }
+  .tab-group { width: 100%; }
+  #learnToggle { width: 100%; text-align: left; }
+  .tab-menu { position: static; box-shadow: none; border: 0; border-left: 2px solid var(--line2);
+    border-radius: 0; margin: 2px 0 2px 10px; padding: 2px 0 2px 4px; min-width: 0; }
+  .tab-menu-item { padding: 10px 12px; }
+}

@@ -82,6 +82,7 @@
     if (view === 'progress') renderProgress();
     if (view === 'toolkit' && window.Toolkit) Toolkit.ensure();
     if (view === 'test' && window.TestArea) TestArea.enter();
+    if (window.CTFCloseNav) window.CTFCloseNav();
     window.scrollTo(0, 0);
   }
   window.CTFShow = show;
@@ -94,6 +95,20 @@
     lm.hidden = !open; learnToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
   });
   document.addEventListener('click', function (e) { if (!e.target.closest('.tab-group')) closeLearnMenu(); });
+  // mobile hamburger
+  var hamburger = document.getElementById('hamburger');
+  function closeNav() { document.body.classList.remove('nav-open'); if (hamburger) hamburger.setAttribute('aria-expanded', 'false'); }
+  if (hamburger) hamburger.addEventListener('click', function (e) {
+    e.stopPropagation();
+    var open = document.body.classList.toggle('nav-open');
+    hamburger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (!open) closeLearnMenu();
+  });
+  document.addEventListener('click', function (e) {
+    if (!document.body.classList.contains('nav-open')) return;
+    if (!e.target.closest('#mainNav') && !e.target.closest('#hamburger')) closeNav();
+  });
+  window.CTFCloseNav = closeNav;
   document.addEventListener('click', function (e) {
     var g = e.target.closest('[data-goto]');
     if (g) { e.preventDefault(); show(g.dataset.goto); if (g.dataset.anchor) { var el = document.getElementById(g.dataset.anchor); if (el) el.scrollIntoView(); } return; }
