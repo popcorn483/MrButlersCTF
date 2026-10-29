@@ -435,6 +435,23 @@
     var box = document.getElementById('chalAnswer'); if (box) box.scrollIntoView({ block: 'nearest' });
     return true;
   }
+  // Why a challenge quietly tells you how to solve it — the clue-reading skill, by category.
+  var CLUES = {
+    warmup: 'Warm-ups are deliberately one move long. The title plus a single technical word — <b>Base64</b>, <b>binary</b>, <b>reverse</b>, <b>ROT/Caesar</b> — names the exact tool you need. The whole skill here is learning to spot that one word and let it name the solution.',
+    crypto: 'Crypto challenges nearly always reveal the <b>shape</b> of the data or name the cipher family on purpose. An <code>=</code> on the end whispers Base64; only 0s and 1s means binary; words that look <i>almost</i> right are a Caesar shift; the word "key" hints at XOR. The author plants that fingerprint so you can recognise it and reach for the matching decoder — not guess.',
+    stego: 'A steganography task hands you a picture and tells you it "looks normal" or is "hiding something". That wording <i>is</i> the clue: nothing is wrong with the image you can see, so the message lives in the bytes — the metadata, the strings, or the lowest bit of each pixel. Work from the outside in.',
+    programming: 'Programming puzzles describe a <b>rule</b> and then give you far more data than you could process by hand ("every tenth character", "add up the ones that…"). The giveaway is the scale: if doing it manually would be slow and error-prone, the challenge is telling you to write a short loop in C# to do it for you.',
+    web: 'Web challenges point you at the browser — "the page checks the password", something is "hidden", "look closer at the site". Because your browser runs the page, everything it uses (HTML, comments, scripts, cookies) is visible to you through <b>View HTML</b>. The moment a challenge mentions the page <i>doing</i> something, that is the signpost to read its code.',
+    forensics: 'Forensics tasks give you a file plus a contradiction — a <code>.txt</code> that will not open as text, a download that behaves oddly. That mismatch between the name and the behaviour is the clue: file names lie, the bytes do not. Check the real type by its <b>magic bytes</b> in the Hex viewer, and skim the strings for <code>flag{</code>.',
+    osint: 'OSINT challenges ask a question about a real person, place or account and give you a public starting point (a username, a photo, a handle). The tell is that there is nothing to decode — the answer is already out in the open. The challenge is testing whether you can find and join up details people have made public.',
+    reversing: 'Reverse-engineering tasks show you a process with input going in and a result coming out, then ask for the input that produces a target. The clue is <b>direction</b>: you are handed the forward steps on purpose, so the solution is to undo each one in reverse order.',
+    networking: 'Networking challenges speak in packets, captures, ports and protocol names. That vocabulary is the signpost: the flag is somewhere inside the conversation between machines. Follow the stream or read the exact field the challenge names, rather than treating the data as one random blob.',
+    safety: 'Online-safety questions are scenarios — a suspicious link, a reused password, an oversharing post. The clue is hidden in the <i>details</i> of the scenario: one specific thing is the risk. Solving it is spotting which detail would actually get someone caught out.'
+  };
+  function clueBlock(c) {
+    var txt = CLUES[c.cat]; if (!txt) return '';
+    return '<div class="clue-read"><div class="clue-head">🔍 Reading the clues — why this challenge pointed you here</div><p>' + txt + '</p></div>';
+  }
   function renderAnswer(c) {
     var box = document.getElementById('chalAnswer');
     if (!box) { box = document.createElement('div'); box.id = 'chalAnswer'; box.className = 'hints'; $('#flagMsg').after(box); }
@@ -446,6 +463,7 @@
       var useWalk = c.walk && c.walk.length;
       var steps = (useWalk ? c.walk : (c.hints || [])).map(function (h) { return '<li>' + h + '</li>'; }).join('');
       box.innerHTML = '<div class="hint-box answer-box"><div class="hint-warn">📖 Full walkthrough</div>' +
+        clueBlock(c) +
         (steps ? '<p><b>' + (useWalk ? 'Thinking it through:' : 'Step by step:') + '</b></p><ol class="walk">' + steps + '</ol>' : '') +
         (c.sol ? '<p><b>Why it works:</b> ' + c.sol + '</p>' : '') +
         '<p class="flag-reveal">The flag is <code>' + esc(c.f) + '</code></p>' +

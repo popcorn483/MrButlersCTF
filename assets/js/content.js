@@ -44,6 +44,26 @@ window.CTF_WALK_HTML = function () {
   <p>Most beginners get stuck not because a challenge is too hard, but because they are not sure what to try first. This page gives you a repeatable way of thinking that works on almost any task. Read it once before you start, and come back to it whenever you feel stuck.</p>
   <div class="callout good"><b>The one goal:</b> every challenge hides a flag shaped like <code>flag{...}</code>. You are always hunting for that. If what you are looking at is not a flag yet, you have more work to do.</div>
 
+  <h2>The big secret: a challenge tells you how to solve it</h2>
+  <p>Here is the thing almost nobody explains to beginners: <b>CTF challenges are not trying to trick you.</b> Whoever wrote the challenge wants a fair fight, so they leave a trail of clues that point at the intended technique. Once you learn to <i>read</i> those clues, a task stops feeling like a locked door and starts feeling like a set of instructions written in code. Getting good at CTFs is mostly getting good at noticing the signposts.</p>
+  <p>There are <b>five places</b> a clue almost always hides. Train your eye to check each one before you touch a tool.</p>
+
+  <div class="guide-grid">
+    <div class="guide-card"><h3>1 · The title</h3><p>The title is the single biggest hint, and people skip it. A title is chosen on purpose.</p>
+      <div class="clue-why"><b class="sig">Why:</b> a title like <span class="signpost">Base what?</span> is naming the encoding. <span class="signpost">Shifty business</span> is telling you it is a Caesar shift. <span class="signpost">Hidden in plain sight</span> is steganography. The pun usually <i>is</i> the method.</div></div>
+    <div class="guide-card"><h3>2 · The flavour text</h3><p>The sentence or two describing the task. Read it twice and underline every technical-sounding word.</p>
+      <div class="clue-why"><b class="sig">Why:</b> "we <b>encoded</b> it a few times", "the password is <b>checked by the browser</b>", "this file <b>won't open</b>" — each verb is literally describing the solution. Authors describe what they did; you just reverse it.</div></div>
+    <div class="guide-card"><h3>3 · The category</h3><p>Crypto, Web, Forensics, OSINT… the category narrows the whole universe of possible techniques before you start.</p>
+      <div class="clue-why"><b class="sig">Why:</b> the same string of hex means "decode me" under Cryptography but "check the file type" under Forensics. The category tells you which lens to look through.</div></div>
+    <div class="guide-card"><h3>4 · The points &amp; difficulty</h3><p>Low points means one or two steps. High points means layers or a trick.</p>
+      <div class="clue-why"><b class="sig">Why:</b> if a 25-point Beginner task looks complicated, you are over-thinking it — the answer is simple. If a 200-point task decodes in one step, you are not finished; look for the next layer.</div></div>
+    <div class="guide-card"><h3>5 · The file you're given</h3><p>An image, a <code>.txt</code>, a capture, a snippet of code. The <i>kind</i> of file hints at the whole approach.</p>
+      <div class="clue-why"><b class="sig">Why:</b> a picture invites the Image inspector; a file that "won't open" invites the Hex viewer; code with input and output invites you to run it backwards. The attachment is a signpost too.</div></div>
+    <div class="guide-card"><h3>The habit</h3><p>Before every challenge, run the five past yourself out loud: <b>title, text, category, points, file.</b></p>
+      <div class="clue-why"><b class="sig">Payoff:</b> nine times out of ten you will have already named the technique before you open a single tool. That is what strong solvers are doing in their heads.</div></div>
+  </div>
+  <p class="muted small">The worked examples further down this page each end with a <b>“Why the wording pointed here”</b> box, so you can see exactly which words gave the game away.</p>
+
   <h2>The method: five steps for any challenge</h2>
   <div class="callout"><b>Read &rarr; Recognise &rarr; Try the obvious &rarr; Use a tool &rarr; Check the format.</b> Learn this loop and you will rarely be completely stuck.</div>
   <ol class="walk-steps">
@@ -93,6 +113,7 @@ window.CTF_WALK_HTML = function () {
       <li><b>Format and submit.</b> It already looks like <code>flag{...}</code>, so submit it. Done.</li>
     </ol>
     <p class="muted">The pattern to notice: <b>after every step, look at the output and ask "what is this now?"</b> Each layer tells you the next move. You are never guessing blindly.</p>
+    <div class="clue-why"><b class="sig">Why the wording pointed here:</b> the phrase <span class="signpost">encoded a few times</span> did two jobs. "Encoded" (not "encrypted") says this is reversible with decoders, no key-cracking needed. "A few times" warns you there are <b>several layers</b>, so you should expect the first decode to produce more encoded data, not the flag. The challenge told you the whole plan in four words.</div>
   </div>
 
   <h2>More worked examples, category by category</h2>
@@ -107,6 +128,7 @@ window.CTF_WALK_HTML = function () {
       <li><b>Also worth a look:</b> HTML comments (<code>&lt;!-- --&gt;</code>), hidden form fields (<code>type="hidden"</code>), cookies and response headers. Flags love to hide in all of these.</li>
       <li><b>Submit</b> the flag you found. <i>Lesson: anything the browser can see, you can see.</i></li>
     </ol>
+    <div class="clue-why"><b class="sig">Why the wording pointed here:</b> <span class="signpost">checked by the browser</span> is the entire solution in three words. If the <i>server</i> checked the password, you could never see the answer — it would live on a computer you don't control. The moment a challenge says your own browser does the checking, it is admitting the secret has been sent to your machine, which means <b>View HTML</b> can find it.</div>
   </div>
 
   <div class="worked">
@@ -118,6 +140,7 @@ window.CTF_WALK_HTML = function () {
       <li><b>Act on it.</b> Download it, rename it to <code>.png</code>, and open it: the flag is written inside the image. For plain files, skim the <b>Strings</b> list for <code>flag{</code> instead.</li>
       <li><b>Submit.</b> <i>Lesson: always check what a file really is, not what it is called.</i></li>
     </ol>
+    <div class="clue-why"><b class="sig">Why the wording pointed here:</b> the clue is the <b>contradiction</b> — <span class="signpost">notes.txt</span> that <span class="signpost">will not open as text</span>. A real text file always opens as text. When the name and the behaviour disagree, the author is hinting that the name is a disguise. That contradiction is your cue to stop trusting the extension and read the magic bytes.</div>
   </div>
 
   <div class="worked">
@@ -128,6 +151,7 @@ window.CTF_WALK_HTML = function () {
       <li><b>Then look at the pixels.</b> Open it in the Image inspector and try each view: single colour channels, "lowest bit", and "exaggerate tiny differences". Hidden text jumps out that your eyes could never see at normal brightness.</li>
       <li><b>Read and submit</b> the revealed flag. <i>Lesson: work from the outside in &mdash; metadata, then strings, then the pixels themselves.</i></li>
     </ol>
+    <div class="clue-why"><b class="sig">Why the wording pointed here:</b> <span class="signpost">looks completely normal</span> is a steganography author gently winking at you. Why point out that a picture looks normal unless "normal to look at" and "normal underneath" are different things? The reassurance is the giveaway — it is telling you the change is there but too small for your eyes, which is exactly what the lowest-bit view is for.</div>
   </div>
 
   <div class="worked">
@@ -139,6 +163,43 @@ window.CTF_WALK_HTML = function () {
       <li><b>Join the dots.</b> "Rodney is the best dog ever" answers "What is your pet's name?". That is how accounts get taken over in real life.</li>
       <li><b>Submit</b> the answer as the flag. <i>Lesson: think about what a photo or a post quietly reveals.</i></li>
     </ol>
+    <div class="clue-why"><b class="sig">Why the wording pointed here:</b> there is <b>nothing to decode</b> — no odd characters, no file, just a <span class="signpost">public profile</span> and a question. That absence is itself the clue: when a task gives you a real person and a question but no puzzle-data, it is an OSINT task, and the answer is sitting in public waiting to be read, not computed.</div>
+  </div>
+
+  <div class="worked">
+    <p><b>⚙️ Programming &mdash; "Here are 2,000 numbers. Add up only the ones in an even position."</b></p>
+    <ol class="walk-steps">
+      <li><b>Recognise.</b> A simple rule ("even positions", "add up") applied to far too much data to do by hand. That combination is the fingerprint of a programming task.</li>
+      <li><b>Describe the loop in words.</b> "Go through the list; if the position is even, add the number to a running total." If you can say it as a sentence, you can write it as a <code>for</code> loop.</li>
+      <li><b>Write a few lines of C#.</b> <code>int total = 0; for (int i = 0; i &lt; n.Length; i++) { if (i % 2 == 0) total += n[i]; }</code> then print <code>total</code>.</li>
+      <li><b>Mind the edges.</b> Does "even position" mean index 0 or index 1? Try both and see which gives a sensible flag. Off-by-one is the most common slip.</li>
+      <li><b>Wrap and submit</b> the result, usually as <code>flag{total}</code>. <i>Lesson: let the computer do the boring, careful work.</i></li>
+    </ol>
+    <div class="clue-why"><b class="sig">Why the wording pointed here:</b> the signpost is the <b>scale</b> — <span class="signpost">2,000 numbers</span>. A handful you would just add up. Thousands, with a rule attached, is the author saying "doing this by hand would take an hour and you'd make mistakes — write the loop." The size of the data is the instruction to code.</div>
+  </div>
+
+  <div class="worked">
+    <p><b>🔢 Number bases &mdash; "01100110 01101100 01100001 01100111 ..."</b></p>
+    <ol class="walk-steps">
+      <li><b>Recognise.</b> Only <code>0</code> and <code>1</code>, grouped into blocks of <b>eight</b>. Eight bits is one character, so this is binary text.</li>
+      <li><b>Decode.</b> Send it to the Decoder &rarr; From Binary. Each block of 8 becomes one letter.</li>
+      <li><b>Read the result.</b> You will get readable text, often a flag straight away, or the next layer to work on.</li>
+      <li><b>If the blocks are a different size</b> (say pairs of hex, or numbers up to 26) the <i>grouping</i> tells you the system: hex pairs &rarr; From Hex; numbers 1&ndash;26 &rarr; A1Z26.</li>
+      <li><b>Submit</b> the decoded flag. <i>Lesson: the shape of the groups names the number system.</i></li>
+    </ol>
+    <div class="clue-why"><b class="sig">Why the wording pointed here:</b> you were given <b>no instructions at all</b> — just data. In that case the <i>characters themselves</i> are the clue. Two symbols only (<span class="signpost">0</span> and <span class="signpost">1</span>) in <b>groups of eight</b> can only really be binary bytes. The data announces its own type; you just have to notice the alphabet it uses.</div>
+  </div>
+
+  <div class="worked">
+    <p><b>📡 Networking &mdash; "We captured the traffic. The password is in there somewhere."</b></p>
+    <ol class="walk-steps">
+      <li><b>Recognise.</b> Words like "captured", "traffic", "packets" or a <code>.pcap</code> file mean the flag is inside a recorded conversation between two machines.</li>
+      <li><b>Follow the conversation.</b> Traffic is made of many small packets; the useful part is one back-and-forth exchange. Look for the stream that carries readable text (a login, a message, a web request).</li>
+      <li><b>Read the fields that matter.</b> Usernames, passwords and messages often travel in plain text in these puzzles. Skim for <code>flag{</code> or an obvious login.</li>
+      <li><b>Watch for encoding.</b> Web logins are frequently Base64-wrapped, so a captured password may need one more decode step.</li>
+      <li><b>Submit</b> what you find. <i>Lesson: a capture is a transcript &mdash; read the conversation, don't stare at the whole blob.</i></li>
+    </ol>
+    <div class="clue-why"><b class="sig">Why the wording pointed here:</b> <span class="signpost">captured the traffic</span> is pure networking vocabulary. "Traffic" means data moving between computers, and "captured" means it was recorded for you to read afterwards. The sentence is telling you the flag was never hidden or encrypted — it was simply <i>said out loud</i> on the network, and you are reading the transcript.</div>
   </div>
 
   <h2>How to read each kind of task</h2>

@@ -633,3 +633,12 @@ td.tut-cell { color: var(--cyan); font-weight: 700; }
   .daily-side .btn { width: 100%; }
   .badge-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
 }
+
+/* "reading the clues" block inside a revealed walkthrough */
+.clue-read { border: 1px solid rgba(76,201,255,.35); background: rgba(76,201,255,.07); border-radius: 8px; padding: 10px 12px; margin: 2px 0 12px; }
+.clue-read .clue-head { font-weight: 700; color: var(--cyan); font-size: .92rem; margin-bottom: 4px; }
+.clue-read p { margin: 0; font-size: .92rem; }
+/* walkthrough page: clue callouts */
+.clue-why { border-left: 3px solid var(--amber); background: rgba(255,191,71,.07); padding: 8px 12px; margin: 8px 0 0; border-radius: 0 6px 6px 0; font-size: .92rem; }
+.clue-why b.sig { color: var(--amber); }
+.signpost { display: inline-block; background: rgba(255,191,71,.14); border: 1px solid rgba(255,191,71,.4); border-radius: 5px; padding: 1px 6px; font-family: var(--mono); font-size: .85em; color: var(--amber); }
