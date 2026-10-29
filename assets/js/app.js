@@ -477,8 +477,10 @@
     if (sha256(norm) === c.h) {
       if (!S.solved[c.id]) {
         var rv = S.revealed[c.id] ? 1 : 0;
+        var firstTry = !(S.tries && S.tries[c.id]);
         S.solved[c.id] = { t: Date.now(), p: sha256(S.pid + '|' + norm).slice(0, 16), h: S.hints[c.id] || 0, r: rv };
         save();
+        try { document.dispatchEvent(new CustomEvent('ctf:solve', { detail: { id: c.id, revealed: rv, firstTry: firstTry } })); } catch (e) { }
         var praise = ['Brilliant work', 'Nicely done', 'You got it', 'Spot on', 'Great solve', 'Well played'];
         var p = praise[Math.floor(Math.random() * praise.length)];
         msg.className = 'flag-msg ok'; msg.textContent = rv ? '✓ Correct! No points this time because you saw the answer first — but you learned the method, and that is what counts.' : '✓ ' + p + '! +' + c.pts + ' points.';
@@ -559,6 +561,7 @@
       var c = BY_ID[id];
       return '<div><span class="when">' + fmtDate(S.solved[id].t) + '</span><span>' + esc(c.title) + ' <span class="muted">(' + esc(c.id) + ', ' + c.pts + ' pts' + (S.solved[id].h ? ', ' + S.solved[id].h + ' hint' + (S.solved[id].h > 1 ? 's' : '') : '') + (S.solved[id].r ? ', answer revealed' : '') + ')</span></span></div>';
     }).join('') : '<p class="muted">No flags yet. Head to the board and start with the Warm-Up category.</p>';
+    try { document.dispatchEvent(new CustomEvent('ctf:progress')); } catch (e) { }
   }
 
   function makeExport() {
@@ -600,6 +603,7 @@
       S.wrong = Math.max(S.wrong, d.wrong || 0);
       if (!S.name && d.name) S.name = d.name;
       save(); refreshHeader(); renderBoard(); renderProgress();
+      try { document.dispatchEvent(new CustomEvent('ctf:refresh')); } catch (e) { }
       msg.hidden = false; msg.className = 'notice good'; msg.textContent = 'Loaded. ' + added + ' new solve' + (added === 1 ? '' : 's') + ' added. Welcome back' + (S.name ? ', ' + S.name : '') + '!';
     }).catch(function (err) {
       msg.hidden = false; msg.className = 'notice bad'; msg.textContent = err.message || 'Could not read that file.';
@@ -608,6 +612,7 @@
   $('#resetBtn').addEventListener('click', function () {
     if (!confirm('Delete ALL progress on this computer? Download a progress file first if you want to keep it.')) return;
     S = blankState(); save(); refreshHeader(); renderBoard(); renderProgress(); toast('Progress reset');
+    try { document.dispatchEvent(new CustomEvent('ctf:refresh')); } catch (e) { }
   });
 
   // ---------- teacher ----------
@@ -719,6 +724,13 @@
   document.addEventListener('click', function (e) {
     if (e.target.closest('[data-action="print"]')) { e.preventDefault(); window.print(); }
   });
+
+  // ---------- hooks for features.js (badges, daily challenge, streaks, certificate) ----------
+  window.CTF.getState = function () { return S; };
+  window.CTF.openChal = openChal;
+  window.CTF.show = show;
+  window.CTF.CH = CH; window.CTF.CATS = CATS; window.CTF.TIERS = TIERS;
+  window.CTF.rankName = function () { var e = document.getElementById('rankName'); return e ? e.textContent : ''; };
 
   // ---------- boot ----------
   renderChips(); renderBoard(); refreshHeader(); renderTeacher(); updateModeUI();

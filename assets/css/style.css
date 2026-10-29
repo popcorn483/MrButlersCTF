@@ -562,3 +562,74 @@ td.tut-cell { color: var(--cyan); font-weight: 700; }
   /* show the drawer-only board options — only while the challenge board is open */
   body.view-board .nav-extra { display: flex; }
 }
+
+/* ======================= Extra features ======================= */
+/* confetti overlay */
+#confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; opacity: 0; transition: opacity .4s ease; }
+
+/* daily challenge card */
+.daily-card { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;
+  border: 1px solid var(--line2); border-left: 4px solid var(--amber); border-radius: var(--radius);
+  background: linear-gradient(100deg, rgba(255,191,71,.10), rgba(76,201,255,.05)); padding: 14px 16px; margin: 0 0 14px; }
+.daily-card.done { border-left-color: var(--green); background: linear-gradient(100deg, rgba(57,255,158,.10), rgba(76,201,255,.04)); }
+.daily-flag { font-family: var(--mono); font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--amber); }
+.daily-card.done .daily-flag { color: var(--green); }
+.daily-title { font-size: 1.15rem; font-weight: 700; margin-top: 2px; }
+.daily-meta { color: var(--muted); font-size: .85rem; margin-top: 2px; }
+.daily-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.streak-pill { font-family: var(--mono); font-size: .8rem; color: var(--text); background: rgba(255,191,71,.12); border: 1px solid rgba(255,191,71,.35); border-radius: 999px; padding: 4px 11px; white-space: nowrap; }
+.daily-done { color: var(--green); font-weight: 700; font-size: .9rem; }
+
+/* badge shelf */
+.badge-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.badge-head h2 { margin-bottom: 0; }
+.sound-toggle { white-space: nowrap; }
+.badge-count { font-family: var(--mono); font-size: .9rem; color: var(--muted); font-weight: 400; }
+.badge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 6px 0 4px; }
+.badge-tile { position: relative; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); padding: 12px 12px 10px; text-align: center; opacity: .5; filter: grayscale(.7); transition: transform .12s ease; }
+.badge-tile.got { opacity: 1; filter: none; border-color: var(--green-d); background: linear-gradient(180deg, rgba(57,255,158,.08), var(--panel)); }
+.badge-tile.got:hover { transform: translateY(-2px); }
+.badge-ic { display: block; font-size: 1.8rem; line-height: 1; margin-bottom: 6px; }
+.badge-nm { display: block; font-weight: 700; font-size: .92rem; }
+.badge-dsc { display: block; color: var(--muted); font-size: .76rem; margin: 3px 0 6px; min-height: 2.2em; }
+.badge-prog { display: inline-block; font-family: var(--mono); font-size: .72rem; color: var(--muted); }
+.badge-tile.got .badge-prog { color: var(--green); }
+
+/* certificate CTA on progress */
+.cert-cta { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;
+  border: 1px solid var(--line2); border-radius: var(--radius); background: var(--panel); padding: 14px 16px; margin: 14px 0; }
+.cert-cta.locked { opacity: .75; }
+.cert-cta b { font-size: 1.02rem; }
+.cert-cta p { margin: 3px 0 0; }
+
+/* certificate modal */
+.cert-name-field { display: block; color: var(--muted); font-size: .85rem; margin: 4px 0 12px; }
+.cert-name-field input { display: block; width: 100%; margin-top: 5px; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--line2); background: var(--bg2); color: var(--text); font-size: 1rem; box-sizing: border-box; }
+.cert-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.cert-sheet { background: #fff; border-radius: 10px; padding: 4px; }
+.cert-inner { border: 3px double #c9a227; border-radius: 8px; padding: 30px 26px; text-align: center; color: #1a2b1f;
+  background: radial-gradient(circle at 50% 0%, #fffdf4, #fff); font-family: "Georgia", "Times New Roman", serif; }
+.cert-top { font-family: var(--mono); letter-spacing: .18em; text-transform: uppercase; color: #1fbf74; font-size: .8rem; }
+.cert-sub { font-size: 1.9rem; font-weight: 700; margin: 6px 0 16px; color: #14301f; letter-spacing: .01em; }
+.cert-awarded { color: #4a5a50; font-size: .9rem; }
+.cert-person { font-size: 1.7rem; font-weight: 700; margin: 6px 0; color: #0d6b43; border-bottom: 2px solid #e3d6a0; display: inline-block; padding: 0 18px 4px; }
+.cert-line { max-width: 460px; margin: 14px auto 0; color: #2c3a31; font-size: 1rem; line-height: 1.55; }
+.cert-badges { font-size: 1.6rem; margin: 16px 0 4px; letter-spacing: 4px; }
+.cert-foot { display: flex; justify-content: space-between; margin-top: 22px; color: #4a5a50; font-size: .82rem; }
+.cert-sig { font-style: italic; }
+
+/* print only the certificate sheet */
+@media print {
+  body.printing-cert { background: #fff; }
+  body.printing-cert > *:not(#certModal) { display: none !important; }
+  body.printing-cert #certModal { position: static; display: block; background: #fff; }
+  body.printing-cert #certModal .modal-card { box-shadow: none; border: 0; max-width: none; width: auto; padding: 0; background: #fff; }
+  body.printing-cert .modal-x, body.printing-cert .cert-name-field, body.printing-cert #certHeading, body.printing-cert .cert-actions { display: none !important; }
+  body.printing-cert .cert-sheet { padding: 0; }
+}
+
+@media (max-width: 760px) {
+  .daily-side { align-items: stretch; width: 100%; }
+  .daily-side .btn { width: 100%; }
+  .badge-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+}
