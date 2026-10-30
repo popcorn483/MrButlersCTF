@@ -33,6 +33,7 @@
         <button class="tab-menu-item" data-view="walkthrough">Walkthrough</button>
         <button class="tab-menu-item" data-view="resources">Useful sites</button>
         <button class="tab-menu-item" data-view="reference">Reference</button>
+        <button class="tab-menu-item" data-view="pack">Classroom pack 🖨</button>
       </div>
     </div>
     <button class="tab" data-view="toolkit">Toolkit</button>
@@ -127,6 +128,11 @@
     <div class="prose wide" id="refContent"></div>
   </section>
 
+  <!-- ============ CLASSROOM PACK ============ -->
+  <section class="view" id="view-pack">
+    <div class="prose wide" id="packContent"></div>
+  </section>
+
   <!-- ============ TEST AREA ============ -->
   <section class="view" id="view-test">
     <div id="testArea"></div>
@@ -184,6 +190,13 @@
   <!-- ============ TEACHER ============ -->
   <section class="view" id="view-teacher">
     <div class="prose wide">
+      <div class="event-launch callout">
+        <div>
+          <b>🖥 Run a class mock event</b>
+          <p class="muted small">A big-screen countdown and live-style scoreboard for a whole-class dress rehearsal. Put it on the projector, start the clock, and have teams work through the <a href="#" data-goto="test">Test area</a> on their own devices.</p>
+        </div>
+        <button class="btn primary" id="openEvent">Open projector event screen →</button>
+      </div>
       <h1>Teacher leaderboard</h1>
       <p>Ask pupils to download their progress file and send it to you (Teams, shared drive or email). Load them all here at once to build a class leaderboard. Nothing is uploaded anywhere; it all stays on this computer.</p>
       <p class="callout">🔒 <b>Staff answer book</b> — the full solutions and a downloadable PDF live on the password-protected <a href="teacher.html">Teacher Area</a> page.</p>
@@ -268,6 +281,51 @@
   </div>
 </div>
 
+<!-- ============ PROJECTOR MOCK-EVENT SCREEN ============ -->
+<div id="eventScreen" hidden>
+  <div class="ev-top">
+    <input id="evTitle" class="ev-title" value="Mr Butler's CTF — Mock Event" aria-label="Event title">
+    <div class="ev-top-btns">
+      <button class="btn small" id="evFull">⛶ Fullscreen</button>
+      <button class="btn small" id="evExit">✕ Exit</button>
+    </div>
+  </div>
+  <div class="ev-main">
+    <div class="ev-clock-wrap">
+      <div class="ev-status" id="evStatus">Ready when you are</div>
+      <div class="ev-clock" id="evClock">45:00</div>
+      <div class="ev-controls">
+        <label class="ev-dur">Length
+          <select id="evDur">
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="45" selected>45 min</option>
+            <option value="60">60 min</option>
+            <option value="90">90 min</option>
+          </select>
+        </label>
+        <button class="btn primary" id="evStart">▶ Start</button>
+        <button class="btn" id="evPause" hidden>⏸ Pause</button>
+        <button class="btn" id="evAdd" hidden>+5 min</button>
+        <button class="btn" id="evReset" hidden>↺ Reset</button>
+      </div>
+      <div class="ev-ticker"><span id="evTicker"></span></div>
+    </div>
+    <div class="ev-side">
+      <div class="ev-side-head">
+        <h2>Live standings</h2>
+        <div class="ev-side-btns no-print">
+          <label class="btn small" for="evFiles">⬆ Load team results</label>
+          <input type="file" id="evFiles" accept=".json,application/json" multiple hidden>
+          <button class="btn small" id="evClear">Clear</button>
+        </div>
+      </div>
+      <div id="evBoard" class="ev-board"></div>
+      <p class="ev-hint">Pupils: open <b>🔒 Test area</b>, enter your <b>team name</b> and the password, and race the clock on this screen. When you finish, download your result and send it to your teacher to appear here.</p>
+    </div>
+  </div>
+</div>
+
 <canvas id="confetti" aria-hidden="true"></canvas>
 <div class="toast" id="toast" hidden></div>
 
@@ -276,6 +334,7 @@
 <script src="assets/js/content.js"></script>
 <script src="assets/js/app.js"></script>
 <script src="assets/js/features.js"></script>
+<script src="assets/js/event.js"></script>
 <script src="assets/js/tools.js"></script>
 <script src="assets/js/test.js"></script>
 <script src="assets/js/welcome.js"></script>

@@ -642,3 +642,94 @@ td.tut-cell { color: var(--cyan); font-weight: 700; }
 .clue-why { border-left: 3px solid var(--amber); background: rgba(255,191,71,.07); padding: 8px 12px; margin: 8px 0 0; border-radius: 0 6px 6px 0; font-size: .92rem; }
 .clue-why b.sig { color: var(--amber); }
 .signpost { display: inline-block; background: rgba(255,191,71,.14); border: 1px solid rgba(255,191,71,.4); border-radius: 5px; padding: 1px 6px; font-family: var(--mono); font-size: .85em; color: var(--amber); }
+
+/* ======================= Classroom pack ======================= */
+.handout { border: 1px solid var(--line2); border-radius: var(--radius); background: var(--panel); padding: 16px 18px; margin: 0 0 18px; }
+.handout-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.handout-head h2 { margin: 0; border: 0; padding: 0; }
+.handout-body { font-size: .95rem; }
+.poster { text-align: center; }
+.poster-big code { font-size: 2.4rem; color: var(--green); background: none; }
+.poster-sub { color: var(--muted); font-size: .9rem; }
+.poster-list { text-align: left; max-width: 640px; margin: 12px auto 0; }
+.poster-list li { margin: 7px 0; }
+.method-poster { counter-reset: m; list-style: none; padding: 0; margin: 0; }
+.method-poster li { position: relative; padding: 10px 12px 10px 48px; border: 1px solid var(--line); border-radius: 8px; margin: 8px 0; }
+.method-poster li::before { counter-increment: m; content: counter(m); position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background: var(--green); color: #03110a; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.role-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.role-card { border: 1px dashed var(--line2); border-radius: 8px; padding: 12px 14px; background: var(--bg2); }
+.role-card h3 { margin: 0 0 6px; font-size: 1.05rem; }
+.role-card p { margin: 0; font-size: .88rem; color: var(--text); }
+.twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 26px; }
+.twocol h3 { margin: 6px 0 4px; }
+.twocol ul { margin: 0 0 8px; padding-left: 20px; }
+.twocol li { margin: 4px 0; }
+@media (max-width: 700px) { .twocol { grid-template-columns: 1fr; } }
+
+/* print: one handout, or the whole pack, clean in black and white */
+@media print {
+  body.printing-handout .topbar, body.printing-handout .foot, body.printing-handout .player,
+  body.printing-pack .topbar, body.printing-pack .foot, body.printing-pack .player,
+  body.printing-handout .no-print, body.printing-pack .no-print { display: none !important; }
+  body.printing-handout .handout:not(.printing) { display: none !important; }
+  body.printing-handout, body.printing-pack { background: #fff !important; color: #111 !important; }
+  body.printing-handout .prose, body.printing-pack .prose { max-width: none; }
+  body.printing-handout .handout, body.printing-pack .handout { border: 1px solid #999; background: #fff; color: #111; break-inside: avoid; page-break-inside: avoid; margin-bottom: 16px; }
+  body.printing-handout .handout, body.printing-handout .handout *,
+  body.printing-pack .handout, body.printing-pack .handout * { color: #111 !important; }
+  body.printing-handout .poster-big code, body.printing-pack .poster-big code { color: #111; }
+  body.printing-handout .role-card, body.printing-pack .role-card { background: #fff; border: 1px dashed #666; break-inside: avoid; }
+  body.printing-handout table, body.printing-pack table { color: #111; }
+  body.printing-handout th, body.printing-handout td, body.printing-pack th, body.printing-pack td { border-color: #bbb !important; }
+  body.printing-handout code, body.printing-pack code { color: #111; background: #eee; }
+  body.printing-handout .poster-sub, body.printing-pack .poster-sub { color: #444; }
+  body.printing-pack .handout { page-break-after: always; }
+  body.printing-pack .handout:last-child { page-break-after: auto; }
+}
+
+/* ======================= Projector mock-event screen ======================= */
+.event-launch { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.event-launch p { margin: 3px 0 0; }
+body.event-open { overflow: hidden; }
+#eventScreen { position: fixed; inset: 0; z-index: 200; background: radial-gradient(circle at 50% -10%, #0d1b33, var(--bg) 60%); color: var(--text); display: flex; flex-direction: column; padding: 18px clamp(16px, 3vw, 40px) 24px; overflow: auto; }
+#eventScreen[hidden] { display: none !important; }
+.ev-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ev-title { flex: 1; min-width: 0; background: transparent; border: 1px solid transparent; color: var(--green); font-family: var(--mono); font-weight: 700; font-size: clamp(1.1rem, 2.4vw, 1.8rem); padding: 6px 8px; border-radius: 8px; }
+.ev-title:hover, .ev-title:focus { border-color: var(--line2); outline: none; background: rgba(255,255,255,.03); }
+.ev-top-btns { display: flex; gap: 8px; flex-shrink: 0; }
+.ev-main { flex: 1; display: grid; grid-template-columns: 1.3fr 1fr; gap: clamp(16px, 3vw, 40px); align-items: start; margin-top: clamp(8px, 2vh, 24px); }
+.ev-clock-wrap { text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+.ev-status { font-family: var(--mono); letter-spacing: .08em; text-transform: uppercase; font-size: clamp(.8rem, 1.6vw, 1.05rem); color: var(--muted); }
+.ev-status.live { color: var(--green); }
+.ev-status.paused { color: var(--amber); }
+.ev-status.done { color: var(--red); }
+.ev-clock { font-family: var(--mono); font-weight: 700; line-height: 1; font-size: clamp(5rem, 22vw, 18rem); color: var(--text); letter-spacing: -.02em; }
+.ev-clock.low { color: var(--amber); }
+.ev-clock.critical { color: var(--red); animation: evpulse 1s ease-in-out infinite; }
+.ev-clock.done { color: var(--red); }
+@keyframes evpulse { 50% { opacity: .55; } }
+.ev-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.ev-controls .btn { font-size: clamp(.9rem, 1.6vw, 1.1rem); padding: 9px 16px; }
+.ev-dur { display: flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: .85rem; color: var(--muted); }
+.ev-dur select { background: var(--panel); color: var(--text); border: 1px solid var(--line2); border-radius: 8px; padding: 8px 10px; font-size: 1rem; }
+.ev-ticker { margin-top: 8px; min-height: 2.2em; max-width: 42ch; }
+.ev-ticker span { color: var(--cyan); font-size: clamp(.95rem, 1.8vw, 1.25rem); transition: opacity .3s ease; }
+.ev-side { background: rgba(10,18,33,.6); border: 1px solid var(--line2); border-radius: 14px; padding: 16px 18px; max-height: 76vh; display: flex; flex-direction: column; }
+.ev-side-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.ev-side-head h2 { margin: 0; border: 0; padding: 0; font-size: clamp(1.1rem, 2vw, 1.5rem); }
+.ev-side-btns { display: flex; gap: 8px; }
+.ev-board { flex: 1; overflow: auto; }
+.ev-empty { color: var(--muted); font-size: .95rem; }
+.ev-row { display: grid; grid-template-columns: 1.8em minmax(0, 1fr) auto auto; align-items: center; gap: 9px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); margin-bottom: 8px; background: var(--panel); font-size: clamp(1rem, 1.5vw, 1.2rem); }
+.ev-row.top { border-color: var(--green-d); background: linear-gradient(180deg, rgba(57,255,158,.08), var(--panel)); }
+.ev-rank { font-size: 1.25em; text-align: center; }
+.ev-name { font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+.ev-pts { font-family: var(--mono); color: var(--green); font-weight: 700; }
+.ev-pts small { color: var(--muted); font-weight: 400; }
+.ev-flags { font-family: var(--mono); color: var(--muted); }
+.ev-hint { margin-top: 10px; color: var(--muted); font-size: .82rem; line-height: 1.45; }
+@media (max-width: 820px) {
+  .ev-main { grid-template-columns: 1fr; }
+  .ev-side { max-height: none; }
+  .ev-clock { font-size: clamp(4rem, 30vw, 9rem); }
+}

@@ -518,3 +518,108 @@ window.CTF_REFERENCE_HTML = function () {
     '<h2>Frequently asked questions</h2><dl class="faq">' + faq.map(function (q) { return '<dt>' + q[0] + '</dt><dd>' + q[1] + '</dd>'; }).join('') + '</dl>' +
     '<div class="callout good no-print">Tip: print this page and keep it beside you while you practise. On the day, you will know it by heart.</div>';
 };
+
+
+/* Printable classroom pack: handouts a teacher can print for the class. Each prints on its own. */
+window.CTF_PACK_HTML = function () {
+  function handout(id, title, body) {
+    return '<section class="handout" data-handout="' + id + '">' +
+      '<div class="handout-head"><h2>' + title + '</h2>' +
+      '<button class="btn small no-print" data-print-handout="' + id + '">🖨 Print this handout</button></div>' +
+      '<div class="handout-body">' + body + '</div></section>';
+  }
+
+  var flag = '<div class="poster">' +
+    '<div class="poster-big"><code>flag{...}</code></div>' +
+    '<p class="poster-sub">Every answer is a flag. If what you have is not shaped like this, you are not finished.</p>' +
+    '<ul class="poster-list">' +
+    '<li><b>Keep the wrapper.</b> <code>peel_the_layers</code> is wrong; <code>flag{peel_the_layers}</code> is right.</li>' +
+    '<li><b>Underscores, not spaces.</b> Words are joined with <code>_</code>.</li>' +
+    '<li><b>Capitals matter only inside</b> if the challenge shows them — otherwise lower case is fine.</li>' +
+    '<li><b>Copy it exactly.</b> No extra spaces at the start or end.</li>' +
+    '<li><b>Close but gibberish?</b> You missed a layer — decode once more.</li>' +
+    '</ul></div>';
+
+  var method = '<ol class="method-poster">' +
+    '<li><b>READ it twice.</b> The title and the bold words are clues. Sometimes the flag is already there.</li>' +
+    '<li><b>RECOGNISE what you have.</b> Name the data before touching a tool: Base64? Binary? A shifted cipher? A file? A picture?</li>' +
+    '<li><b>TRY the obvious.</b> Is it just backwards, shifted, or sitting in the page source? Many flags take one step.</li>' +
+    '<li><b>USE the right tool.</b> Decoder for codes, Hex viewer for files, Image inspector for pictures, Hashes for password hashes.</li>' +
+    '<li><b>CHECK the format.</b> Your answer should read like words. Wrap it as <code>flag{...}</code> and submit.</li>' +
+    '</ol>' +
+    '<p class="poster-sub">Stuck for 15 minutes? Move on and come back with fresh eyes. Easy flags first.</p>';
+
+  var recog = [
+    ['Letters/numbers ending in <code>=</code>', 'Base64', 'Decoder &rarr; From Base64'],
+    ['Only <code>0</code> and <code>1</code>, groups of 8', 'Binary', 'Decoder &rarr; From Binary'],
+    ['Only <code>0-9 a-f</code>', 'Hex', 'Decoder &rarr; From Hex'],
+    ['Words almost right, letters shifted', 'Caesar / ROT', 'Decoder &rarr; Caesar brute force'],
+    ['Dots and dashes', 'Morse', 'Decoder &rarr; From Morse'],
+    ['Numbers 1&ndash;26', 'A1Z26', 'Decoder &rarr; A1Z26'],
+    ['A web page or login box', 'Web', 'View HTML; comments, cookies'],
+    ['A file that won\'t open right', 'Forensics', 'Hex viewer; magic bytes &amp; strings'],
+    ['A normal-looking picture', 'Steganography', 'Image inspector; lowest-bit view'],
+    ['A 32-char hex string', 'MD5 hash', 'Hashes tool; crack with wordlist'],
+    ['A profile, photo or clue', 'OSINT', 'Read public details; join the dots'],
+    ['Code: input in, result out', 'Reverse engineering', 'Undo the steps in reverse']
+  ];
+  var cheat = '<table class="recognise"><thead><tr><th>If you see…</th><th>It is probably…</th><th>Do this</th></tr></thead><tbody>' +
+    recog.map(function (r) { return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td>' + r[2] + '</td></tr>'; }).join('') +
+    '</tbody></table>';
+
+  var tools = '<table class="recognise"><thead><tr><th>Tool</th><th>Reach for it when…</th></tr></thead><tbody>' +
+    '<tr><td><b>Decoder</b></td><td>you have a code or cipher (Base64, hex, binary, Caesar, Morse). Chain steps like CyberChef.</td></tr>' +
+    '<tr><td><b>Frequency analysis</b></td><td>a substitution cipher where you don\'t know the key — the letter counts give it away.</td></tr>' +
+    '<tr><td><b>Hex viewer</b></td><td>a file. Check the first bytes (magic number) and skim the strings for <code>flag{</code>.</td></tr>' +
+    '<tr><td><b>Image inspector</b></td><td>a picture that might be hiding something — try the colour channels and lowest-bit view.</td></tr>' +
+    '<tr><td><b>Hashes</b></td><td>a password hash to identify or crack against the wordlist.</td></tr>' +
+    '<tr><td><b>View HTML</b></td><td>any web challenge — it does the job of View Source (Inspect is blocked at school).</td></tr>' +
+    '<tr><td><b>ASCII table</b></td><td>you have numbers that might be character codes (65 = A, 97 = a).</td></tr>' +
+    '</tbody></table>';
+
+  var roles = [
+    ['👑 Captain', 'Keeps the team moving. Watches the clock, decides what to tackle next, and makes sure nobody is stuck in silence. Calls "move on" after 15 minutes on one challenge.'],
+    ['🔐 Cryptography', 'Owns codes and ciphers. Lives in the Decoder. First to spot Base64, binary, hex and Caesar shifts. Peels layered challenges one step at a time.'],
+    ['🌐 Web', 'Owns web challenges. Always clicks View HTML first; reads comments, scripts and cookies. Knows "if the browser checks it, the answer is in the code."'],
+    ['🔎 Forensics & Stego', 'Owns files and pictures. Uses the Hex viewer for magic bytes and strings, and the Image inspector for hidden pixels and metadata.'],
+    ['🕵️ OSINT & Networking', 'Owns clue-hunting and captures. Finds answers in public details, follows the conversation in traffic, and knows the common ports.'],
+    ['✍️ Scribe', 'Writes down every flag found and everything tried. Stops the team repeating work and spots patterns across challenges. Reads flags back carefully before submitting.']
+  ];
+  var roleCards = '<div class="role-cards">' + roles.map(function (r) {
+    return '<div class="role-card"><h3>' + r[0] + '</h3><p>' + r[1] + '</p></div>';
+  }).join('') + '</div>' +
+  '<p class="poster-sub">Tip: in a small team, one person can hold two roles. Everyone can still try any challenge — roles just say who leads where.</p>';
+
+  var onday = '<div class="twocol">' +
+    '<div><h3>What to bring</h3><ul>' +
+    '<li>Yourself and your team — split the categories using your role cards.</li>' +
+    '<li>A pen and a sheet of paper (or the Scribe\'s notes) to track flags and ideas.</li>' +
+    '<li>This cheat sheet and the 5-step method, in your head or in your pocket.</li>' +
+    '<li>Your school login if the event is on your own devices.</li>' +
+    '</ul>' +
+    '<h3>How a CTF runs</h3><ul>' +
+    '<li>Challenges sit in categories, each worth points — harder ones are worth more.</li>' +
+    '<li>You can do them in any order. Grab the easy points first to build confidence.</li>' +
+    '<li>You submit a flag; it is instantly right or wrong. Wrong guesses usually cost nothing, so try.</li>' +
+    '<li>A live scoreboard shows every team\'s score. It moves all the way to the end — never give up.</li>' +
+    '</ul></div>' +
+    '<div><h3>Golden rules on the day</h3><ul>' +
+    '<li><b>Read the challenge twice</b> before you touch a tool.</li>' +
+    '<li><b>Share what you learn.</b> A trick on one challenge often unlocks another.</li>' +
+    '<li><b>Watch the format</b> — right word, wrong shape is the commonest miss.</li>' +
+    '<li><b>Mind the clock</b> and keep easy flags flowing.</li>' +
+    '<li><b>No hints at the event</b> — but everything on this site has prepared you for that.</li>' +
+    '</ul>' +
+    '<h3>Feeling nervous? That\'s normal</h3><p>Every team starts not knowing where to look. The ones who do well are not the cleverest — they are the ones who stay calm, read carefully, and keep trying the next thing. You have practised all of this. Trust it.</p></div>' +
+    '</div>';
+
+  return '<div class="ref-head"><h1>Classroom pack</h1>' +
+    '<button class="btn primary no-print" id="printAllPack">🖨 Print the whole pack</button></div>' +
+    '<p>Ready-to-print handouts for the lead-up to the event. Print one at a time with the button on each, or the whole set at once. Designed to print clean in black and white.</p>' +
+    handout('flag', '🚩 Flag format — pin this up', flag) +
+    handout('method', '🧭 The 5-step method', method) +
+    handout('cheat', '🔎 Spot-it-fast cheat sheet', cheat) +
+    handout('tools', '🧰 Toolkit quick-reference', tools) +
+    handout('roles', '👥 Team role cards (cut out)', roleCards) +
+    handout('onday', '📅 On the day — what to bring &amp; expect', onday);
+};

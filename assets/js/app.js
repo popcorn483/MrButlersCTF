@@ -67,7 +67,7 @@
   }
 
   // ---------- navigation ----------
-  var LEARN_VIEWS = ['start', 'lessons', 'walkthrough', 'resources', 'reference'];
+  var LEARN_VIEWS = ['start', 'lessons', 'walkthrough', 'resources', 'reference', 'pack'];
   function closeLearnMenu() {
     var lm = document.getElementById('learnMenu'), lt = document.getElementById('learnToggle');
     if (lm) lm.hidden = true; if (lt) lt.setAttribute('aria-expanded', 'false');
@@ -715,6 +715,7 @@
   if (window.CTF_LESSONS_HTML) $('#lessonsContent').innerHTML = window.CTF_LESSONS_HTML();
   if (window.CTF_TOOLS_HELP_HTML) { var tg = document.getElementById('toolGuideBody'); if (tg) tg.innerHTML = window.CTF_TOOLS_HELP_HTML(); }
   if (window.CTF_REFERENCE_HTML) $('#refContent').innerHTML = window.CTF_REFERENCE_HTML();
+  if (window.CTF_PACK_HTML) $('#packContent').innerHTML = window.CTF_PACK_HTML();
 
   // Surprise me: open a random unsolved challenge (any if all solved)
   function surprise() {
@@ -741,6 +742,25 @@
   // print action (Reference page)
   document.addEventListener('click', function (e) {
     if (e.target.closest('[data-action="print"]')) { e.preventDefault(); window.print(); }
+    // print one classroom-pack handout on its own
+    var ph = e.target.closest('[data-print-handout]');
+    if (ph) {
+      e.preventDefault();
+      var id = ph.getAttribute('data-print-handout');
+      var h = document.querySelector('.handout[data-handout="' + id + '"]');
+      if (h) {
+        $$('.handout').forEach(function (x) { x.classList.remove('printing'); });
+        h.classList.add('printing'); document.body.classList.add('printing-handout');
+        window.print();
+        setTimeout(function () { document.body.classList.remove('printing-handout'); h.classList.remove('printing'); }, 600);
+      }
+    }
+    // print the whole pack
+    if (e.target.closest('#printAllPack')) {
+      e.preventDefault();
+      document.body.classList.add('printing-pack'); window.print();
+      setTimeout(function () { document.body.classList.remove('printing-pack'); }, 600);
+    }
   });
 
   // ---------- hooks for features.js (badges, daily challenge, streaks, certificate) ----------
