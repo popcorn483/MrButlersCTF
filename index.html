@@ -14,12 +14,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Mr B's CTF Practice">
-<!-- sister-app theme fonts -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+<!-- sister-app theme fonts (self-hosted, so they work offline on C2k) -->
 <link rel="preload" href="assets/fonts/lemonmilk-bold.woff" as="font" type="font/woff" crossorigin>
-<link rel="preload" href="assets/fonts/lemonmilk-regular.woff" as="font" type="font/woff" crossorigin>
+<link rel="preload" href="assets/fonts/AtkinsonHyperlegible-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
@@ -255,6 +252,8 @@
   <span>Practice challenges written for this site. They are in the style of ZeroDays / Cyber-Schools events but are <b>not</b> the real competition tasks.</span>
   <button class="linkish" id="getAppBtn">📲 Get the app on your phone</button>
   <button class="linkish" id="viewSiteHtml">View this page's HTML</button>
+  <span class="app-ver" data-app-ver></span>
+  <button class="linkish" data-app-check><span>Check for updates</span></button>
 </footer>
 
 <!-- ============ CHALLENGE MODAL ============ -->
@@ -409,5 +408,6 @@
 <script src="assets/js/test.js"></script>
 <script src="assets/js/welcome.js"></script>
 <script src="assets/js/pwa.js"></script>
+<script src="assets/js/update.js"></script>
 </body>
 </html>

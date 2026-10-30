@@ -4,6 +4,9 @@
 @font-face { font-family: 'Lemon Milk'; src: url('../fonts/lemonmilk-regular.woff') format('woff'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Lemon Milk'; src: url('../fonts/lemonmilk-medium.woff') format('woff'); font-weight: 500; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Lemon Milk'; src: url('../fonts/lemonmilk-bold.woff') format('woff'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Atkinson Hyperlegible'; src: url('../fonts/AtkinsonHyperlegible-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Atkinson Hyperlegible'; src: url('../fonts/AtkinsonHyperlegible-Bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Atkinson Hyperlegible'; src: url('../fonts/AtkinsonHyperlegible-Italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
 :root {
   --navy: #16213A;          /* brand surface — matches the Digital Technology app */
   --desk: #0E1117;
@@ -812,3 +815,17 @@ body.event-open { overflow: hidden; }
 #splash.rm .sp-c path { opacity: .75; }
 #splash.rm { transition: none; }
 @media (prefers-reduced-motion: reduce) { #splash, #splash * { animation: none !important; transition: none !important; } #splash .sp-flag, #splash .sp-mb, #splash .sp-dt, #splash .sp-c circle { opacity: 1; transform: none; } #splash .sp-c path { stroke-dashoffset: 0; } #splash .sp-strip { transform: none; } }
+
+/* ======================= Update / What's-new toast (matches DT) ======================= */
+.upd { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 1100; display: flex; align-items: center; flex-wrap: wrap; gap: 10px 12px; width: min(600px, calc(100vw - 24px)); box-sizing: border-box; padding: 14px 16px; border-radius: 18px; background: #16213A; color: #fff; box-shadow: 0 18px 44px -12px rgba(0,0,0,.55); font-family: var(--sans); }
+.upd > svg { flex: none; width: 24px; height: 24px; color: #8AB6FF; }
+.upd > div { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 2px; }
+.upd b { font-size: 15px; }
+.upd span { font-size: 13px; opacity: .85; }
+.upd ul { margin: 2px 0 0; padding-left: 1.1em; font-size: 13.5px; line-height: 1.45; }
+.upd button { font: inherit; font-weight: 700; font-size: 14px; border-radius: 12px; padding: 9px 14px; cursor: pointer; border: 0; }
+.upd .upd-go { background: #8AB6FF; color: #101826; }
+.upd .upd-go:disabled { opacity: .7; }
+.upd .upd-later { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.35); }
+@media (max-width: 520px) { .upd { bottom: 10px; } .upd .upd-go { flex: 1; } }
+.app-ver { color: var(--muted); font-size: .82rem; }
