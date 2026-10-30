@@ -733,3 +733,32 @@ body.event-open { overflow: hidden; }
   .ev-side { max-height: none; }
   .ev-clock { font-size: clamp(4rem, 30vw, 9rem); }
 }
+
+/* ======================= Save & continue ======================= */
+.save-status { border-radius: 8px; padding: 9px 13px; margin: 2px 0 14px; font-size: .92rem; }
+.save-status.ok { border: 1px solid var(--green-d); background: rgba(57,255,158,.08); color: var(--text); }
+.save-status.warn { border: 1px solid rgba(255,191,71,.5); background: rgba(255,191,71,.1); color: var(--text); }
+.save-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 0 0 12px; }
+.save-method { border: 1px solid var(--line2); border-radius: var(--radius); background: var(--panel); padding: 14px 16px; }
+.save-method-head { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
+.save-method-head h3 { margin: 0; font-size: 1.05rem; }
+.save-num { width: 24px; height: 24px; border-radius: 50%; background: var(--line2); color: var(--text); font-family: var(--mono); font-weight: 700; display: inline-flex; align-items: center; justify-content: center; font-size: .85rem; flex-shrink: 0; }
+.pill-rec { font-family: var(--mono); font-size: .66rem; letter-spacing: .08em; text-transform: uppercase; color: #03110a; background: var(--green); border-radius: 999px; padding: 2px 7px; vertical-align: middle; }
+.save-method .btn { margin-top: 4px; }
+.save-file-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.resume-box { display: block; width: 100%; box-sizing: border-box; margin-top: 10px; min-height: 68px; resize: vertical;
+  font-family: var(--mono); font-size: .78rem; line-height: 1.4; color: var(--text); background: var(--bg2); border: 1px solid var(--line2); border-radius: 8px; padding: 8px 10px; word-break: break-all; }
+.resume-paste { margin-top: 10px; }
+.resume-paste summary { cursor: pointer; color: var(--cyan); font-size: .9rem; }
+.resume-paste .btn { margin-top: 8px; }
+.reset-row { margin: 6px 0 2px; }
+
+/* board banners */
+.notice-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  border-radius: var(--radius); padding: 11px 15px; margin: 0 0 14px; font-size: .95rem; }
+.notice-banner[hidden] { display: none !important; }
+.notice-banner.save { border: 1px solid rgba(255,191,71,.5); background: rgba(255,191,71,.1); }
+.notice-banner.resume { border: 1px solid rgba(76,201,255,.45); background: rgba(76,201,255,.08); }
+.nb-btns { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.nb-x { padding: 4px 9px; }
+@media (max-width: 700px) { .save-panel { grid-template-columns: 1fr; } }

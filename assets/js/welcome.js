@@ -15,7 +15,7 @@
     { icon: '🧰', title: 'Your Toolkit', body:
       "School PCs block some tools, so this site has its own. The <b>Decoder</b> cracks codes and ciphers, the <b>Hex viewer</b> opens files, and more. Each challenge tells you which tool to reach for." },
     { icon: '📚', title: 'Learn and save your progress', body:
-      "The <b>Learn</b> menu has lessons that teach each skill from scratch. And remember to open <b>My progress</b> and download your progress file at the end of each session, so nothing is lost." },
+      "The <b>Learn</b> menu has lessons that teach each skill from scratch. And before you log off, open <b>My progress</b> and copy your <b>resume code</b> (or download your file) — paste it back next time to carry on exactly where you left off, so nothing is lost." },
     { icon: '🔒', title: 'The Test area', body:
       "When you feel ready, the <b>Test area</b> is a timed mock with no hints — just like the real event. You will need a password from your teacher to start it." },
     { icon: '🚀', title: 'Ready to go!', body:

@@ -88,6 +88,8 @@
       <span class="mode-desc" id="modeDesc"></span>
     </div>
 
+    <div id="resumeBanner" hidden></div>
+    <div id="saveBanner" hidden></div>
     <div id="recommend"></div>
     <div id="dailyCard"></div>
 
@@ -169,14 +171,34 @@
   <section class="view" id="view-progress">
     <div class="prose wide">
       <h1>My progress</h1>
-      <p>Your progress saves automatically in this browser. School computers can clear browser storage when you log off, so <b>download a progress file at the end of every session</b> and load it next time.</p>
-      <div class="progress-actions">
-        <button class="btn primary" id="exportBtn">⬇ Download my progress</button>
-        <label class="btn" for="importFile">⬆ Load a progress file</label>
-        <input type="file" id="importFile" accept=".json,application/json" hidden>
-        <button class="btn danger" id="resetBtn">Reset everything</button>
+      <p>Your work saves automatically in this browser as you go. But school computers often <b>wipe browser storage when you log off</b> — so before you leave, save your progress one of these two ways and bring it back next time.</p>
+
+      <div id="saveStatus" class="save-status"></div>
+
+      <div class="save-panel">
+        <div class="save-method">
+          <div class="save-method-head"><span class="save-num">1</span><h3>Resume code <span class="pill-rec">easiest</span></h3></div>
+          <p class="muted small">Copy your code and keep it somewhere safe — paste it into OneNote, a note to yourself, or an email. Next time, paste it back to carry on exactly where you left off.</p>
+          <button class="btn primary" id="makeCodeBtn">📋 Copy my resume code</button>
+          <textarea id="resumeOut" class="resume-box" readonly hidden aria-label="Your resume code"></textarea>
+          <details class="resume-paste" id="resumePaste">
+            <summary>Got a code from last time? Paste it here</summary>
+            <textarea id="resumeIn" class="resume-box" placeholder="Paste your resume code…" spellcheck="false"></textarea>
+            <button class="btn" id="loadCodeBtn">▶ Continue from my code</button>
+          </details>
+        </div>
+        <div class="save-method">
+          <div class="save-method-head"><span class="save-num">2</span><h3>Progress file</h3></div>
+          <p class="muted small">Prefer a file? Download one as a backup and load it next time. Teachers collect these for the leaderboard.</p>
+          <div class="save-file-btns">
+            <button class="btn" id="exportBtn">⬇ Download file</button>
+            <label class="btn" for="importFile">⬆ Load file</label>
+            <input type="file" id="importFile" accept=".json,application/json" hidden>
+          </div>
+        </div>
       </div>
       <div id="importMsg" class="notice" hidden></div>
+      <div class="reset-row"><button class="btn danger small" id="resetBtn">Reset everything</button></div>
       <div class="stat-grid" id="statGrid"></div>
       <div id="badgeShelf"></div>
       <div id="certCard"></div>

@@ -79,7 +79,7 @@
     var lt = document.getElementById('learnToggle');
     if (lt) lt.classList.toggle('active', LEARN_VIEWS.indexOf(view) >= 0);
     closeLearnMenu();
-    if (view === 'board') renderRecommend();
+    if (view === 'board') { renderRecommend(); renderBanners(); }
     if (view === 'progress') renderProgress();
     if (view === 'toolkit' && window.Toolkit) Toolkit.ensure();
     if (view === 'test' && window.TestArea) TestArea.enter();
@@ -579,6 +579,7 @@
       var c = BY_ID[id];
       return '<div><span class="when">' + fmtDate(S.solved[id].t) + '</span><span>' + esc(c.title) + ' <span class="muted">(' + esc(c.id) + ', ' + c.pts + ' pts' + (S.solved[id].h ? ', ' + S.solved[id].h + ' hint' + (S.solved[id].h > 1 ? 's' : '') : '') + (S.solved[id].r ? ', answer revealed' : '') + ')</span></span></div>';
     }).join('') : '<p class="muted">No flags yet. Head to the board and start with the Warm-Up category.</p>';
+    renderSaveStatus();
     try { document.dispatchEvent(new CustomEvent('ctf:progress')); } catch (e) { }
   }
 
@@ -593,43 +594,146 @@
     var ok = sha256(JSON.stringify(obj.data) + SALT) === obj.check;
     return { data: obj.data, ok: ok };
   }
+  // ---------- "saved since" tracking, so we can nudge pupils before they log off ----------
+  var SAVE_KEY = 'mbctf-saved-v1';
+  function savedMark() { try { return JSON.parse(localStorage.getItem(SAVE_KEY) || '{}'); } catch (e) { return {}; } }
+  function markSaved() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ count: solvedCount(), at: Date.now() })); } catch (e) { } renderSaveBanner(); renderSaveStatus(); }
+  function unsavedCount() { return Math.max(0, solvedCount() - (savedMark().count || 0)); }
+
+  // merge a loaded progress payload into the current state (used by file load and resume code)
+  function applyImport(d) {
+    var added = 0;
+    if (!Object.keys(S.solved).length) { S.pid = d.pid; }
+    if (d.pid === S.pid) {
+      Object.keys(d.solved || {}).forEach(function (id) { if (!S.solved[id]) { S.solved[id] = d.solved[id]; added++; } });
+    } else {
+      Object.keys(d.solved || {}).forEach(function (id) { if (!S.solved[id]) { S.solved[id] = { t: d.solved[id].t, p: '', h: d.solved[id].h || 0, r: d.solved[id].r || 0, m: 1 }; added++; } });
+    }
+    Object.keys(d.hints || {}).forEach(function (id) { S.hints[id] = Math.max(S.hints[id] || 0, d.hints[id]); });
+    if (!S.tut) S.tut = {}; Object.keys(d.tut || {}).forEach(function (id) { S.tut[id] = Math.max(S.tut[id] || 0, d.tut[id]); });
+    Object.keys(d.revealed || {}).forEach(function (id) { if (!S.revealed[id]) S.revealed[id] = d.revealed[id]; });
+    if (!S.tries) S.tries = {}; Object.keys(d.tries || {}).forEach(function (id) { S.tries[id] = Math.max(S.tries[id] || 0, d.tries[id]); });
+    S.wrong = Math.max(S.wrong, d.wrong || 0);
+    if (!S.name && d.name) S.name = d.name;
+    save(); markSaved(); refreshHeader(); renderBoard(); renderProgress();
+    try { document.dispatchEvent(new CustomEvent('ctf:refresh')); } catch (e) { }
+    return added;
+  }
+
+  // ---------- resume code: the same signed progress data as the file, as copy-paste text ----------
+  function b64uEnc(bytes) { var s = ''; for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+  function b64uDec(str) { str = str.replace(/-/g, '+').replace(/_/g, '/'); while (str.length % 4) str += '='; var bin = atob(str), a = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; }
+  function gzip(str) { var cs = new CompressionStream('gzip'); return new Response(new Blob([str]).stream().pipeThrough(cs)).arrayBuffer().then(function (buf) { return new Uint8Array(buf); }); }
+  function gunzip(bytes) { var ds = new DecompressionStream('gzip'); return new Response(new Blob([bytes]).stream().pipeThrough(ds)).text(); }
+  function makeResumeCode() {
+    var json = makeExport();
+    if (window.CompressionStream) {
+      return gzip(json).then(function (bytes) { return 'C1~' + b64uEnc(bytes); }).catch(function () { return 'R1~' + b64uEnc(new TextEncoder().encode(json)); });
+    }
+    return Promise.resolve('R1~' + b64uEnc(new TextEncoder().encode(json)));
+  }
+  function decodeResumeCode(code) {
+    code = (code || '').trim().replace(/\s+/g, '');
+    var i = code.indexOf('~'), tag = i > 0 ? code.slice(0, i) : '', body = i > 0 ? code.slice(i + 1) : code;
+    var bytes;
+    try { bytes = b64uDec(body); } catch (e) { return Promise.reject(new Error('That does not look like a resume code. Check you copied all of it.')); }
+    if (tag.charAt(0) === 'C') {
+      if (!window.DecompressionStream) return Promise.reject(new Error('This code needs a newer browser to open. Load your progress file instead.'));
+      return gunzip(bytes);
+    }
+    return Promise.resolve(new TextDecoder().decode(bytes));
+  }
+  function importMsg(cls, text) { var m = $('#importMsg'); if (!m) return; m.hidden = false; m.className = 'notice ' + cls; m.textContent = text; }
+  function loadPayload(d, ok) {
+    if (!ok) throw new Error('This progress has been edited by hand, so it can\'t be loaded.');
+    if (Object.keys(S.solved).length && d.pid !== S.pid && !confirm('This progress belongs to "' + (d.name || 'unnamed') + '". Merge their solves into the progress on this computer?')) return null;
+    return applyImport(d);
+  }
   $('#exportBtn').addEventListener('click', function () {
     if (!S.name) askName();
     var name = (S.name || 'player').replace(/[^\w-]+/g, '_');
     var d = new Date(), stamp = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
     download('MrButlersCTF-' + name + '-' + stamp + '.json', makeExport());
-    toast('Progress file downloaded');
+    markSaved(); toast('Progress file downloaded — keep it safe for next time');
   });
   $('#importFile').addEventListener('change', function () {
-    var file = this.files[0]; if (!file) return;
-    var msg = $('#importMsg'); var input = this;
+    var file = this.files[0]; if (!file) return; var input = this;
     file.text().then(function (text) {
-      var r = parseImport(text);
-      if (!r.ok) throw new Error('This progress file has been edited by hand, so it can\'t be loaded.');
-      var d = r.data, added = 0;
-      if (Object.keys(S.solved).length && d.pid !== S.pid && !confirm('This file belongs to "' + (d.name || 'unnamed') + '". Merge their solves into the progress on this computer?')) return;
-      if (!Object.keys(S.solved).length) { S.pid = d.pid; }
-      if (d.pid === S.pid) {
-        Object.keys(d.solved || {}).forEach(function (id) { if (!S.solved[id]) { S.solved[id] = d.solved[id]; added++; } });
-      } else {
-        Object.keys(d.solved || {}).forEach(function (id) { if (!S.solved[id]) { S.solved[id] = { t: d.solved[id].t, p: '', h: d.solved[id].h || 0, r: d.solved[id].r || 0, m: 1 }; added++; } });
-      }
-      Object.keys(d.hints || {}).forEach(function (id) { S.hints[id] = Math.max(S.hints[id] || 0, d.hints[id]); });
-      if (!S.tut) S.tut = {}; Object.keys(d.tut || {}).forEach(function (id) { S.tut[id] = Math.max(S.tut[id] || 0, d.tut[id]); });
-      Object.keys(d.revealed || {}).forEach(function (id) { if (!S.revealed[id]) S.revealed[id] = d.revealed[id]; });
-      if (!S.tries) S.tries = {}; Object.keys(d.tries || {}).forEach(function (id) { S.tries[id] = Math.max(S.tries[id] || 0, d.tries[id]); });
-      S.wrong = Math.max(S.wrong, d.wrong || 0);
-      if (!S.name && d.name) S.name = d.name;
-      save(); refreshHeader(); renderBoard(); renderProgress();
-      try { document.dispatchEvent(new CustomEvent('ctf:refresh')); } catch (e) { }
-      msg.hidden = false; msg.className = 'notice good'; msg.textContent = 'Loaded. ' + added + ' new solve' + (added === 1 ? '' : 's') + ' added. Welcome back' + (S.name ? ', ' + S.name : '') + '!';
-    }).catch(function (err) {
-      msg.hidden = false; msg.className = 'notice bad'; msg.textContent = err.message || 'Could not read that file.';
-    }).then(function () { input.value = ''; });
+      var r = parseImport(text); var added = loadPayload(r.data, r.ok);
+      if (added === null) return;
+      importMsg('good', 'Loaded from your file. ' + added + ' new solve' + (added === 1 ? '' : 's') + ' added. Welcome back' + (S.name ? ', ' + S.name : '') + '!');
+    }).catch(function (err) { importMsg('bad', err.message || 'Could not read that file.'); }).then(function () { input.value = ''; });
   });
+  // resume code: copy mine
+  var mcb = $('#makeCodeBtn');
+  if (mcb) mcb.addEventListener('click', function () {
+    if (!solvedCount()) { importMsg('bad', 'Solve at least one challenge first, then you\'ll have something to save.'); return; }
+    if (!S.name) askName();
+    makeResumeCode().then(function (code) {
+      var out = $('#resumeOut'); out.hidden = false; out.value = code;
+      out.focus(); out.select();
+      var done = function () { markSaved(); toast('Resume code copied — paste it somewhere safe for next time'); importMsg('good', 'Here is your resume code. It\'s copied to your clipboard — paste it into OneNote, a note, or an email, and bring it back next time.'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(done, function () { try { document.execCommand('copy'); } catch (e) { } done(); });
+      else { try { document.execCommand('copy'); } catch (e) { } done(); }
+    });
+  });
+  // resume code: continue from one
+  var lcb = $('#loadCodeBtn');
+  if (lcb) lcb.addEventListener('click', function () {
+    var code = ($('#resumeIn') || {}).value || '';
+    if (!code.trim()) { importMsg('bad', 'Paste your resume code into the box first.'); return; }
+    decodeResumeCode(code).then(function (json) {
+      var r = parseImport(json); var added = loadPayload(r.data, r.ok);
+      if (added === null) return;
+      $('#resumeIn').value = '';
+      importMsg('good', 'Welcome back' + (S.name ? ', ' + S.name : '') + '! Restored from your resume code — ' + added + ' new solve' + (added === 1 ? '' : 's') + ' added.');
+    }).catch(function (err) { importMsg('bad', err.message || 'That resume code could not be read. Check you copied all of it.'); });
+  });
+
+  // ---------- save status + banners (so nobody loses their work on a wiped school PC) ----------
+  function renderSaveStatus() {
+    var el = document.getElementById('saveStatus'); if (!el) return;
+    var n = solvedCount(), u = unsavedCount();
+    if (!n) { el.hidden = true; return; }
+    el.hidden = false;
+    if (u > 0) { el.className = 'save-status warn'; el.innerHTML = '⚠ You have <b>' + u + '</b> new solve' + (u === 1 ? '' : 's') + ' that aren\'t saved for next time yet. Copy your resume code or download your file below.'; }
+    else { el.className = 'save-status ok'; el.innerHTML = '✓ All your progress is saved. Keep your resume code or file safe and you can carry on next time.'; }
+  }
+  function renderSaveBanner() {
+    var el = document.getElementById('saveBanner'); if (!el) return;
+    var u = unsavedCount();
+    if (u < 3 || (window.TestArea && TestArea.isLive && TestArea.isLive())) { el.hidden = true; return; }
+    el.hidden = false; el.className = 'notice-banner save';
+    el.innerHTML = '<span>💾 You\'ve solved <b>' + u + '</b> flags since you last saved. Don\'t lose them when you log off!</span>' +
+      '<span class="nb-btns"><button class="btn small primary" data-goto="progress">Save my progress →</button></span>';
+  }
+  var resumeDismissed = false;
+  function renderResumeBanner() {
+    var el = document.getElementById('resumeBanner'); if (!el) return;
+    if (resumeDismissed || solvedCount() > 0) { el.hidden = true; return; }
+    el.hidden = false; el.className = 'notice-banner resume';
+    el.innerHTML = '<span>👋 Been here before? Your work may have been cleared when you logged off. Load your <b>resume code</b> or <b>file</b> to carry on.</span>' +
+      '<span class="nb-btns"><button class="btn small primary" data-goto="progress">Continue →</button><button class="btn small nb-x" id="resumeBannerX" aria-label="Dismiss">✕</button></span>';
+    var x = document.getElementById('resumeBannerX');
+    if (x) x.addEventListener('click', function (e) { e.stopPropagation(); resumeDismissed = true; el.hidden = true; });
+  }
+  function renderBanners() { renderSaveBanner(); renderResumeBanner(); }
+
+  // gentle one-time nudge once a pupil has some solves this session
+  var sessSolves = 0, nudged = false;
+  document.addEventListener('ctf:solve', function () {
+    sessSolves++;
+    renderBanners(); renderSaveStatus();
+    if (!nudged && sessSolves >= 3 && unsavedCount() >= 3) {
+      nudged = true;
+      setTimeout(function () { toast('💾 Nice progress! Remember to save it (My progress) before you log off, so you can carry on next time.', 4200); }, 2000);
+    }
+  });
+  document.addEventListener('ctf:refresh', function () { renderBanners(); renderSaveStatus(); });
   $('#resetBtn').addEventListener('click', function () {
     if (!confirm('Delete ALL progress on this computer? Download a progress file first if you want to keep it.')) return;
-    S = blankState(); save(); refreshHeader(); renderBoard(); renderProgress(); toast('Progress reset');
+    S = blankState(); save(); try { localStorage.removeItem(SAVE_KEY); } catch (e) { } resumeDismissed = true;
+    refreshHeader(); renderBoard(); renderProgress(); toast('Progress reset');
     try { document.dispatchEvent(new CustomEvent('ctf:refresh')); } catch (e) { }
   });
 
@@ -771,7 +875,7 @@
   window.CTF.rankName = function () { var e = document.getElementById('rankName'); return e ? e.textContent : ''; };
 
   // ---------- boot ----------
-  renderChips(); renderBoard(); refreshHeader(); renderTeacher(); updateModeUI();
+  renderChips(); renderBoard(); refreshHeader(); renderTeacher(); updateModeUI(); renderBanners();
   if (!S.name) setTimeout(function () { var w = $('#playerName'); w.style.color = 'var(--amber)'; }, 300);
   var hash = location.hash.replace('#', '');
   if (BY_ID[hash]) openChal(hash);
