@@ -6,6 +6,14 @@
 <title>Mr Butler's CTF</title>
 <meta name="description" content="200 practice capture-the-flag challenges for secondary school pupils getting ready for a ZeroDays-style cyber security competition.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b1220'/%3E%3Cpath d='M9 6v20' stroke='%2339ff9e' stroke-width='3'/%3E%3Cpath d='M10 7h13l-4 5 4 5H10z' fill='%2339ff9e'/%3E%3C/svg%3E">
+<!-- install-to-phone (PWA) -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#070c16">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mr Butler's CTF">
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
@@ -238,6 +246,7 @@
 
 <footer class="foot">
   <span>Practice challenges written for this site. They are in the style of ZeroDays / Cyber-Schools events but are <b>not</b> the real competition tasks.</span>
+  <button class="linkish" id="getAppBtn">📲 Get the app on your phone</button>
   <button class="linkish" id="viewSiteHtml">View this page's HTML</button>
 </footer>
 
@@ -303,6 +312,38 @@
   </div>
 </div>
 
+<!-- ============ INSTALL-TO-PHONE MODAL ============ -->
+<div class="modal" id="installModal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="installHeading">
+    <button class="modal-x" data-close aria-label="Close">✕</button>
+    <h2 id="installHeading">📲 Add CTF Practice to your phone</h2>
+    <p>Install it like an app — it gets its own icon on your home screen, opens full-screen with no address bar, and even <b>works offline</b> once you've opened it. It's not from an app store, so there's nothing to pay for and no sign-up.</p>
+    <div id="installOneTap" hidden>
+      <button class="btn primary big" id="pwaInstallBtn">⬇ Install now</button>
+      <p class="muted small">Tap the button, then confirm. Done!</p>
+    </div>
+    <div class="install-steps">
+      <div class="install-os">
+        <h3>📱 iPhone / iPad (Safari)</h3>
+        <ol>
+          <li>Tap the <b>Share</b> button <span class="kbd">⬆️</span> at the bottom of Safari.</li>
+          <li>Scroll down and tap <b>Add to Home Screen</b>.</li>
+          <li>Tap <b>Add</b> — the CTF icon appears on your home screen.</li>
+        </ol>
+      </div>
+      <div class="install-os">
+        <h3>🤖 Android (Chrome)</h3>
+        <ol>
+          <li>Tap the <b>⋮</b> menu (top-right).</li>
+          <li>Tap <b>Install app</b> (or <b>Add to Home screen</b>).</li>
+          <li>Tap <b>Install</b> — the CTF icon appears in your apps.</li>
+        </ol>
+      </div>
+    </div>
+    <p class="muted small">On a school computer you can also just bookmark this page. Already added? You can close this.</p>
+  </div>
+</div>
+
 <!-- ============ PROJECTOR MOCK-EVENT SCREEN ============ -->
 <div id="eventScreen" hidden>
   <div class="ev-top">
@@ -360,5 +401,6 @@
 <script src="assets/js/tools.js"></script>
 <script src="assets/js/test.js"></script>
 <script src="assets/js/welcome.js"></script>
+<script src="assets/js/pwa.js"></script>
 </body>
 </html>

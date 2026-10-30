@@ -762,3 +762,14 @@ body.event-open { overflow: hidden; }
 .nb-btns { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .nb-x { padding: 4px 9px; }
 @media (max-width: 700px) { .save-panel { grid-template-columns: 1fr; } }
+
+/* ======================= Install-to-phone ======================= */
+#installOneTap { border: 1px solid var(--green-d); background: rgba(57,255,158,.08); border-radius: var(--radius); padding: 12px 14px; margin: 4px 0 14px; }
+#installOneTap p { margin: 6px 0 0; }
+.install-steps { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 6px; }
+.install-os { border: 1px solid var(--line2); border-radius: var(--radius); background: var(--panel); padding: 12px 14px; }
+.install-os h3 { margin: 0 0 6px; font-size: 1rem; }
+.install-os ol { margin: 0; padding-left: 20px; }
+.install-os li { margin: 5px 0; font-size: .92rem; }
+.install-os .kbd { font-family: var(--mono); background: var(--bg2); border: 1px solid var(--line2); border-radius: 5px; padding: 0 5px; }
+@media (max-width: 640px) { .install-steps { grid-template-columns: 1fr; } }
