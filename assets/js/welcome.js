@@ -4,7 +4,7 @@
   'use strict';
   var KEY = 'mbctf-welcomed-v1';
   var STEPS = [
-    { icon: '👋', title: "Welcome to Mr Butler's CTF!", body:
+    { icon: '👋', title: "Welcome to Mr B's CTF Practice!", body:
       "This is your training ground for the cyber security competition. It is friendly, you cannot break anything, and getting stuck is completely normal. Let's take 30 seconds to show you around." },
     { icon: '🚩', title: 'Everything is about finding a flag', body:
       "Each challenge hides a secret called a <b>flag</b>, written like <code>flag{like_this}</code>. Your job is to find it and type it in. When you do, you score points. That is the whole game!" },
