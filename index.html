@@ -76,8 +76,41 @@
 
 <main id="main">
 
+  <!-- ============ HOME ============ -->
+  <section class="view active" id="view-home">
+    <div class="home">
+      <div class="home-wm">
+        <span class="home-flag" aria-hidden="true">⚑</span>
+        <span class="home-mb">Mr Butler&rsquo;s</span>
+        <span class="home-dt">CTF Practice</span>
+      </div>
+      <span class="home-strip" aria-hidden="true"><i style="background:var(--h1)"></i><i style="background:var(--h2)"></i><i style="background:var(--h3)"></i><i style="background:var(--h4)"></i><i style="background:var(--h5)"></i><i style="background:var(--h6)"></i><i style="background:var(--h7)"></i><i style="background:var(--h8)"></i><i style="background:var(--h9)"></i><i style="background:var(--h10)"></i></span>
+      <p class="home-line">Get ready for the ZeroDays-style competition &mdash; 203 practice flags, step-by-step lessons and a timed mock event, all in one place.</p>
+
+      <div class="home-ch">
+        <a class="home-c" href="#" data-goto="board" style="--wc:var(--h6)"><span class="home-ic">🚩</span><span class="home-tx"><b>Challenge board</b><span class="home-u">203 flags across 10 categories</span></span><span class="home-go" aria-hidden="true">→</span></a>
+        <a class="home-c" href="#" data-goto="start" style="--wc:var(--h1)"><span class="home-ic">📘</span><span class="home-tx"><b>Learn the skills</b><span class="home-u">Lessons, walkthroughs &amp; tools, from scratch</span></span><span class="home-go" aria-hidden="true">→</span></a>
+        <a class="home-c" href="#" data-goto="test" style="--wc:var(--h5)"><span class="home-ic">🔒</span><span class="home-tx"><b>Test area</b><span class="home-u">A timed mock, just like the real event</span></span><span class="home-go" aria-hidden="true">→</span></a>
+        <a class="home-c" href="#" data-goto="toolkit" style="--wc:var(--h3)"><span class="home-ic">🧰</span><span class="home-tx"><b>Toolkit</b><span class="home-u">Decoder, hex viewer and more</span></span><span class="home-go" aria-hidden="true">→</span></a>
+      </div>
+
+      <div id="homeCont"></div>
+
+      <div class="home-sec">
+        <button type="button" class="home-s" id="homeInstall">📲 Install app</button>
+        <button type="button" class="home-s" data-goto="progress">My progress</button>
+        <button type="button" class="home-s" id="homeAboutBtn" aria-expanded="false" aria-controls="homeAbout">About</button>
+      </div>
+      <div class="home-about" id="homeAbout" hidden>
+        <p>Practice challenges in the style of ZeroDays / Cyber-Schools events, written for pupils getting ready for the competition. They are <b>not</b> the real tasks.</p>
+        <p>Your progress saves in this browser. Use <a href="#" data-goto="progress">My progress</a> to back it up with a resume code or file.</p>
+        <p class="home-ver"><span data-app-ver></span> <button type="button" class="wl-chk" data-app-check><span>Check for updates</span></button></p>
+      </div>
+    </div>
+  </section>
+
   <!-- ============ BOARD ============ -->
-  <section class="view active" id="view-board">
+  <section class="view" id="view-board">
     <div class="board-intro">
       <div>
         <h1>Challenge board</h1>

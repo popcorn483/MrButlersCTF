@@ -79,6 +79,7 @@
     var lt = document.getElementById('learnToggle');
     if (lt) lt.classList.toggle('active', LEARN_VIEWS.indexOf(view) >= 0);
     closeLearnMenu();
+    if (view === 'home') renderHome();
     if (view === 'board') { renderRecommend(); renderBanners(); }
     if (view === 'progress') renderProgress();
     if (view === 'toolkit' && window.Toolkit) Toolkit.ensure();
@@ -205,6 +206,18 @@
     var pick = nextRecommended();
     if (pick) { show('board'); openChal(pick.id); }
     else { show('test'); }
+  }
+  function renderHome() {
+    var box = document.getElementById('homeCont'); if (!box) return;
+    var n = solvedCount(), pick = nextRecommended();
+    if (!n || !pick) { box.innerHTML = ''; return; }
+    var cat = CATS.filter(function (x) { return x.id === pick.cat; })[0];
+    box.innerHTML = '<a class="home-cont" href="#" id="homeContLink"><span class="hc-ic">▶</span>' +
+      '<span class="hc-tx"><small>Continue where you left off</small><b>' + esc(pick.title) + '</b>' +
+      '<span>' + cat.icon + ' ' + esc(cat.name) + ' · ' + TIERS[pick.tier].name + ' · ' + score() + ' pts so far</span></span>' +
+      '<span class="btn primary">Resume →</span></a>';
+    var a = document.getElementById('homeContLink');
+    if (a) a.addEventListener('click', function (e) { e.preventDefault(); openRecommended(); });
   }
   function renderRecommend() {
     var box = document.getElementById('recommend'); if (!box) return;
@@ -875,7 +888,17 @@
   window.CTF.rankName = function () { var e = document.getElementById('rankName'); return e ? e.textContent : ''; };
 
   // ---------- boot ----------
-  renderChips(); renderBoard(); refreshHeader(); renderTeacher(); updateModeUI(); renderBanners();
+  // home screen wiring
+  var brandEl = document.querySelector('.brand');
+  if (brandEl) { brandEl.style.cursor = 'pointer'; brandEl.setAttribute('role', 'link'); brandEl.setAttribute('tabindex', '0'); brandEl.setAttribute('title', 'Home');
+    brandEl.addEventListener('click', function () { show('home'); });
+    brandEl.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); show('home'); } }); }
+  var homeAboutBtn = document.getElementById('homeAboutBtn');
+  if (homeAboutBtn) homeAboutBtn.addEventListener('click', function () {
+    var p = document.getElementById('homeAbout'), open = p.hidden; p.hidden = !open; homeAboutBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  renderChips(); renderBoard(); refreshHeader(); renderTeacher(); updateModeUI(); renderBanners(); renderHome();
   if (!S.name) setTimeout(function () { var w = $('#playerName'); w.style.color = 'var(--amber)'; }, 300);
   var hash = location.hash.replace('#', '');
   if (BY_ID[hash]) openChal(hash);

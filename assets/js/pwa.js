@@ -27,10 +27,13 @@
     return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
   }
 
-  if (getApp) getApp.addEventListener('click', function () {
+  function openInstall() {
     if (isStandalone()) { if (window.CTFUtil && CTFUtil.toast) CTFUtil.toast('You are already using the installed app 🎉'); return; }
     if (window.CTFModal) window.CTFModal.open('#installModal');
-  });
+  }
+  if (getApp) getApp.addEventListener('click', openInstall);
+  var homeInstall = document.getElementById('homeInstall');
+  if (homeInstall) homeInstall.addEventListener('click', openInstall);
 
   if (installBtn) installBtn.addEventListener('click', function () {
     if (!deferred) return;
