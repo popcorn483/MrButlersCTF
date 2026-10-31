@@ -1,11 +1,11 @@
 {
-  "version": "mbctf-v4",
-  "date": "2026-10-30",
+  "version": "mbctf-v5",
+  "date": "2026-10-31",
   "notes": [
-    "A fresh look — now a matching sister app to Mr Butler's Digital Technology, with a new launch screen",
-    "Added a flag to the app logo and renamed the app \"Mr B's CTF Practice\"",
-    "Install it on your phone and use it offline, with your progress saved by resume code",
-    "New class tools: a projector mock-event screen and a printable classroom pack",
-    "Earn badges, a daily challenge and streaks as you practise"
+    "A brand-new home screen with quick links to the board, lessons, test area and toolkit",
+    "A fresh look to match Mr Butler's Digital Technology app, with a new icon and launch screen",
+    "Fonts now load offline, so the whole app works with no signal once installed",
+    "Install it on your phone, save progress with a resume code, and get update notes like this one",
+    "Class tools, badges, a daily challenge and streaks to keep you practising"
   ]
 }

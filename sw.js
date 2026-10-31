@@ -2,7 +2,7 @@
    Stale-while-revalidate: serve fast from cache, refresh in the background.
    A new deploy = a new CACHE/VERSION; the new worker WAITS so the page can offer
    "Update now" (with patch notes), and activates when it receives SKIP_WAITING. */
-var VERSION = 'mbctf-v4';
+var VERSION = 'mbctf-v5';
 var CACHE = VERSION;
 var CORE = [
   './', 'index.html', 'teacher.html', 'manifest.webmanifest',
@@ -34,6 +34,11 @@ self.addEventListener('message', function (e) {
 self.addEventListener('fetch', function (e) {
   var req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  // version.json network-first, so update checks see fresh patch notes
+  if (/version\.json$/.test(new URL(req.url).pathname)) {
+    e.respondWith(fetch(req).then(function (res) { var c = res.clone(); caches.open(CACHE).then(function (ch) { ch.put(req, c); }); return res; }).catch(function () { return caches.match(req); }));
+    return;
+  }
   e.respondWith(
     caches.open(CACHE).then(function (cache) {
       return cache.match(req).then(function (cached) {
