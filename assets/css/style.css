@@ -865,3 +865,36 @@ body.event-open { overflow: hidden; }
 .home-about a { color: var(--accent); font-weight: 700; }
 .home-ver { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
 @media (max-width: 640px) { .home-ch { grid-template-columns: 1fr; gap: 14px; } }
+
+/* ======================= Home screen: polish ======================= */
+/* hide the global hamburger and the (duplicated) footer on the home screen */
+body.view-home .hamburger { display: none !important; }
+body.view-home .foot { display: none !important; }
+
+/* Continue card → top right (like the sister app) */
+#homeCont { order: -1; width: 100%; margin: 0 0 6px; }
+#homeCont:empty { display: none; }
+.home-cont { margin-top: 0; width: min(440px, 100%); margin-left: auto; }
+.home-cont .hc-tx small { white-space: nowrap; }
+.home-cont .hc-tx span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 640px) { .home-cont { width: 100%; margin-left: 0; } }
+
+/* movement: a gently waving flag + a staggered entrance that replays each visit */
+.home-flag { display: inline-block; transform-origin: bottom center; animation: home-flagwave 3.2s ease-in-out infinite; }
+@keyframes home-flagwave { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-7px) rotate(3deg); } }
+@keyframes home-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes home-strip-in { from { opacity: 0; transform: scaleX(.2); } to { opacity: 1; transform: scaleX(1); } }
+.home-in .home-wm, .home-in .home-line, .home-in .home-ch .home-c, .home-in #homeCont, .home-in .home-sec { animation: home-rise .5s cubic-bezier(.2,.7,.2,1) backwards; }
+.home-in .home-strip { animation: home-strip-in .6s cubic-bezier(.2,.7,.2,1) backwards; transform-origin: center; }
+.home-in #homeCont { animation-delay: .04s; }
+.home-in .home-wm { animation-delay: .06s; }
+.home-in .home-strip { animation-delay: .16s; }
+.home-in .home-line { animation-delay: .22s; }
+.home-in .home-ch .home-c:nth-child(1) { animation-delay: .28s; }
+.home-in .home-ch .home-c:nth-child(2) { animation-delay: .34s; }
+.home-in .home-ch .home-c:nth-child(3) { animation-delay: .40s; }
+.home-in .home-ch .home-c:nth-child(4) { animation-delay: .46s; }
+.home-in .home-sec { animation-delay: .54s; }
+@media (prefers-reduced-motion: reduce) {
+  .home-flag, .home-in .home-wm, .home-in .home-line, .home-in .home-ch .home-c, .home-in #homeCont, .home-in .home-sec, .home-in .home-strip { animation: none !important; }
+}

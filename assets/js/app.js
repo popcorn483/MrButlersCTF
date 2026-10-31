@@ -76,6 +76,7 @@
     $$('.tab').forEach(function (t) { t.classList.toggle('active', t.dataset.view === view); });
     $$('.view').forEach(function (v) { v.classList.toggle('active', v.id === 'view-' + view); });
     document.body.classList.toggle('view-board', view === 'board'); // drawer board-options only on the board
+    document.body.classList.toggle('view-home', view === 'home');   // hide the hamburger on the home screen
     var lt = document.getElementById('learnToggle');
     if (lt) lt.classList.toggle('active', LEARN_VIEWS.indexOf(view) >= 0);
     closeLearnMenu();
@@ -107,6 +108,7 @@
   })();
   window.CTFShow = show;
   document.body.classList.toggle('view-board', document.getElementById('view-board').classList.contains('active'));
+  document.body.classList.toggle('view-home', document.getElementById('view-home').classList.contains('active'));
   $$('.tab[data-view]').forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.view); }); });
   $$('.tab-menu-item').forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.view); }); });
   var learnToggle = document.getElementById('learnToggle');
@@ -208,13 +210,15 @@
     else { show('test'); }
   }
   function renderHome() {
+    var h = document.querySelector('.home'); // replay the entrance animation each time home is shown
+    if (h) { h.classList.remove('home-in'); void h.offsetWidth; h.classList.add('home-in'); }
     var box = document.getElementById('homeCont'); if (!box) return;
     var n = solvedCount(), pick = nextRecommended();
     if (!n || !pick) { box.innerHTML = ''; return; }
     var cat = CATS.filter(function (x) { return x.id === pick.cat; })[0];
     box.innerHTML = '<a class="home-cont" href="#" id="homeContLink"><span class="hc-ic">▶</span>' +
-      '<span class="hc-tx"><small>Continue where you left off</small><b>' + esc(pick.title) + '</b>' +
-      '<span>' + cat.icon + ' ' + esc(cat.name) + ' · ' + TIERS[pick.tier].name + ' · ' + score() + ' pts so far</span></span>' +
+      '<span class="hc-tx"><small>Continue</small><b>' + esc(pick.title) + '</b>' +
+      '<span>' + cat.icon + ' ' + esc(cat.name) + ' · ' + score() + ' pts so far</span></span>' +
       '<span class="btn primary">Resume →</span></a>';
     var a = document.getElementById('homeContLink');
     if (a) a.addEventListener('click', function (e) { e.preventDefault(); openRecommended(); });
