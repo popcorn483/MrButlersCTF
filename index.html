@@ -78,7 +78,7 @@
 
   <!-- ============ HOME ============ -->
   <section class="view active" id="view-home">
-    <div class="home-bg" aria-hidden="true"><span class="home-star"></span><span class="home-star home-star2"></span></div>
+    <div class="home-bg" aria-hidden="true"></div>
     <div class="home">
       <div class="home-wm">
         <span class="home-flag" aria-hidden="true">⚑</span>
@@ -98,6 +98,7 @@
       <div id="homeCont"></div>
 
       <div class="home-sec">
+        <button type="button" class="home-s" id="homeShare">🔗 Share</button>
         <button type="button" class="home-s" id="homeInstall">📲 Install app</button>
         <button type="button" class="home-s" data-goto="progress">My progress</button>
         <button type="button" class="home-s" id="homeAboutBtn" aria-expanded="false" aria-controls="homeAbout">About</button>
@@ -352,6 +353,22 @@
   </div>
 </div>
 
+<!-- ============ SHARE MODAL ============ -->
+<div class="modal" id="shareModal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="shareHeading">
+    <button class="modal-x" data-close aria-label="Close">✕</button>
+    <h2 id="shareHeading">🔗 Share with your class</h2>
+    <p>Put this on the board — students <b>scan the QR code</b> or open the link to jump straight in. No login, nothing to install.</p>
+    <div class="share-qr" id="shareBox"></div>
+    <div class="share-url" id="shareUrl"></div>
+    <div class="share-actions">
+      <button class="btn primary" id="shareCopy">📋 Copy link</button>
+      <button class="btn" id="shareNative">Share…</button>
+      <button class="btn" data-close>Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ INSTALL-TO-PHONE MODAL ============ -->
 <div class="modal" id="installModal" hidden>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="installHeading">
@@ -442,6 +459,8 @@
 <script src="assets/js/test.js"></script>
 <script src="assets/js/welcome.js"></script>
 <script src="assets/js/pwa.js"></script>
+<script src="assets/js/qrcode.js"></script>
+<script src="assets/js/share.js"></script>
 <script src="assets/js/update.js"></script>
 </body>
 </html>

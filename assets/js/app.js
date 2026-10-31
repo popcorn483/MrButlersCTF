@@ -209,9 +209,27 @@
     if (pick) { show('board'); openChal(pick.id); }
     else { show('test'); }
   }
+  // animated circuit-trace background (same visual language as the splash / sister app)
+  function buildHomeBg() {
+    var bg = document.querySelector('.home-bg'); if (!bg) return;
+    var HL = ['#8AB6FF', '#4FD6C6', '#BDA2FF', '#FF8FBC', '#F5B25C', '#85D68C', '#A8B2FF', '#5CD3EE', '#FF9E78', '#E59AF2'];
+    var port = (window.innerHeight || 1) > (window.innerWidth || 1), VB = port ? '0 0 300 400' : '0 0 400 300';
+    var T = port
+      ? [['M-10 70H50L80 100H120', 0], ['M310 48H240L210 78H180', 2], ['M90 -10V30L115 55', 8], ['M-10 330H52L82 300H125', 4], ['M310 352H246L216 322H176', 7], ['M215 410V372L190 347', 1], ['M-10 128H30', 5], ['M310 272H268', 9], ['M-10 200H44L74 230', 3], ['M310 168H252L222 198', 6]]
+      : [['M-10 70H70L100 100H150', 0], ['M410 52H330L300 82H262', 2], ['M-10 232H58L88 202H138', 4], ['M410 246H344L314 216H258', 7], ['M120 -10V30L150 60', 8], ['M286 310V272L256 242', 1], ['M-10 150H40', 5], ['M410 150H362', 9], ['M-10 300H64L94 272', 3], ['M410 96H356L326 124', 6]];
+    var paths = T.map(function (t, i) {
+      var cur = [0, 0];
+      t[0].match(/[MHVL][^MHVL]*/g).forEach(function (s) { var c = s[0], v = s.slice(1).trim().split(/\s+/).map(Number); if (c === 'M' || c === 'L') cur = [v[0], v[1]]; else if (c === 'H') cur = [v[0], cur[1]]; else cur = [cur[0], v[0]]; });
+      var dl = (i * 0.06).toFixed(2), col = HL[t[1]];
+      return '<path d="' + t[0] + '" pathLength="1" stroke="' + col + '" style="animation-delay:' + dl + 's"/><circle cx="' + cur[0] + '" cy="' + cur[1] + '" r="4" stroke="' + col + '" style="animation-delay:' + (+dl + 0.9).toFixed(2) + 's"/>';
+    }).join('');
+    bg.innerHTML = '<svg class="home-traces" viewBox="' + VB + '" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' + paths + '</svg>';
+  }
   function renderHome() {
     var h = document.querySelector('.home'); // replay the entrance animation each time home is shown
     if (h) { h.classList.remove('home-in'); void h.offsetWidth; h.classList.add('home-in'); }
+    var bg = document.querySelector('.home-bg');
+    if (bg) { if (!bg.firstChild) buildHomeBg(); bg.classList.remove('draw'); void bg.offsetWidth; bg.classList.add('draw'); }
     var box = document.getElementById('homeCont'); if (!box) return;
     var n = solvedCount(), pick = nextRecommended();
     if (!n || !pick) { box.innerHTML = ''; return; }
