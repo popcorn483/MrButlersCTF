@@ -216,10 +216,11 @@
     var n = solvedCount(), pick = nextRecommended();
     if (!n || !pick) { box.innerHTML = ''; return; }
     var cat = CATS.filter(function (x) { return x.id === pick.cat; })[0];
-    box.innerHTML = '<a class="home-cont" href="#" id="homeContLink"><span class="hc-ic">▶</span>' +
-      '<span class="hc-tx"><small>Continue</small><b>' + esc(pick.title) + '</b>' +
-      '<span>' + cat.icon + ' ' + esc(cat.name) + ' · ' + score() + ' pts so far</span></span>' +
-      '<span class="btn primary">Resume →</span></a>';
+    var frac = n / CH.length, C = 100.5, off = (C * (1 - frac)).toFixed(1);
+    box.innerHTML = '<a class="home-cont" href="#" id="homeContLink" title="Resume: ' + esc(pick.title) + '">' +
+      '<svg class="hc-ring" viewBox="0 0 40 40" aria-hidden="true"><circle class="hc-track" cx="20" cy="20" r="16"/>' +
+      '<circle class="hc-arc" cx="20" cy="20" r="16" style="stroke-dasharray:' + C + ';stroke-dashoffset:' + off + '"/></svg>' +
+      '<span class="hc-tx"><small>Continue</small><b>' + esc(pick.title) + '</b></span></a>';
     var a = document.getElementById('homeContLink');
     if (a) a.addEventListener('click', function (e) { e.preventDefault(); openRecommended(); });
   }

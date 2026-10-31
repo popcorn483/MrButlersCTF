@@ -849,12 +849,14 @@ body.event-open { overflow: hidden; }
 .home-u { display: block; margin-top: 5px; font-size: 14px; color: var(--muted); }
 .home-go { position: absolute; right: 16px; top: 18px; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 18px; font-weight: 700; color: var(--wc); background: color-mix(in srgb, var(--wc) 14%, transparent); transition: transform .18s; }
 .home-c:hover .home-go { transform: translateX(3px); }
-.home-cont { display: flex; align-items: center; gap: 14px; width: 100%; margin-top: 16px; padding: 14px 18px; border-radius: 16px; text-align: left; background: var(--navy); outline: 1px solid var(--card-line); box-shadow: var(--card-shadow); }
-.home-cont .hc-ic { font-size: 26px; }
-.home-cont .hc-tx { flex: 1; min-width: 0; }
-.home-cont .hc-tx small { display: block; font-size: 12.5px; font-weight: 700; color: var(--muted); font-family: var(--mono); text-transform: uppercase; letter-spacing: .08em; }
-.home-cont .hc-tx b { display: block; font-size: 16px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.home-cont .hc-tx span { font-size: 13px; color: var(--muted); }
+.home-cont { display: inline-flex; align-items: center; gap: 11px; max-width: min(340px, 100%); padding: 8px 18px 8px 9px; border-radius: 999px; text-decoration: none; color: var(--text); background: color-mix(in srgb, var(--navy) 80%, transparent); border: 1px solid var(--line2); box-shadow: var(--card-shadow); transition: transform .15s cubic-bezier(.2,.7,.2,1), border-color .15s; }
+.home-cont:hover { transform: translateY(-1px); border-color: var(--h4); }
+.hc-ring { width: 38px; height: 38px; flex: none; }
+.hc-track { fill: none; stroke: var(--line2); stroke-width: 4; }
+.hc-arc { fill: none; stroke: var(--h4); stroke-width: 4; stroke-linecap: round; transform: rotate(-90deg); transform-origin: center; }
+.home-cont .hc-tx { min-width: 0; display: flex; flex-direction: column; line-height: 1.18; }
+.home-cont .hc-tx small { font-size: 12px; font-weight: 700; color: var(--h4); }
+.home-cont .hc-tx b { font-size: 14.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 230px; }
 .home-sec { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: clamp(22px,4vh,34px); }
 .home-s { display: inline-flex; align-items: center; gap: 7px; font: inherit; font-size: 14px; font-weight: 700; color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: 10px; padding: 8px 13px; cursor: pointer; }
 .home-s:hover, .home-s[aria-expanded="true"] { background: var(--panel); border-color: var(--line2); color: var(--text); }
@@ -874,10 +876,8 @@ body.view-home .foot { display: none !important; }
 /* Continue card → top right (like the sister app) */
 #homeCont { order: -1; width: 100%; margin: 0 0 6px; }
 #homeCont:empty { display: none; }
-.home-cont { margin-top: 0; width: min(440px, 100%); margin-left: auto; }
-.home-cont .hc-tx small { white-space: nowrap; }
-.home-cont .hc-tx span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-@media (max-width: 640px) { .home-cont { width: 100%; margin-left: 0; } }
+#homeCont { display: flex; justify-content: flex-end; }
+@media (max-width: 640px) { #homeCont { justify-content: center; } }
 
 /* movement: a gently waving flag + a staggered entrance that replays each visit */
 .home-flag { display: inline-block; transform-origin: bottom center; animation: home-flagwave 3.2s ease-in-out infinite; }
@@ -898,3 +898,17 @@ body.view-home .foot { display: none !important; }
 @media (prefers-reduced-motion: reduce) {
   .home-flag, .home-in .home-wm, .home-in .home-line, .home-in .home-ch .home-c, .home-in #homeCont, .home-in .home-sec, .home-in .home-strip { animation: none !important; }
 }
+
+/* ======================= Home: animated background ======================= */
+#view-home { position: relative; overflow: hidden; }
+#view-home > .home { position: relative; z-index: 1; }
+.home-bg { position: absolute; inset: -10% -5%; z-index: 0; pointer-events: none; overflow: hidden; }
+.home-bg::before, .home-bg::after { content: ""; position: absolute; border-radius: 50%; filter: blur(70px); opacity: .45; }
+.home-bg::before { width: 46vw; max-width: 520px; aspect-ratio: 1; background: radial-gradient(circle, color-mix(in srgb, var(--h1) 60%, transparent), transparent 70%); top: -6%; left: -4%; animation: home-drift1 28s ease-in-out infinite; }
+.home-bg::after { width: 42vw; max-width: 460px; aspect-ratio: 1; background: radial-gradient(circle, color-mix(in srgb, var(--h3) 55%, transparent), transparent 70%); top: 24%; right: -6%; animation: home-drift2 34s ease-in-out infinite; }
+@keyframes home-drift1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(7vw,5vh) scale(1.12); } }
+@keyframes home-drift2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-6vw,7vh) scale(1.1); } }
+.home-star { position: absolute; top: 16%; left: -15%; width: 170px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--h8), #fff); opacity: 0; transform: rotate(18deg); animation: home-shoot 9s linear infinite; }
+.home-star2 { top: 62%; width: 130px; background: linear-gradient(90deg, transparent, var(--h4), #fff); animation-duration: 13s; animation-delay: 5s; }
+@keyframes home-shoot { 0% { opacity: 0; transform: translate(0,0) rotate(18deg); } 4% { opacity: .9; } 16% { opacity: 0; transform: translate(80vw,26vh) rotate(18deg); } 100% { opacity: 0; transform: translate(80vw,26vh) rotate(18deg); } }
+@media (prefers-reduced-motion: reduce) { .home-bg::before, .home-bg::after, .home-star { animation: none !important; } .home-star { display: none; } }
