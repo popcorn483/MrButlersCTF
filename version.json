@@ -1,10 +1,10 @@
 {
-  "version": "mbctf-v9",
+  "version": "mbctf-v10",
   "date": "2026-10-31",
   "notes": [
-    "The board is tidier: the Hard and Expert challenges in each category now stay tucked behind a single lock until you've solved a few of the easier ones there",
-    "17 new harder challenges across crypto, programming, reversing, forensics, networking and web",
-    "220 challenges in total, with more at Hard and Expert level",
+    "16 more hard and expert challenges — the thinner categories (networking, web, forensics, steganography) now have a proper stack of tough ones, so the lock is always worth opening",
+    "The Hard and Expert challenges in each category stay tucked behind a single lock until you've solved a few of the easier ones there",
+    "Tidier home screen",
     "The teacher answer book and printable PDF include every new challenge",
     "Share button with a QR code — put it on the board and students scan to jump straight in"
   ]
