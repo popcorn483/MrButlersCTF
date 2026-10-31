@@ -869,7 +869,9 @@ body.event-open { overflow: hidden; }
 @media (max-width: 640px) { .home-ch { grid-template-columns: 1fr; gap: 14px; } }
 
 /* ======================= Home screen: polish ======================= */
-/* hide the global hamburger and the (duplicated) footer on the home screen */
+/* the home screen has its own wordmark + nav cards, so hide the top bar,
+   the hamburger and the (duplicated) footer there */
+body.view-home .topbar { display: none !important; }
 body.view-home .hamburger { display: none !important; }
 body.view-home .foot { display: none !important; }
 
