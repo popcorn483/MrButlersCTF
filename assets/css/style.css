@@ -879,7 +879,6 @@ body.view-home .foot { display: none !important; }
 #homeCont { order: -1; width: 100%; margin: 0 0 6px; }
 #homeCont:empty { display: none; }
 #homeCont { display: flex; justify-content: flex-end; }
-@media (max-width: 640px) { #homeCont { justify-content: center; } }
 
 /* movement: a gently waving flag + a staggered entrance that replays each visit */
 .home-flag { display: inline-block; transform-origin: bottom center; animation: home-flagwave 3.2s ease-in-out infinite; }
