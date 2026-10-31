@@ -1,11 +1,11 @@
 {
-  "version": "mbctf-v7",
+  "version": "mbctf-v8",
   "date": "2026-10-31",
   "notes": [
+    "17 new harder challenges added — tougher crypto, programming, reversing, forensics, networking and web puzzles for pupils who want a real stretch",
+    "220 challenges in total, with more at Hard and Expert level",
+    "The teacher answer book and printable PDF now include every new challenge",
     "The home screen circuit lines now flow continuously, like the sister app",
-    "New: Share button with a QR code — put it on the board and students scan to jump straight in",
-    "A matching home screen, icon and look to Mr Butler's Digital Technology app",
-    "Works offline once installed, with progress saved by resume code",
-    "Class tools, badges, a daily challenge and streaks"
+    "Share button with a QR code — put it on the board and students scan to jump straight in"
   ]
 }

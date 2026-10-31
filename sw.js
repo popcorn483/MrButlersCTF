@@ -2,7 +2,7 @@
    Stale-while-revalidate: serve fast from cache, refresh in the background.
    A new deploy = a new CACHE/VERSION; the new worker WAITS so the page can offer
    "Update now" (with patch notes), and activates when it receives SKIP_WAITING. */
-var VERSION = 'mbctf-v7';
+var VERSION = 'mbctf-v8';
 var CACHE = VERSION;
 var CORE = [
   './', 'index.html', 'teacher.html', 'manifest.webmanifest',
