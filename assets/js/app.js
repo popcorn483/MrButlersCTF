@@ -46,6 +46,14 @@
   function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { } }
   function score() { var p = 0; Object.keys(S.solved).forEach(function (id) { if (BY_ID[id] && !S.solved[id].r) p += BY_ID[id].pts; }); return p; }
   function solvedCount() { return Object.keys(S.solved).filter(function (id) { return BY_ID[id]; }).length; }
+  // Hard (tier 4) and Expert (tier 5) challenges in a category stay locked until
+  // the pupil has solved a few of the easier ones (tier <= 3) in that same category.
+  function catUnlock(catId) {
+    var easier = CH.filter(function (c) { return c.cat === catId && c.tier <= 3; });
+    var need = Math.min(3, easier.length);
+    var have = easier.filter(function (c) { return S.solved[c.id]; }).length;
+    return { locked: need > 0 && have < need, need: need, have: have };
+  }
 
   // ---------- header / rank ----------
   function refreshHeader() {
@@ -169,15 +177,21 @@
   // ---------- board ----------
   function renderBoard() {
     var board = $('#board'); board.innerHTML = '';
-    var shown = 0;
     CATS.forEach(function (cat) {
-      var list = CH.filter(function (c) {
+      var unlock = catUnlock(cat.id);
+      var matchAll = CH.filter(function (c) {
         if (c.cat !== cat.id || !F.tiers[c.tier]) return false;
         if (F.hide && S.solved[c.id]) return false;
         if (F.q && (c.title + ' ' + c.id).toLowerCase().indexOf(F.q) < 0) return false;
         return true;
       });
-      if (!list.length) return;
+      // hide Hard/Expert while the category is locked (but never hide a solved one)
+      var hiddenHard = [];
+      var list = matchAll.filter(function (c) {
+        if (unlock.locked && c.tier >= 4 && !S.solved[c.id]) { hiddenHard.push(c); return false; }
+        return true;
+      });
+      if (!list.length && !hiddenHard.length) return;
       var all = CH.filter(function (c) { return c.cat === cat.id; });
       var done = all.filter(function (c) { return S.solved[c.id]; }).length;
       var sec = document.createElement('section'); sec.className = 'cat';
@@ -190,11 +204,19 @@
         b.className = 'tile ' + TIERS[c.tier].cls + (S.solved[c.id] ? ' solved' : '') + (S.tut && S.tut[c.id] ? ' tut-used' : '');
         b.innerHTML = (S.tut && S.tut[c.id] ? '<span class="tut-mark" title="Tutorial used">📘</span>' : '') + '<div class="tile-title">' + esc(c.title) + '</div><div class="tile-foot"><span>' + TIERS[c.tier].name + '</span><span class="tile-pts">' + c.pts + '</span></div>';
         b.addEventListener('click', function () { openChal(c.id); });
-        tiles.appendChild(b); shown++;
+        tiles.appendChild(b);
       });
+      if (hiddenHard.length) {
+        var remain = unlock.need - unlock.have;
+        var lb = document.createElement('button'); lb.className = 'tile tile-locked';
+        lb.innerHTML = '<span class="lock-ic">🔒</span><div class="tile-title">' + hiddenHard.length + ' harder challenge' + (hiddenHard.length > 1 ? 's' : '') +
+          '</div><div class="tile-foot"><span>Solve ' + remain + ' more here to unlock</span></div>';
+        lb.addEventListener('click', function () { toast('🔒 Solve ' + remain + ' more ' + cat.name + ' challenge' + (remain > 1 ? 's' : '') + ' to unlock the harder ones.'); });
+        tiles.appendChild(lb);
+      }
       board.appendChild(sec);
     });
-    if (!shown) board.innerHTML = '<div class="empty">No challenges match those filters.</div>';
+    if (!board.children.length) board.innerHTML = '<div class="empty">No challenges match those filters.</div>';
     renderRecommend();
   }
   function nextRecommended() {

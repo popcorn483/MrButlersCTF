@@ -131,6 +131,11 @@ h3 { font-size: 1rem; margin: 18px 0 6px; }
 .tile.solved { background: rgba(82,230,163,.09); border-color: rgba(82,230,163,.35); }
 .tile.solved::after { content: "✓"; position: absolute; top: 6px; right: 8px; color: var(--green); font-weight: 700; }
 .tile.solved .tile-title { color: var(--muted); }
+.tile.tile-locked { border-left-color: var(--line2); border-style: dashed; background: transparent; color: var(--muted); opacity: .85; }
+.tile.tile-locked:hover { transform: none; border-color: var(--line2); background: rgba(255,255,255,.02); opacity: 1; }
+.tile.tile-locked .tile-title { color: var(--muted); font-weight: 600; }
+.tile.tile-locked .tile-foot { color: var(--muted); }
+.tile.tile-locked .lock-ic { position: absolute; top: 7px; right: 9px; font-size: .9rem; opacity: .7; }
 .t1 { --tc: var(--t1); } .t2 { --tc: var(--t2); } .t3 { --tc: var(--t3); } .t4 { --tc: var(--t4); } .t5 { --tc: var(--t5); }
 .empty { color: var(--muted); padding: 30px; text-align: center; border: 1px dashed var(--line2); border-radius: 12px; }
 

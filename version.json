@@ -1,11 +1,11 @@
 {
-  "version": "mbctf-v8",
+  "version": "mbctf-v9",
   "date": "2026-10-31",
   "notes": [
-    "17 new harder challenges added — tougher crypto, programming, reversing, forensics, networking and web puzzles for pupils who want a real stretch",
+    "The board is tidier: the Hard and Expert challenges in each category now stay tucked behind a single lock until you've solved a few of the easier ones there",
+    "17 new harder challenges across crypto, programming, reversing, forensics, networking and web",
     "220 challenges in total, with more at Hard and Expert level",
-    "The teacher answer book and printable PDF now include every new challenge",
-    "The home screen circuit lines now flow continuously, like the sister app",
+    "The teacher answer book and printable PDF include every new challenge",
     "Share button with a QR code — put it on the board and students scan to jump straight in"
   ]
 }
