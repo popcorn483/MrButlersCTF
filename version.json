@@ -1,9 +1,9 @@
 {
-  "version": "mbctf-v6",
+  "version": "mbctf-v7",
   "date": "2026-10-31",
   "notes": [
+    "The home screen circuit lines now flow continuously, like the sister app",
     "New: Share button with a QR code — put it on the board and students scan to jump straight in",
-    "The home screen now has the animated circuit-trace background from the sister app",
     "A matching home screen, icon and look to Mr Butler's Digital Technology app",
     "Works offline once installed, with progress saved by resume code",
     "Class tools, badges, a daily challenge and streaks"

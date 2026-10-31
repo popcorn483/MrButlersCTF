@@ -220,8 +220,10 @@
     var paths = T.map(function (t, i) {
       var cur = [0, 0];
       t[0].match(/[MHVL][^MHVL]*/g).forEach(function (s) { var c = s[0], v = s.slice(1).trim().split(/\s+/).map(Number); if (c === 'M' || c === 'L') cur = [v[0], v[1]]; else if (c === 'H') cur = [v[0], cur[1]]; else cur = [cur[0], v[0]]; });
-      var dl = (i * 0.06).toFixed(2), col = HL[t[1]];
-      return '<path d="' + t[0] + '" pathLength="1" stroke="' + col + '" style="animation-delay:' + dl + 's"/><circle cx="' + cur[0] + '" cy="' + cur[1] + '" r="4" stroke="' + col + '" style="animation-delay:' + (+dl + 0.9).toFixed(2) + 's"/>';
+      var dl = (i * 0.45).toFixed(2), col = HL[t[1]];
+      return '<path class="trace-base" d="' + t[0] + '" stroke="' + col + '"/>' +
+        '<path class="trace-flow" d="' + t[0] + '" pathLength="1" stroke="' + col + '" style="animation-delay:' + dl + 's"/>' +
+        '<circle cx="' + cur[0] + '" cy="' + cur[1] + '" r="4" fill="var(--desk)" stroke="' + col + '" style="animation-delay:' + (i * 0.2).toFixed(2) + 's"/>';
     }).join('');
     bg.innerHTML = '<svg class="home-traces" viewBox="' + VB + '" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' + paths + '</svg>';
   }
