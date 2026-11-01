@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mr B's CTF Practice</title>
+<meta name="description" content="Practice capture-the-flag challenges for secondary school pupils getting ready for a ZeroDays-style cyber security competition.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b1220'/%3E%3Cpath d='M9 6v20' stroke='%2339ff9e' stroke-width='3'/%3E%3Cpath d='M10 7h13l-4 5 4 5H10z' fill='%2339ff9e'/%3E%3C/svg%3E">
+<!-- install-to-phone (PWA) -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#16213A">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mr B's CTF Practice">
+<!-- sister-app theme fonts (self-hosted, so they work offline on C2k) -->
+<link rel="preload" href="assets/fonts/lemonmilk-bold.woff" as="font" type="font/woff" crossorigin>
+<link rel="preload" href="assets/fonts/AtkinsonHyperlegible-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<script src="assets/js/splash.js"></script>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-flag" aria-hidden="true">⚑</span>
+    <div>
+      <div class="brand-name">MR&nbsp;B'S&nbsp;CTF</div>
+      <div class="brand-sub">practice</div>
+    </div>
+  </div>
+  <button class="hamburger" id="hamburger" aria-label="Menu" aria-expanded="false" aria-controls="mainNav">
+    <span></span><span></span><span></span>
+  </button>
+  <nav class="tabs" id="mainNav" aria-label="Main">
+    <div class="nav-head"><span></span><button class="nav-close" id="navClose" aria-label="Close menu">✕</button></div>
+    <button class="tab active" data-view="board">Challenges</button>
+    <div class="tab-group">
+      <button class="tab" id="learnToggle" aria-haspopup="true" aria-expanded="false">Learn ▾</button>
+      <div class="tab-menu" id="learnMenu" hidden>
+        <button class="tab-menu-item" data-view="start">Getting started</button>
+        <button class="tab-menu-item" data-view="lessons">Lessons</button>
+        <button class="tab-menu-item" data-view="walkthrough">Walkthrough</button>
+        <button class="tab-menu-item" data-view="resources">Useful sites</button>
+        <button class="tab-menu-item" data-view="reference">Reference</button>
+        <button class="tab-menu-item" data-view="pack">Classroom pack 🖨</button>
+      </div>
+    </div>
+    <button class="tab" data-view="toolkit">Toolkit</button>
+    <button class="tab tab-test" data-view="test">🔒 Test area</button>
+    <button class="tab" data-view="progress">My progress</button>
+    <button class="tab" data-view="teacher">Teacher</button>
+
+    <div class="nav-extra" id="navExtra">
+      <div class="nav-sep">Board options</div>
+      <button class="tab nav-action" id="navContinue">▶ Continue where you left off</button>
+      <button class="tab nav-action" id="navSurprise">🎲 Surprise me</button>
+      <div class="nav-mode">
+        <span class="nav-sub">View</span>
+        <div class="mode-seg">
+          <button class="mode-btn" data-mode="real">🎯 Real event</button>
+          <button class="mode-btn" data-mode="tutorial">📘 Tutorial</button>
+        </div>
+      </div>
+      <label class="nav-check"><input type="checkbox" id="navHideSolved"> Hide solved challenges</label>
+      <div class="nav-diff"><span class="nav-sub">Difficulty</span><div class="chip-row" id="navTierChips"></div></div>
+    </div>
+  </nav>
+  <div class="player" id="playerBox">
+    <button class="player-name" id="playerName" title="Change your name">Set your name</button>
+    <div class="player-stats"><span id="playerScore">0</span> pts · <span id="playerSolved">0</span>/<span id="playerTotal">200</span></div>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ============ HOME ============ -->
+  <section class="view active" id="view-home">
+    <div class="home-bg" aria-hidden="true"></div>
+    <div class="home">
+      <div class="home-wm">
+        <span class="home-flag" aria-hidden="true">⚑</span>
+        <span class="home-mb">Mr Butler&rsquo;s</span>
+        <span class="home-dt">CTF Practice</span>
+      </div>
+      <span class="home-strip" aria-hidden="true"><i style="background:var(--h1)"></i><i style="background:var(--h2)"></i><i style="background:var(--h3)"></i><i style="background:var(--h4)"></i><i style="background:var(--h5)"></i><i style="background:var(--h6)"></i><i style="background:var(--h7)"></i><i style="background:var(--h8)"></i><i style="background:var(--h9)"></i><i style="background:var(--h10)"></i></span>
+      <p class="home-line">Get ready for the ZeroDays-style competition &mdash; practice flags, step-by-step lessons and a timed mock event, all in one place.</p>
+
+      <div class="home-ch">
+        <a class="home-c" href="#" data-goto="board" style="--wc:var(--h6)"><span class="home-ic">🚩</span><span class="home-tx"><b>Challenge board</b><span class="home-u">Every flag, grouped by category</span></span><span class="home-go" aria-hidden="true">→</span></a>
+        <a class="home-c" href="#" data-goto="start" style="--wc:var(--h1)"><span class="home-ic">📘</span><span class="home-tx"><b>Learn the skills</b><span class="home-u">Lessons, walkthroughs &amp; tools, from scratch</span></span><span class="home-go" aria-hidden="true">→</span></a>
+        <a class="home-c" href="#" data-goto="test" style="--wc:var(--h5)"><span class="home-ic">🔒</span><span class="home-tx"><b>Test area</b><span class="home-u">A timed mock, just like the real event</span></span><span class="home-go" aria-hidden="true">→</span></a>
+        <a class="home-c" href="#" data-goto="toolkit" style="--wc:var(--h3)"><span class="home-ic">🧰</span><span class="home-tx"><b>Toolkit</b><span class="home-u">Decoder, hex viewer and more</span></span><span class="home-go" aria-hidden="true">→</span></a>
+      </div>
+
+      <div id="homeCont"></div>
+
+      <div class="home-sec">
+        <button type="button" class="home-s" id="homeShare">🔗 Share</button>
+        <button type="button" class="home-s" id="homeInstall">📲 Install app</button>
+        <button type="button" class="home-s" data-goto="progress">My progress</button>
+        <button type="button" class="home-s" id="homeAboutBtn" aria-expanded="false" aria-controls="homeAbout">About</button>
+      </div>
+      <div class="home-about" id="homeAbout" hidden>
+        <p>Practice challenges in the style of ZeroDays / Cyber-Schools events, written for pupils getting ready for the competition. They are <b>not</b> the real tasks.</p>
+        <p>Your progress saves in this browser. Use <a href="#" data-goto="progress">My progress</a> to back it up with a resume code or file.</p>
+        <p class="home-ver"><span data-app-ver></span> <button type="button" class="wl-chk" data-app-check><span>Check for updates</span></button></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ BOARD ============ -->
+  <section class="view" id="view-board">
+    <div class="board-intro">
+      <div>
+        <h1>Challenge board</h1>
+        <p>Pick a tile, find the flag, submit it. Tiles get harder from left to right. New to CTFs? Start with <b>Warm-Up</b> and read <a href="#" data-goto="start">Getting started</a>.</p>
+      </div>
+      <div class="rank-card">
+        <div class="rank-label">Rank</div>
+        <div class="rank-name" id="rankName">Script Kiddie</div>
+        <div class="rank-bar"><span id="rankBar"></span></div>
+        <div class="rank-next" id="rankNext"></div>
+      </div>
+    </div>
+
+    <div class="mode-bar">
+      <span class="mode-label">View</span>
+      <div class="mode-seg" role="group" aria-label="View mode">
+        <button class="mode-btn" data-mode="real" aria-pressed="true">🎯 Real event</button>
+        <button class="mode-btn" data-mode="tutorial" aria-pressed="false">📘 Tutorial</button>
+      </div>
+      <span class="mode-desc" id="modeDesc"></span>
+    </div>
+
+    <div id="resumeBanner" hidden></div>
+    <div id="saveBanner" hidden></div>
+    <div id="recommend"></div>
+    <div id="dailyCard"></div>
+
+    <div class="filters" role="group" aria-label="Filters">
+      <div class="chip-row">
+        <label class="search"><span class="sr">Search</span><input id="searchBox" type="search" placeholder="Search challenges…"></label>
+        <label class="toggle"><input type="checkbox" id="hideSolved"> Hide solved</label>
+        <button class="chip" id="randomBtn" title="Open a random challenge you haven't solved">🎲 Surprise me</button>
+      </div>
+      <div class="chip-row" id="tierChips"></div>
+    </div>
+
+    <div id="board" class="board"></div>
+  </section>
+
+  <!-- ============ GETTING STARTED ============ -->
+  <section class="view" id="view-start">
+    <div class="prose" id="startContent"></div>
+  </section>
+
+  <!-- ============ LESSONS ============ -->
+  <section class="view" id="view-lessons">
+    <div class="prose wide" id="lessonsContent"></div>
+  </section>
+
+  <!-- ============ WALKTHROUGH ============ -->
+  <section class="view" id="view-walkthrough">
+    <div class="prose wide" id="walkContent"></div>
+  </section>
+
+  <!-- ============ RESOURCES ============ -->
+  <section class="view" id="view-resources">
+    <div class="prose wide" id="resContent"></div>
+  </section>
+
+  <!-- ============ REFERENCE ============ -->
+  <section class="view" id="view-reference">
+    <div class="prose wide" id="refContent"></div>
+  </section>
+
+  <!-- ============ CLASSROOM PACK ============ -->
+  <section class="view" id="view-pack">
+    <div class="prose wide" id="packContent"></div>
+  </section>
+
+  <!-- ============ TEST AREA ============ -->
+  <section class="view" id="view-test">
+    <div id="testArea"></div>
+  </section>
+
+  <!-- ============ TOOLKIT ============ -->
+  <section class="view" id="view-toolkit">
+    <div class="tool-head">
+      <h1>Toolkit</h1>
+      <p>School computers block <i>Inspect Element</i>, so this site has its own tools. At the real event you'll usually have the internet, so learn the names: the decoder here works like <b>CyberChef</b>, and View HTML does the job of <b>View Source</b> (<kbd>Ctrl</kbd>+<kbd>U</kbd>).</p>
+      <p class="muted">New to these? No problem &mdash; here's exactly what each one is for and when to reach for it.</p>
+      <details class="tool-guide">
+        <summary>How and when to use each tool</summary>
+        <div class="tool-guide-body" id="toolGuideBody"></div>
+      </details>
+    </div>
+    <div class="tool-back" id="toolBack" hidden>
+      <button class="btn primary" id="toolBackBtn"><span class="tb-label">← Back to challenge</span></button>
+      <span class="tb-hint">Done decoding? Head back and submit your flag.</span>
+    </div>
+    <div class="subtabs" id="toolTabs">
+      <button class="subtab active" data-tool="decoder">Decoder</button>
+      <button class="subtab" data-tool="freq">Frequency analysis</button>
+      <button class="subtab" data-tool="hash">Hashes</button>
+      <button class="subtab" data-tool="hex">Hex viewer</button>
+      <button class="subtab" data-tool="image">Image inspector</button>
+      <button class="subtab" data-tool="scratch">JS scratchpad</button>
+      <button class="subtab" data-tool="ascii">ASCII table</button>
+    </div>
+    <div id="toolPanel" class="tool-panel"></div>
+  </section>
+
+  <!-- ============ PROGRESS ============ -->
+  <section class="view" id="view-progress">
+    <div class="prose wide">
+      <h1>My progress</h1>
+      <p>Your work saves automatically in this browser as you go. But school computers often <b>wipe browser storage when you log off</b> — so before you leave, save your progress one of these two ways and bring it back next time.</p>
+
+      <div id="saveStatus" class="save-status"></div>
+
+      <div class="save-panel">
+        <div class="save-method">
+          <div class="save-method-head"><span class="save-num">1</span><h3>Resume code <span class="pill-rec">easiest</span></h3></div>
+          <p class="muted small">Copy your code and keep it somewhere safe — paste it into OneNote, a note to yourself, or an email. Next time, paste it back to carry on exactly where you left off.</p>
+          <button class="btn primary" id="makeCodeBtn">📋 Copy my resume code</button>
+          <textarea id="resumeOut" class="resume-box" readonly hidden aria-label="Your resume code"></textarea>
+          <details class="resume-paste" id="resumePaste">
+            <summary>Got a code from last time? Paste it here</summary>
+            <textarea id="resumeIn" class="resume-box" placeholder="Paste your resume code…" spellcheck="false"></textarea>
+            <button class="btn" id="loadCodeBtn">▶ Continue from my code</button>
+          </details>
+        </div>
+        <div class="save-method">
+          <div class="save-method-head"><span class="save-num">2</span><h3>Progress file</h3></div>
+          <p class="muted small">Prefer a file? Download one as a backup and load it next time. Teachers collect these for the leaderboard.</p>
+          <div class="save-file-btns">
+            <button class="btn" id="exportBtn">⬇ Download file</button>
+            <label class="btn" for="importFile">⬆ Load file</label>
+            <input type="file" id="importFile" accept=".json,application/json" hidden>
+          </div>
+        </div>
+      </div>
+      <div id="importMsg" class="notice" hidden></div>
+      <div class="reset-row"><button class="btn danger small" id="resetBtn">Reset everything</button></div>
+      <div class="stat-grid" id="statGrid"></div>
+      <div id="badgeShelf"></div>
+      <div id="certCard"></div>
+      <h2>By category</h2>
+      <div id="catBars" class="cat-bars"></div>
+      <h2>Solve history</h2>
+      <div id="history" class="history"></div>
+    </div>
+  </section>
+
+  <!-- ============ TEACHER ============ -->
+  <section class="view" id="view-teacher">
+    <div class="prose wide">
+      <div class="event-launch callout">
+        <div>
+          <b>🖥 Run a class mock event</b>
+          <p class="muted small">A big-screen countdown and live-style scoreboard for a whole-class dress rehearsal. Put it on the projector, start the clock, and have teams work through the <a href="#" data-goto="test">Test area</a> on their own devices.</p>
+        </div>
+        <button class="btn primary" id="openEvent">Open projector event screen →</button>
+      </div>
+      <h1>Teacher leaderboard</h1>
+      <p>Ask pupils to download their progress file and send it to you (Teams, shared drive or email). Load them all here at once to build a class leaderboard. Nothing is uploaded anywhere; it all stays on this computer.</p>
+      <p class="callout">🔒 <b>Staff answer book</b> — the full solutions and a downloadable PDF live on the password-protected <a href="teacher.html">Teacher Area</a> page.</p>
+      <div class="progress-actions">
+        <label class="btn primary" for="teacherFiles">Load pupil progress files</label>
+        <input type="file" id="teacherFiles" accept=".json,application/json" multiple hidden>
+        <button class="btn" id="teacherClear">Clear</button>
+        <button class="btn" id="teacherCsv">⬇ Leaderboard CSV</button>
+        <button class="btn" id="challengeListCsv">⬇ Challenge list (no answers)</button>
+      </div>
+      <p class="muted small">Each solve carries a proof code that only a real flag submission produces, so hand-edited files show up as <span class="badge bad">unverified</span>. Challenges solved after the pupil clicked <b>Show answer</b> count as flags but score 0 points.</p>
+      <div id="teacherMsg" class="notice" hidden></div>
+      <div id="teacherTable"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>Practice challenges written for this site. They are in the style of ZeroDays / Cyber-Schools events but are <b>not</b> the real competition tasks.</span>
+  <button class="linkish" id="getAppBtn">📲 Get the app on your phone</button>
+  <button class="linkish" id="viewSiteHtml">View this page's HTML</button>
+  <span class="app-ver" data-app-ver></span>
+  <button class="linkish" data-app-check><span>Check for updates</span></button>
+</footer>
+
+<!-- ============ CHALLENGE MODAL ============ -->
+<div class="modal" id="chalModal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="chalTitle">
+    <button class="modal-x" data-close aria-label="Close">✕</button>
+    <div class="chal-meta" id="chalMeta"></div>
+    <h2 id="chalTitle"></h2>
+    <div class="chal-desc" id="chalDesc"></div>
+    <div id="chalFiles"></div>
+    <div class="chal-actions" id="chalActions"></div>
+    <div class="hints" id="chalHints"></div>
+    <form class="flag-form" id="flagForm" autocomplete="off">
+      <label class="sr" for="flagInput">Flag</label>
+      <input id="flagInput" placeholder="flag{...}" spellcheck="false">
+      <button class="btn primary" type="submit">Submit</button>
+    </form>
+    <div class="flag-msg" id="flagMsg" aria-live="polite"></div>
+  </div>
+</div>
+
+<!-- ============ TEST CHALLENGE MODAL ============ -->
+<div class="modal" id="testModal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="tChalTitle">
+    <button class="modal-x" data-close aria-label="Close">✕</button>
+    <div class="chal-meta" id="tChalMeta"></div>
+    <h2 id="tChalTitle"></h2>
+    <div class="chal-desc" id="tChalDesc"></div>
+    <div id="tChalFiles"></div>
+    <div class="chal-actions" id="tChalActions"></div>
+    <form class="flag-form" id="tFlagForm" autocomplete="off">
+      <label class="sr" for="tFlagInput">Flag</label>
+      <input id="tFlagInput" placeholder="flag{...}" spellcheck="false">
+      <button class="btn primary" type="submit">Submit</button>
+    </form>
+    <div class="flag-msg" id="tFlagMsg" aria-live="polite"></div>
+  </div>
+</div>
+
+<!-- ============ SOURCE VIEWER ============ -->
+<div class="modal" id="srcModal" hidden>
+  <div class="modal-card wide" role="dialog" aria-modal="true" aria-labelledby="srcTitle">
+    <button class="modal-x" data-close aria-label="Close">✕</button>
+    <h2 id="srcTitle">View HTML</h2>
+    <pre class="code" id="srcCode"></pre>
+  </div>
+</div>
+
+<!-- ============ CERTIFICATE MODAL ============ -->
+<div class="modal" id="certModal" hidden>
+  <div class="modal-card wide" role="dialog" aria-modal="true" aria-labelledby="certHeading">
+    <button class="modal-x" data-close aria-label="Close">✕</button>
+    <h2 id="certHeading">Your certificate</h2>
+    <label class="cert-name-field">Name on certificate
+      <input id="certName" maxlength="40" placeholder="Your name or team name" spellcheck="false">
+    </label>
+    <div class="cert-sheet" id="certSheet"></div>
+    <div class="cert-actions">
+      <button class="btn primary" id="certPrint">🖨 Print / Save as PDF</button>
+      <button class="btn" data-close>Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SHARE MODAL ============ -->
+<div class="modal" id="shareModal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="shareHeading">
+    <button class="modal-x" data-close aria-label="Close">✕</button>
+    <h2 id="shareHeading">🔗 Share with your class</h2>
+    <p>Put this on the board — students <b>scan the QR code</b> or open the link to jump straight in. No login, nothing to install.</p>
+    <div class="share-qr" id="shareBox"></div>
+    <div class="share-url" id="shareUrl"></div>
+    <div class="share-actions">
+      <button class="btn primary" id="shareCopy">📋 Copy link</button>
+      <button class="btn" id="shareNative">Share…</button>
+      <button class="btn" data-close>Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ INSTALL-TO-PHONE MODAL ============ -->
+<div class="modal" id="installModal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="installHeading">
+    <button class="modal-x" data-close aria-label="Close">✕</button>
+    <h2 id="installHeading">📲 Add Mr B's CTF Practice to your phone</h2>
+    <p>Install it like an app — it gets its own icon on your home screen, opens full-screen with no address bar, and even <b>works offline</b> once you've opened it. It's not from an app store, so there's nothing to pay for and no sign-up.</p>
+    <div id="installOneTap" hidden>
+      <button class="btn primary big" id="pwaInstallBtn">⬇ Install now</button>
+      <p class="muted small">Tap the button, then confirm. Done!</p>
+    </div>
+    <div class="install-steps">
+      <div class="install-os">
+        <h3>📱 iPhone / iPad (Safari)</h3>
+        <ol>
+          <li>Tap the <b>Share</b> button <span class="kbd">⬆️</span> at the bottom of Safari.</li>
+          <li>Scroll down and tap <b>Add to Home Screen</b>.</li>
+          <li>Tap <b>Add</b> — the CTF icon appears on your home screen.</li>
+        </ol>
+      </div>
+      <div class="install-os">
+        <h3>🤖 Android (Chrome)</h3>
+        <ol>
+          <li>Tap the <b>⋮</b> menu (top-right).</li>
+          <li>Tap <b>Install app</b> (or <b>Add to Home screen</b>).</li>
+          <li>Tap <b>Install</b> — the CTF icon appears in your apps.</li>
+        </ol>
+      </div>
+    </div>
+    <p class="muted small">On a school computer you can also just bookmark this page. Already added? You can close this.</p>
+  </div>
+</div>
+
+<!-- ============ PROJECTOR MOCK-EVENT SCREEN ============ -->
+<div id="eventScreen" hidden>
+  <div class="ev-top">
+    <input id="evTitle" class="ev-title" value="Mr B's CTF Practice — Mock Event" aria-label="Event title">
+    <div class="ev-top-btns">
+      <button class="btn small" id="evFull">⛶ Fullscreen</button>
+      <button class="btn small" id="evExit">✕ Exit</button>
+    </div>
+  </div>
+  <div class="ev-main">
+    <div class="ev-clock-wrap">
+      <div class="ev-status" id="evStatus">Ready when you are</div>
+      <div class="ev-clock" id="evClock">45:00</div>
+      <div class="ev-controls">
+        <label class="ev-dur">Length
+          <select id="evDur">
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="45" selected>45 min</option>
+            <option value="60">60 min</option>
+            <option value="90">90 min</option>
+          </select>
+        </label>
+        <button class="btn primary" id="evStart">▶ Start</button>
+        <button class="btn" id="evPause" hidden>⏸ Pause</button>
+        <button class="btn" id="evAdd" hidden>+5 min</button>
+        <button class="btn" id="evReset" hidden>↺ Reset</button>
+      </div>
+      <div class="ev-ticker"><span id="evTicker"></span></div>
+    </div>
+    <div class="ev-side">
+      <div class="ev-side-head">
+        <h2>Live standings</h2>
+        <div class="ev-side-btns no-print">
+          <label class="btn small" for="evFiles">⬆ Load team results</label>
+          <input type="file" id="evFiles" accept=".json,application/json" multiple hidden>
+          <button class="btn small" id="evClear">Clear</button>
+        </div>
+      </div>
+      <div id="evBoard" class="ev-board"></div>
+      <p class="ev-hint">Pupils: open <b>🔒 Test area</b>, enter your <b>team name</b> and the password, and race the clock on this screen. When you finish, download your result and send it to your teacher to appear here.</p>
+    </div>
+  </div>
+</div>
+
+<canvas id="confetti" aria-hidden="true"></canvas>
+<div class="toast" id="toast" hidden></div>
+
+<script src="assets/js/challenges.js"></script>
+<script src="assets/js/hashes.js"></script>
+<script src="assets/js/content.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/features.js"></script>
+<script src="assets/js/event.js"></script>
+<script src="assets/js/tools.js"></script>
+<script src="assets/js/test.js"></script>
+<script src="assets/js/welcome.js"></script>
+<script src="assets/js/pwa.js"></script>
+<script src="assets/js/qrcode.js"></script>
+<script src="assets/js/share.js"></script>
+<script src="assets/js/update.js"></script>
+</body>
+</html>
