@@ -26,10 +26,15 @@ window.CTF_CONFIG = {
 
 Commit, wait a minute for GitHub Pages, and you're live.
 
+## 4. Updating the script (when Code.gs changes)
+1. In Apps Script, replace `Code.gs` with the new version from this folder — **keep your own `TEACHER_KEY` line**.
+2. Save, then **Deploy → Manage deployments → ✏ Edit → Version: New version → Deploy**. The URL stays the same, so nothing on the site needs changing.
+
 ## Using it
 - Open the site → **Teacher** tab → **▶ Start live view** → enter your teacher key (remembered on that computer).
 - The table refreshes every 20 seconds. 🟢 = the pupil did something in the last 5 minutes.
 - Pupils see a 📡 note on **My progress** confirming it's being sent. Ask them to set their name (click *Set your name* at the top).
+- **Click any pupil** in the leaderboard to see every challenge they've solved, attempted, used hints or tutorials on, or revealed. **🗑 Delete pupil** removes them (e.g. test accounts); their device is listed on the *Removed* tab of the Sheet and ignored from then on — delete a row there to let it back in.
 - **Clear live data** empties the Sheet — use it before a new group. Pupils' own progress is untouched and re-sends when they next solve.
 - The Sheet itself is readable too (name, score, flags, last update), but the Teacher tab is better: it checks each solve's proof code, so anything tampered with shows as *edited* / *unverified*.
 

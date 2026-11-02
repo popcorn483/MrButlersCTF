@@ -16,6 +16,7 @@ var TEACHER_KEY = 'change-me-to-something-secret';
 var SHEET_NAME = 'Progress';
 var HEADER = ['Pupil ID', 'Name', 'Score', 'Flags', 'Last update', 'Data (do not edit)'];
 var MAX_JSON = 45000; // a Sheets cell holds 50,000 characters
+var REMOVED_SHEET = 'Removed'; // pupil IDs the teacher deleted — their devices are ignored from then on
 
 function sheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -26,6 +27,17 @@ function sheet_() {
     sh.getRange(1, 1, 1, HEADER.length).setFontWeight('bold');
   }
   return sh;
+}
+
+function removedSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(REMOVED_SHEET);
+  if (!sh) { sh = ss.insertSheet(REMOVED_SHEET); sh.appendRow(['Pupil ID', 'Name', 'Removed']); sh.setFrozenRows(1); }
+  return sh;
+}
+function isRemoved_(pid) {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REMOVED_SHEET);
+  return !!(sh && sh.getRange('A:A').createTextFinder(pid).matchEntireCell(true).findNext());
 }
 
 function out_(obj) {
@@ -46,6 +58,7 @@ function doPost(e) {
   if (!d || d.app !== 'MrButlersCTF' || !/^[0-9a-f]{16}$/.test(String(d.pid)) || typeof body.check !== 'string') {
     return out_({ ok: false, error: 'not ctf progress' });
   }
+  if (isRemoved_(d.pid)) return out_({ ok: true, removed: true });
   var json = JSON.stringify(body);
   if (json.length > MAX_JSON) return out_({ ok: false, error: 'too large' });
 
@@ -71,6 +84,20 @@ function doGet(e) {
   if (p.key !== TEACHER_KEY) return out_({ ok: false, error: 'key' });
 
   var sh = sheet_();
+  if (p.action === 'delete') {
+    if (!/^[0-9a-f]{16}$/.test(String(p.pid))) return out_({ ok: false, error: 'bad pid' });
+    var lock = LockService.getScriptLock();
+    lock.waitLock(15000);
+    try {
+      var cell = sh.getRange('A:A').createTextFinder(p.pid).matchEntireCell(true).findNext();
+      var name = cell ? sh.getRange(cell.getRow(), 2).getValue() : '';
+      if (cell) sh.deleteRow(cell.getRow());
+      if (!isRemoved_(p.pid)) removedSheet_().appendRow([p.pid, name, new Date()]);
+    } finally {
+      lock.releaseLock();
+    }
+    return out_({ ok: true, deleted: p.pid });
+  }
   if (p.action === 'clear') {
     if (sh.getLastRow() > 1) sh.deleteRows(2, sh.getLastRow() - 1);
     return out_({ ok: true, cleared: true });

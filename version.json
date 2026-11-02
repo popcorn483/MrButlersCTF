@@ -1,9 +1,9 @@
 {
-  "version": "mbctf-v16",
+  "version": "mbctf-v18",
   "date": "2026-11-02",
   "notes": [
-    "Your teacher can now see your progress live as soon as you open the site \u2014 add your name when asked",
-    "Test area scores appear live on the Teacher tab and the projector scoreboard as you solve",
-    "Resume codes and progress files still work exactly as before"
+    "Teacher: click any pupil on the leaderboard to see every challenge they have solved, tried, or needed help with",
+    "Teacher: delete a pupil (e.g. a test account) from the live view",
+    "Test area scores appear live on the Teacher tab and the projector scoreboard"
   ]
 }

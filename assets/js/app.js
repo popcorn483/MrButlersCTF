@@ -866,7 +866,7 @@
         renderTeacher(); input.value = '';
       });
   });
-  $('#teacherClear').addEventListener('click', function () { T.rows = []; renderTeacher(); $('#teacherMsg').hidden = true; });
+  $('#teacherClear').addEventListener('click', function () { T.rows = []; T.sel = null; renderTeacher(); $('#teacherMsg').hidden = true; });
   function rowStats(r) {
     var d = r.data, pts = 0, n = 0, unv = 0, tiers = [0, 0, 0, 0, 0, 0], last = 0;
     Object.keys(d.solved || {}).forEach(function (id) {
@@ -878,7 +878,70 @@
     });
     var hints = Object.keys(d.hints || {}).reduce(function (s, k) { return s + d.hints[k]; }, 0), rev = Object.keys(d.revealed || {}).length;
     var tutIds = Object.keys(d.tut || {}).filter(function (id) { return BY_ID[id]; });
-    return { name: d.name || '(no name)', pts: pts, n: n, unv: unv, rev: rev, tiers: tiers, hints: hints, tut: tutIds.length, tutIds: tutIds, last: last, ok: r.ok, file: r.file, seen: r.seen || 0 };
+    return { name: d.name || '(no name)', pts: pts, n: n, unv: unv, rev: rev, tiers: tiers, hints: hints, tut: tutIds.length, tutIds: tutIds, last: last, ok: r.ok, file: r.file, seen: r.seen || 0, pid: d.pid };
+  }
+  // ---------- teacher: one pupil's challenge-by-challenge detail ----------
+  function renderPupilDetail() {
+    var box = $('#pupilDetail'); if (!box) return;
+    var r = T.sel && T.rows.filter(function (x) { return x.data.pid === T.sel; })[0];
+    if (!r) { box.innerHTML = ''; box.hidden = true; return; }
+    box.hidden = false;
+    var d = r.data, st = rowStats(r), solved = d.solved || {}, tries = d.tries || {}, hints = d.hints || {}, tut = d.tut || {}, rev = d.revealed || {};
+    function verified(id) { return !T.key[id] || (!!solved[id].p && sha256(d.pid + '|' + T.key[id].toLowerCase()).slice(0, 16) === solved[id].p); }
+    var cats = CATS.map(function (cat) {
+      var list = CH.filter(function (c) { return c.cat === cat.id; });
+      var done = list.filter(function (c) { return solved[c.id]; }).length;
+      var tiles = list.map(function (c) {
+        var s = solved[c.id], cls = 'pd-tile ' + TIERS[c.tier].cls, tip = c.title + ' · ' + TIERS[c.tier].name + ' · ' + c.pts + ' pts';
+        if (s && !verified(c.id)) { cls += ' unv'; tip += ' — UNVERIFIED solve'; }
+        else if (s && s.r) { cls += ' rev'; tip += ' — solved after revealing the answer (0 pts)'; }
+        else if (s) { cls += ' ok'; tip += ' — solved ' + fmtDate(s.t); }
+        else if (tries[c.id] || hints[c.id] || tut[c.id] || rev[c.id]) { cls += ' tried'; tip += ' — attempted, not solved'; }
+        var extra = [];
+        if (tries[c.id]) extra.push(tries[c.id] + ' wrong');
+        if (hints[c.id]) extra.push(hints[c.id] + ' hint' + (hints[c.id] > 1 ? 's' : ''));
+        if (tut[c.id]) extra.push('tutorial');
+        if (rev[c.id] && !s) extra.push('answer shown');
+        if (extra.length) tip += ' (' + extra.join(', ') + ')';
+        return '<span class="' + cls + '" title="' + esc(tip) + '">' + (s ? (s.r ? '👁' : '✓') : (cls.indexOf('tried') >= 0 ? '…' : '')) + '</span>';
+      }).join('');
+      return '<div class="pd-cat"><div class="pd-cat-head"><span>' + cat.icon + ' ' + esc(cat.name) + '</span><span class="muted small">' + done + '/' + list.length + '</span></div><div class="pd-tiles">' + tiles + '</div></div>';
+    }).join('');
+    // activity list: solves newest first, then challenges they tried but haven't cracked
+    var solvedIds = Object.keys(solved).filter(function (id) { return BY_ID[id]; }).sort(function (a, b) { return solved[b].t - solved[a].t; });
+    var stuck = CH.filter(function (c) { return !solved[c.id] && (tries[c.id] || hints[c.id] || tut[c.id] || rev[c.id]); });
+    function line(c, s) {
+      var bits = [TIERS[c.tier].name, c.pts + ' pts'];
+      if (tries[c.id]) bits.push(tries[c.id] + ' wrong attempt' + (tries[c.id] > 1 ? 's' : ''));
+      if (hints[c.id]) bits.push(hints[c.id] + ' hint' + (hints[c.id] > 1 ? 's' : ''));
+      if (tut[c.id]) bits.push('used tutorial');
+      if (rev[c.id]) bits.push('answer revealed');
+      var flag = s ? (!verified(c.id) ? '<span class="badge bad">unverified</span>' : s.r ? '<span class="badge">0 pts</span>' : '<span class="badge good">+' + c.pts + '</span>') : '<span class="badge">not solved</span>';
+      return '<div class="pd-line"><span class="when">' + (s ? fmtDate(s.t) : '') + '</span><span><b>' + esc(c.title) + '</b> <span class="muted small">' + esc(c.id) + ' · ' + bits.join(' · ') + '</span></span>' + flag + '</div>';
+    }
+    box.innerHTML = '<div class="pd-head"><div><h2>' + esc(st.name) + '</h2><p class="muted small">' + st.pts + ' pts · ' + st.n + ' flags · ' + st.hints + ' hints · ' + st.tut + ' tutorials · ' + st.rev + ' answers revealed' +
+      (r.seen ? ' · last on the site ' + fmtDate(r.seen) : '') + '</p></div><div class="pd-btns"><button class="btn danger small" id="pdDelete">🗑 Delete pupil</button><button class="btn small" id="pdClose">✕ Close</button></div></div>' +
+      '<p class="pd-key small muted"><span class="pd-tile ok">✓</span> solved <span class="pd-tile rev">👁</span> solved after revealing answer <span class="pd-tile tried">…</span> attempted <span class="pd-tile"></span> not started — hover a square for details</p>' +
+      '<div class="pd-cats">' + cats + '</div>' +
+      '<h3>Solved (' + solvedIds.length + ')</h3>' + (solvedIds.length ? solvedIds.map(function (id) { return line(BY_ID[id], solved[id]); }).join('') : '<p class="muted">Nothing solved yet.</p>') +
+      (stuck.length ? '<h3>Tried but not solved yet (' + stuck.length + ')</h3>' + stuck.map(function (c) { return line(c, null); }).join('') : '');
+    $('#pdClose').addEventListener('click', function () { T.sel = null; renderTeacher(); });
+    $('#pdDelete').addEventListener('click', function () { deletePupil(r, st.name); });
+  }
+  function deletePupil(r, name) {
+    var pid = r.data.pid;
+    function dropLocal() { T.rows = T.rows.filter(function (x) { return x.data.pid !== pid; }); T.sel = null; renderTeacher(); }
+    if (!r.seen || !SYNC_URL) {   // a hand-loaded file: just take it off this screen
+      if (confirm('Remove "' + name + '" from this leaderboard?')) { dropLocal(); toast('Removed'); }
+      return;
+    }
+    if (!confirm('Delete "' + name + '" from the live class view?\n\nThey are removed from the Google Sheet and that device won\'t be shown again (good for test accounts). If it was a real pupil, they can press "Reset everything" on My progress to appear again as new.')) return;
+    if (!LIVE.key && !askLiveKey()) return;
+    fetch(liveUrl('&action=delete&pid=' + encodeURIComponent(pid)), { cache: 'no-store' }).then(function (res) { return res.json(); }).then(function (res) {
+      if (res.ok && res.deleted) { dropLocal(); toast('🗑 Deleted ' + name); }
+      else if (res.ok) toast('Your Google script needs updating to delete pupils — see teacher-sync/SETUP.md (step 4)', 6000);
+      else toast(res.error === 'key' ? 'Teacher key not accepted' : 'Not deleted: ' + (res.error || 'error'));
+    }).catch(function () { toast('Couldn\'t reach the sheet'); });
   }
   function struggleSummary() {
     var count = {};
@@ -896,7 +959,7 @@
   }
   function renderTeacher() {
     var box = $('#teacherTable');
-    if (!T.rows.length) { box.innerHTML = '<p class="muted">' + (LIVE.on ? 'Live view is on — pupils will appear here as soon as they start.' : 'No files loaded yet.') + '</p>'; return; }
+    if (!T.rows.length) { box.innerHTML = '<p class="muted">' + (LIVE.on ? 'Live view is on — pupils will appear here as soon as they start.' : 'No files loaded yet.') + '</p>'; renderPupilDetail(); return; }
     var rows = T.rows.map(rowStats);
     var k = T.sort;
     rows.sort(function (a, b) { return k === 'name' ? a.name.localeCompare(b.name) : (b[k] - a[k]) || (a.last - b.last); });
@@ -905,7 +968,7 @@
       '<th data-k="hints">Hints</th><th data-k="tut">Tutorials</th><th data-k="rev">Answers revealed</th><th>Last solve</th><th>Source</th></tr></thead><tbody>' +
       rows.map(function (r, i) {
         var active = r.seen && Date.now() - r.seen < 5 * 60000;
-        return '<tr><td class="num">' + (i + 1) + '</td><td>' + (active ? '<span class="live-dot" title="Active in the last 5 minutes"></span>' : '') + esc(r.name) + '</td><td class="num">' + r.pts + '</td><td class="num">' + r.n + '</td>' +
+        return '<tr class="pupil-row' + (T.sel === r.pid ? ' sel' : '') + '" data-pid="' + esc(r.pid) + '" title="Click to see their challenges"><td class="num">' + (i + 1) + '</td><td>' + (active ? '<span class="live-dot" title="Active in the last 5 minutes"></span>' : '') + esc(r.name) + '</td><td class="num">' + r.pts + '</td><td class="num">' + r.n + '</td>' +
           [1, 2, 3, 4, 5].map(function (t) { return '<td class="num">' + r.tiers[t] + '</td>'; }).join('') +
           '<td class="num">' + r.hints + '</td><td class="num' + (r.tut ? ' tut-cell' : '') + '">' + r.tut + '</td><td class="num">' + r.rev + '</td><td class="num">' + (r.last ? fmtDate(r.last) : '-') + '</td><td>' +
           (r.seen ? '<span class="badge live" title="Sent automatically">live · ' + new Date(r.seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '</span> ' : '') +
@@ -913,7 +976,9 @@
           (r.unv ? ' <span class="badge bad">' + r.unv + ' unverified</span>' : '') + '</td></tr>';
       }).join('') + '</tbody></table>' + struggleSummary();
     $$('th[data-k]', box).forEach(function (th) { th.addEventListener('click', function () { T.sort = th.dataset.k === 'pts' ? 'pts' : th.dataset.k; renderTeacher(); }); });
+    $$('tr.pupil-row', box).forEach(function (tr) { tr.addEventListener('click', function () { T.sel = T.sel === tr.dataset.pid ? null : tr.dataset.pid; renderTeacher(); if (T.sel) { var el = $('#pupilDetail'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }); });
     T.lastRows = rows;
+    renderPupilDetail();
   }
   $('#teacherCsv').addEventListener('click', function () {
     if (!T.lastRows) return toast('Load some files first');

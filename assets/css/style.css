@@ -939,3 +939,24 @@ body.view-home .foot { display: none !important; }
 .badge.live { color: var(--green); border-color: var(--green); }
 .live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-right: 6px; vertical-align: middle; }
 table.lb td:nth-child(2) { white-space: nowrap; }
+
+/* teacher: pupil detail */
+tr.pupil-row { cursor: pointer; }
+tr.pupil-row:hover td { background: var(--panel2); }
+tr.pupil-row.sel td { background: var(--panel2); box-shadow: inset 0 -2px 0 var(--green); }
+.pupil-detail { margin: 18px 0; padding: 16px; border: 1px solid var(--line2); border-radius: 12px; background: var(--panel); scroll-margin-top: 80px; }
+.pd-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.pd-head h2 { margin: 0; }
+.pd-cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin: 12px 0; }
+.pd-cat-head { display: flex; justify-content: space-between; font-size: .88rem; margin-bottom: 6px; }
+.pd-tiles { display: flex; flex-wrap: wrap; gap: 4px; }
+.pd-tile { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 4px; font-size: .7rem; border: 1px solid var(--line2); background: transparent; vertical-align: middle; }
+.pd-tile.ok { background: var(--green); border-color: var(--green); color: #04130c; font-weight: 700; }
+.pd-tile.rev { border-color: var(--amber); color: var(--amber); }
+.pd-tile.tried { border-color: var(--amber); border-style: dashed; color: var(--amber); }
+.pd-tile.unv { border-color: var(--red); color: var(--red); }
+.pd-key .pd-tile { margin: 0 4px 0 10px; }
+.pd-line { display: grid; grid-template-columns: 150px 1fr auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: .9rem; }
+.pd-line .when { font-family: var(--mono); color: var(--muted); font-size: .8rem; }
+@media (max-width: 600px) { .pd-line { grid-template-columns: 1fr auto; } .pd-line .when { grid-column: 1 / -1; } }
+.pd-btns { display: flex; gap: 8px; flex-wrap: wrap; }
