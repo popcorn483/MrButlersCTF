@@ -1,9 +1,10 @@
 {
-  "version": "mbctf-v20",
+  "version": "mbctf-v21",
   "date": "2026-11-02",
   "notes": [
-    "Teacher view works on as many PCs as you like at once \u2014 enter the teacher key on each",
-    "New Sign out of this PC button turns a PC back into a pupil machine",
-    "Click any pupil to see their challenges; delete test pupils"
+    "\ud83c\udfc6 New Competition Grade category: 11 Elite challenges worth 500\u2013600 points, built like the real event",
+    "No instructions, hints or walkthroughs on these \u2014 work out what you're looking at yourself",
+    "Unlocks once you've solved 5 Hard or Expert challenges",
+    "273 challenges in total"
   ]
 }

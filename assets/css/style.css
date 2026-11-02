@@ -33,7 +33,7 @@
   --mono: ui-monospace, "Cascadia Mono", "Cascadia Code", "Consolas", "Menlo", monospace;
   --sans: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   --brand: "Lemon Milk", "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
-  --t1: #85D68C; --t2: #5CD3EE; --t3: #F5B25C; --t4: #FF9E78; --t5: #FF8FBC;
+  --t1: #85D68C; --t2: #5CD3EE; --t3: #F5B25C; --t4: #FF9E78; --t5: #FF8FBC; --t6: #FFD45C;
   --radius: 16px;
 }
 * { box-sizing: border-box; }
@@ -136,7 +136,7 @@ h3 { font-size: 1rem; margin: 18px 0 6px; }
 .tile.tile-locked .tile-title { color: var(--muted); font-weight: 600; }
 .tile.tile-locked .tile-foot { color: var(--muted); }
 .tile.tile-locked .lock-ic { position: absolute; top: 7px; right: 9px; font-size: .9rem; opacity: .7; }
-.t1 { --tc: var(--t1); } .t2 { --tc: var(--t2); } .t3 { --tc: var(--t3); } .t4 { --tc: var(--t4); } .t5 { --tc: var(--t5); }
+.t1 { --tc: var(--t1); } .t2 { --tc: var(--t2); } .t3 { --tc: var(--t3); } .t4 { --tc: var(--t4); } .t5 { --tc: var(--t5); } .t6 { --tc: var(--t6); }
 .empty { color: var(--muted); padding: 30px; text-align: center; border: 1px dashed var(--line2); border-radius: 12px; }
 
 /* ---------- buttons ---------- */
@@ -960,3 +960,6 @@ tr.pupil-row.sel td { background: var(--panel2); box-shadow: inset 0 -2px 0 var(
 .pd-line .when { font-family: var(--mono); color: var(--muted); font-size: .8rem; }
 @media (max-width: 600px) { .pd-line { grid-template-columns: 1fr auto; } .pd-line .when { grid-column: 1 / -1; } }
 .pd-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Elite / Competition Grade tiles */
+.tile.t6 { border-color: color-mix(in srgb, var(--t6) 45%, var(--line2)); background: linear-gradient(160deg, color-mix(in srgb, var(--t6) 10%, var(--panel)), var(--panel)); }

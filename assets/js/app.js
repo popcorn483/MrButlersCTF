@@ -15,7 +15,9 @@
 
   var TIERS = [null,
     { name: 'Beginner', cls: 't1' }, { name: 'Easy', cls: 't2' }, { name: 'Medium', cls: 't3' },
-    { name: 'Hard', cls: 't4' }, { name: 'Expert', cls: 't5' }];
+    { name: 'Hard', cls: 't4' }, { name: 'Expert', cls: 't5' }, { name: 'Elite', cls: 't6' }];
+  var TIER_NUMS = [1, 2, 3, 4, 5, 6];
+  var ELITE_NEED = 5;   // Hard/Expert solves needed to unlock Competition Grade
   var RANKS = [[0, 'Script Kiddie'], [150, 'Packet Sniffer'], [500, 'Bug Hunter'], [1200, 'Flag Collector'],
     [2500, 'Cipher Breaker'], [4500, 'Exploit Engineer'], [7000, 'Red Teamer'], [10000, 'Zero-Day Legend']];
   var TOTAL_PTS = CH.reduce(function (s, c) { return s + c.pts; }, 0);
@@ -48,7 +50,12 @@
   function solvedCount() { return Object.keys(S.solved).filter(function (id) { return BY_ID[id]; }).length; }
   // Hard (tier 4) and Expert (tier 5) challenges in a category stay locked until
   // the pupil has solved a few of the easier ones (tier <= 3) in that same category.
+  function kindTag(c) { var k = c.kind && CATS.filter(function (x) { return x.id === c.kind; })[0]; return k ? '<span class="tag">' + k.icon + ' ' + esc(k.name) + '</span>' : ''; }
   function catUnlock(catId) {
+    if (catId === 'elite') {
+      var hardDone = CH.filter(function (c) { return c.tier >= 4 && c.tier <= 5 && S.solved[c.id]; }).length;
+      return { locked: hardDone < ELITE_NEED, need: ELITE_NEED, have: Math.min(hardDone, ELITE_NEED), elite: true };
+    }
     var easier = CH.filter(function (c) { return c.cat === catId && c.tier <= 3; });
     var need = Math.min(3, easier.length);
     var have = easier.filter(function (c) { return S.solved[c.id]; }).length;
@@ -150,12 +157,12 @@
   });
 
   // ---------- filters ----------
-  var F = { tiers: { 1: true, 2: true, 3: true, 4: true, 5: true }, q: '', hide: false };
+  var F = { tiers: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true }, q: '', hide: false };
   function renderChips() {
     ['#tierChips', '#navTierChips'].forEach(function (sel) {
       var box = document.querySelector(sel); if (!box) return;
       box.innerHTML = '';
-      for (var t = 1; t <= 5; t++) {
+      for (var t = 1; t <= 6; t++) {
         var b = document.createElement('button');
         b.className = 'chip ' + TIERS[t].cls + (F.tiers[t] ? ' on' : '');
         b.innerHTML = '<span class="dot" style="background:var(--tc)"></span>' + TIERS[t].name;
@@ -210,8 +217,8 @@
         var remain = unlock.need - unlock.have;
         var lb = document.createElement('button'); lb.className = 'tile tile-locked';
         lb.innerHTML = '<span class="lock-ic">🔒</span><div class="tile-title">' + hiddenHard.length + ' harder challenge' + (hiddenHard.length > 1 ? 's' : '') +
-          '</div><div class="tile-foot"><span>Solve ' + remain + ' more here to unlock</span></div>';
-        lb.addEventListener('click', function () { toast('🔒 Solve ' + remain + ' more ' + cat.name + ' challenge' + (remain > 1 ? 's' : '') + ' to unlock the harder ones.'); });
+          '</div><div class="tile-foot"><span>' + (unlock.elite ? 'Solve ' + remain + ' more Hard/Expert to unlock' : 'Solve ' + remain + ' more here to unlock') + '</span></div>';
+        lb.addEventListener('click', function () { toast(unlock.elite ? '🏆 Competition Grade unlocks once you have solved ' + ELITE_NEED + ' Hard or Expert challenges (' + unlock.have + '/' + ELITE_NEED + ' so far).' : '🔒 Solve ' + remain + ' more ' + cat.name + ' challenge' + (remain > 1 ? 's' : '') + ' to unlock the harder ones.', 4000); });
         tiles.appendChild(lb);
       }
       board.appendChild(sec);
@@ -220,7 +227,7 @@
     renderRecommend();
   }
   function nextRecommended() {
-    var unsolved = CH.filter(function (c) { return !S.solved[c.id]; });
+    var unsolved = CH.filter(function (c) { return !S.solved[c.id] && c.tier < 6; });
     if (!unsolved.length) return null;
     var catIdx = {}; CATS.forEach(function (c, i) { catIdx[c.id] = i; });
     unsolved.sort(function (a, b) { return a.tier - b.tier || catIdx[a.cat] - catIdx[b.cat] || a.id.localeCompare(b.id); });
@@ -340,7 +347,7 @@
     var cat = CATS.filter(function (x) { return x.id === c.cat; })[0];
     var card = $('#chalModal .modal-card');
     card.className = 'modal-card ' + TIERS[c.tier].cls;
-    $('#chalMeta').innerHTML = '<span class="tag">' + cat.icon + ' ' + esc(cat.name) + '</span><span class="tag tier">' + TIERS[c.tier].name +
+    $('#chalMeta').innerHTML = '<span class="tag">' + cat.icon + ' ' + esc(cat.name) + '</span>' + kindTag(c) + '<span class="tag tier">' + TIERS[c.tier].name +
       '</span><span class="tag pts">' + c.pts + ' pts</span><span class="tag">' + esc(c.id) + '</span>' + (S.solved[id] ? '<span class="tag done">✓ solved</span>' : '');
     $('#chalTitle').textContent = c.title;
     var desc = $('#chalDesc'); desc.innerHTML = c.desc;
@@ -449,7 +456,7 @@
   // ---------- view mode: 'real' (no assistance, default) or 'tutorial' (full help) ----------
   var MODE_KEY = 'mbctf-mode', viewMode = 'real';
   try { var _m = localStorage.getItem(MODE_KEY); if (_m === 'tutorial' || _m === 'real') viewMode = _m; } catch (e) { }
-  function assistOff() { return testLive() || viewMode === 'real'; }
+  function assistOff() { return testLive() || viewMode === 'real' || !!(current && current.tier === 6); }
   function updateModeUI() {
     $$('.mode-btn').forEach(function (b) { var on = b.dataset.mode === viewMode; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
     var d = document.getElementById('modeDesc');
@@ -469,6 +476,7 @@
   function renderHints(c) {
     var box = $('#chalHints'); box.innerHTML = '';
     if (testLive()) { box.innerHTML = '<div class="hint-box" style="border-color:var(--red)"><div class="hint-warn" style="color:var(--red)">🔒 Assistance is off during a test</div>Hints and walkthroughs are hidden while a test is running — just like the real event. They come back when the test ends.</div>'; return; }
+    if (c.tier === 6) { box.innerHTML = '<div class="hint-box" style="border-color:var(--t6)"><div class="hint-warn" style="color:var(--t6)">🏆 Competition grade</div>No hints, tutorials or walkthroughs &mdash; just like the real event. Read everything carefully, work out what you have been given, and use the Toolkit. Your teacher has the answers if you are really stuck.</div>'; return; }
     if (viewMode === 'real') { box.innerHTML = '<div class="hint-box" style="border-color:var(--amber)"><div class="hint-warn">🎯 Real-event view</div>No hints or walkthroughs here — this is how the real competition feels. Switch to <b>Tutorial</b> view at the top of the board if you would like help.</div>'; return; }
     if (!c.hints || !c.hints.length) return;
     var used = S.hints[c.id] || 0;
@@ -602,14 +610,14 @@
   }
   function openChalMeta(c) {
     var cat = CATS.filter(function (x) { return x.id === c.cat; })[0];
-    $('#chalMeta').innerHTML = '<span class="tag">' + cat.icon + ' ' + esc(cat.name) + '</span><span class="tag tier">' + TIERS[c.tier].name +
+    $('#chalMeta').innerHTML = '<span class="tag">' + cat.icon + ' ' + esc(cat.name) + '</span>' + kindTag(c) + '<span class="tag tier">' + TIERS[c.tier].name +
       '</span><span class="tag pts">' + c.pts + ' pts</span><span class="tag">' + esc(c.id) + '</span><span class="tag done">✓ solved</span>';
   }
 
   // ---------- progress ----------
   function renderProgress() {
     var sc = score(), n = solvedCount(), hintsUsed = Object.keys(S.hints).reduce(function (s, k) { return s + S.hints[k]; }, 0), revCount = Object.keys(S.revealed || {}).length, tutCount = Object.keys(S.tut || {}).filter(function (id) { return BY_ID[id]; }).length;
-    var tierDone = [0, 0, 0, 0, 0, 0];
+    var tierDone = [0, 0, 0, 0, 0, 0, 0];
     Object.keys(S.solved).forEach(function (id) { if (BY_ID[id]) tierDone[BY_ID[id].tier]++; });
     var enc;
     if (n === 0) enc = 'Every expert started with zero flags. Head to the board and grab your first — the Warm-Up category is the perfect place to start.';
@@ -627,7 +635,7 @@
       '<div class="stat"><b>' + tutCount + '</b><span>tutorials used</span></div>' +
       '<div class="stat"><b>' + S.wrong + '</b><span>wrong guesses</span></div>' +
       '<div class="stat"><b>' + revCount + '</b><span>answers revealed</span></div>' +
-      [1, 2, 3, 4, 5].map(function (t) {
+      TIER_NUMS.map(function (t) {
         var tot = CH.filter(function (c) { return c.tier === t; }).length;
         return '<div class="stat ' + TIERS[t].cls + '"><b style="color:var(--tc)">' + tierDone[t] + '/' + tot + '</b><span>' + TIERS[t].name + '</span></div>';
       }).join('');
@@ -868,7 +876,7 @@
   });
   $('#teacherClear').addEventListener('click', function () { T.rows = []; T.sel = null; renderTeacher(); $('#teacherMsg').hidden = true; });
   function rowStats(r) {
-    var d = r.data, pts = 0, n = 0, unv = 0, tiers = [0, 0, 0, 0, 0, 0], last = 0;
+    var d = r.data, pts = 0, n = 0, unv = 0, tiers = [0, 0, 0, 0, 0, 0, 0], last = 0;
     Object.keys(d.solved || {}).forEach(function (id) {
       var c = BY_ID[id]; if (!c) return;
       var s = d.solved[id], valid = true;
@@ -964,12 +972,12 @@
     var k = T.sort;
     rows.sort(function (a, b) { return k === 'name' ? a.name.localeCompare(b.name) : (b[k] - a[k]) || (a.last - b.last); });
     box.innerHTML = '<table class="lb"><thead><tr><th>#</th><th data-k="name">Name</th><th data-k="pts">Points</th><th data-k="n">Flags</th>' +
-      [1, 2, 3, 4, 5].map(function (t) { return '<th>' + TIERS[t].name + '</th>'; }).join('') +
+      TIER_NUMS.map(function (t) { return '<th>' + TIERS[t].name + '</th>'; }).join('') +
       '<th data-k="hints">Hints</th><th data-k="tut">Tutorials</th><th data-k="rev">Answers revealed</th><th>Last solve</th><th>Source</th></tr></thead><tbody>' +
       rows.map(function (r, i) {
         var active = r.seen && Date.now() - r.seen < 5 * 60000;
         return '<tr class="pupil-row' + (T.sel === r.pid ? ' sel' : '') + '" data-pid="' + esc(r.pid) + '" title="Click to see their challenges"><td class="num">' + (i + 1) + '</td><td>' + (active ? '<span class="live-dot" title="Active in the last 5 minutes"></span>' : '') + esc(r.name) + '</td><td class="num">' + r.pts + '</td><td class="num">' + r.n + '</td>' +
-          [1, 2, 3, 4, 5].map(function (t) { return '<td class="num">' + r.tiers[t] + '</td>'; }).join('') +
+          TIER_NUMS.map(function (t) { return '<td class="num">' + r.tiers[t] + '</td>'; }).join('') +
           '<td class="num">' + r.hints + '</td><td class="num' + (r.tut ? ' tut-cell' : '') + '">' + r.tut + '</td><td class="num">' + r.rev + '</td><td class="num">' + (r.last ? fmtDate(r.last) : '-') + '</td><td>' +
           (r.seen ? '<span class="badge live" title="Sent automatically">live · ' + new Date(r.seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '</span> ' : '') +
           (r.ok ? '<span class="badge good">ok</span>' : '<span class="badge bad">edited</span>') +
@@ -982,9 +990,9 @@
   }
   $('#teacherCsv').addEventListener('click', function () {
     if (!T.lastRows) return toast('Load some files first');
-    var lines = [['Rank', 'Name', 'Points', 'Flags', 'Beginner', 'Easy', 'Medium', 'Hard', 'Expert', 'Hints', 'Tutorials used', 'Answers revealed', 'Unverified', 'Last solve'].join(',')];
+    var lines = [['Rank', 'Name', 'Points', 'Flags', 'Beginner', 'Easy', 'Medium', 'Hard', 'Expert', 'Elite', 'Hints', 'Tutorials used', 'Answers revealed', 'Unverified', 'Last solve'].join(',')];
     T.lastRows.forEach(function (r, i) {
-      lines.push([i + 1, '"' + r.name.replace(/"/g, '""') + '"', r.pts, r.n, r.tiers[1], r.tiers[2], r.tiers[3], r.tiers[4], r.tiers[5], r.hints, r.tut, r.rev, r.unv, r.last ? new Date(r.last).toISOString() : ''].join(','));
+      lines.push([i + 1, '"' + r.name.replace(/"/g, '""') + '"', r.pts, r.n, r.tiers[1], r.tiers[2], r.tiers[3], r.tiers[4], r.tiers[5], r.tiers[6], r.hints, r.tut, r.rev, r.unv, r.last ? new Date(r.last).toISOString() : ''].join(','));
     });
     download('MrButlersCTF-leaderboard.csv', lines.join('\n'), 'text/csv');
   });

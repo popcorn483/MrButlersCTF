@@ -21,7 +21,7 @@
   var U = window.CTFUtil, $ = U.$, esc = U.esc, toast = U.toast, download = U.download;
   var BY_ID = window.CTF.BY_ID, CATS = window.CTF.DATA.cats;
   var TIER = [null, 'Beginner', 'Easy', 'Medium', 'Hard', 'Expert'];
-  var TCLS = [null, 't1', 't2', 't3', 't4', 't5'];
+  var TCLS = [null, 't1', 't2', 't3', 't4', 't5', 't6'];
   var SALT = 'mbctf-test-v1';
   var KEY = 'mbctf-test-v1';
 

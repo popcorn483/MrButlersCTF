@@ -1,6 +1,7 @@
 /* Getting Started page + category guides */
 window.CTF_START_HTML = function (cats) {
   var guides = {
+    elite: ['Unlocks after 5 Hard or Expert solves. Worth 500&ndash;600 points each.', 'No hints, tutorials or walkthroughs &mdash; exactly like the real event.', 'Nobody tells you what kind of puzzle it is. Start by asking: what am I looking at? A log? An encoding? A file pretending to be something else?', 'Expect several steps, decoys and red herrings. Write down every step you try.', 'Most need the JS scratchpad, Hex viewer or a multi-step Decoder recipe.'],
     warmup: ['Read the whole description: flags sometimes sit right there.', 'Click <b>View HTML</b>: comments and hidden text are invisible on screen.', 'Learn to spot encodings: Base64 ends in <code>=</code>, hex is only 0-9 and a-f, binary is 0s and 1s.'],
     web: ['Websites hide things in source code, comments, JavaScript and files like <code>robots.txt</code>.', 'Read any JavaScript that checks a password: if the check happens in the browser, the answer is in the code.', 'At the real event press <kbd>F12</kbd> or <kbd>Ctrl</kbd>+<kbd>U</kbd>. Here, use View HTML and the file viewer.'],
     crypto: ['Work out what it is before decoding: letters only? numbers? <code>=</code> at the end?', 'Shifted letters = Caesar/ROT. Try all 25 shifts with "Caesar brute force".', 'Layered challenges: decode one layer, look at the output, decide the next step.'],

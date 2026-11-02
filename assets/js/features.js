@@ -122,7 +122,7 @@
   // ---------- daily challenge + streak ----------
   function todayKey() { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
   function hashStr(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 16777619) >>> 0; } return h; }
-  function dailyChallenge() { return CH[hashStr('mbctf|' + todayKey()) % CH.length]; }
+  function dailyChallenge() { var pool = CH.filter(function (c) { return c.tier < 6; }); return pool[hashStr('mbctf|' + todayKey()) % pool.length]; }
   function renderDaily() {
     var box = $('#dailyCard'); if (!box) return;
     var S = CTF.getState(), c = dailyChallenge(), cat = CATS.filter(function (x) { return x.id === c.cat; })[0];
