@@ -32,7 +32,7 @@
   function rid() { var a = new Uint8Array(6); (crypto.getRandomValues ? crypto.getRandomValues(a) : a.forEach(function (_, i) { a[i] = Math.random() * 256; })); return Array.prototype.map.call(a, function (b) { return ('0' + b.toString(16)).slice(-2); }).join(''); }
   var TS = blank();
   try { var raw = localStorage.getItem(KEY); if (raw) TS = Object.assign(blank(), JSON.parse(raw)); } catch (e) { }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(TS)); } catch (e) { } }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(TS)); } catch (e) { } if (window.CTFSyncSoon) window.CTFSyncSoon(); }
 
   var timer = null;
   function durationMs() { return CONFIG.minutes * 60 * 1000; }
@@ -294,5 +294,14 @@
     });
   }
 
-  window.TestArea = { enter: enter, isLive: isLive, open: openTest };
+  // what the teacher's live view sees: the result payload plus each solve's proof code
+  function liveSnapshot() {
+    if (!TS.started) return null;
+    var d = resultPayload(), proofs = {};
+    Object.keys(TS.solved).forEach(function (id) { proofs[id] = TS.solved[id].p; });
+    d.proofs = proofs; d.start = TS.start; d.minutes = CONFIG.minutes;
+    d.status = TS.finished ? 'finished' : (remaining() > 0 ? 'running' : 'timeup');
+    return d;
+  }
+  window.TestArea = { enter: enter, isLive: isLive, open: openTest, liveSnapshot: liveSnapshot };
 })();

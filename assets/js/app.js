@@ -686,8 +686,13 @@
   // payload as the progress file, so the teacher view verifies it exactly like a file.
   var SYNC_URL = (window.CTF_CONFIG && window.CTF_CONFIG.syncUrl) || '';
   var syncTimer = null, syncState = { at: 0, ok: null };
-  function hasActivity() { return Object.keys(S.solved).length + Object.keys(S.hints).length + Object.keys(S.revealed || {}).length + Object.keys(S.tut || {}).length > 0 || !!S.name; }
-  function syncBody() { return JSON.stringify(JSON.parse(makeExport())); }
+  function isTeacherDevice() { try { return !!localStorage.getItem('mbctf-teacher-livekey-v1'); } catch (e) { return false; } }
+  function hasActivity() { return !isTeacherDevice(); }
+  function syncBody() {
+    var obj = JSON.parse(makeExport());
+    try { var t = window.TestArea && TestArea.liveSnapshot && TestArea.liveSnapshot(); if (t) obj.test = t; } catch (e) { }
+    return JSON.stringify(obj);
+  }
   function pushSync(leaving) {
     clearTimeout(syncTimer); syncTimer = null;
     if (!SYNC_URL || !hasActivity()) return;
@@ -700,7 +705,8 @@
       .then(function () { syncState = { at: Date.now(), ok: true }; renderSyncStatus(); })
       .catch(function () { syncState.ok = false; renderSyncStatus(); syncTimer = setTimeout(pushSync, 60000); });
   }
-  function scheduleSync() { if (!SYNC_URL) return; clearTimeout(syncTimer); syncTimer = setTimeout(pushSync, 4000); }
+  function scheduleSync(ms) { if (!SYNC_URL) return; clearTimeout(syncTimer); syncTimer = setTimeout(pushSync, ms || 4000); }
+  window.CTFSyncSoon = function () { scheduleSync(1500); };
   function renderSyncStatus() {
     var el = document.getElementById('syncStatus'); if (!el) return;
     if (!SYNC_URL) { el.hidden = true; return; }
@@ -713,6 +719,11 @@
   }
   if (SYNC_URL) {
     setTimeout(pushSync, 3000);
+    // ask for a name up front (after the first-visit welcome tour) so the teacher's list isn't full of '(no name)'
+    setTimeout(function () { var seenTour = false; try { seenTour = !!localStorage.getItem('mbctf-welcomed-v1'); } catch (e) { }
+      if (!S.name && seenTour && !isTeacherDevice()) askName(); }, 2500);
+    // heartbeat so the teacher sees who is on the site right now, even before their first solve
+    setInterval(function () { if (!document.hidden && !syncTimer) pushSync(); }, 3 * 60000);
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && syncTimer) pushSync(true); });
     window.addEventListener('pagehide', function () { if (syncTimer) pushSync(true); });
     window.addEventListener('online', function () { if (syncState.ok === false) pushSync(); });
@@ -934,19 +945,49 @@
       }
       var byPid = {};
       T.rows.forEach(function (r) { if (!r.seen) byPid[r.data.pid] = r; });   // keep any hand-loaded files
-      var bad = 0;
+      var bad = 0, tests = [];
       (res.rows || []).forEach(function (x) {
         try {
+          var raw = JSON.parse(x.json); if (raw.test) tests.push(testRow(raw.test, x.seen));
           var r = parseImport(x.json); r.file = 'live'; r.seen = x.seen;
           var cur = byPid[r.data.pid];
           if (!cur || (cur.data.exported || 0) <= (r.data.exported || 0)) byPid[r.data.pid] = r;
         } catch (e) { bad++; }
       });
       T.rows = Object.keys(byPid).map(function (k) { return byPid[k]; });
-      renderTeacher();
+      renderTeacher(); renderLiveTests(tests);
       var n = (res.rows || []).length, active = (res.rows || []).filter(function (x) { return Date.now() - x.seen < 5 * 60000; }).length;
       liveInfo('good-text', '🔴 Live · ' + n + ' pupil' + (n === 1 ? '' : 's') + ' (' + active + ' active now) · refreshed ' + new Date().toLocaleTimeString() + (bad ? ' · ' + bad + ' unreadable row(s)' : ''));
     }).catch(function () { liveInfo('bad-text', 'Couldn\'t reach the Google Sheet — trying again in a moment…'); });
+  }
+  // ---------- teacher: live Test area (mock competition) results ----------
+  function testRow(t, seen) {
+    var pts = 0, n = 0, unv = 0;
+    Object.keys(t.proofs || {}).forEach(function (id) {
+      var c = BY_ID[id]; if (!c) return;
+      if (T.key[id] && sha256(t.pid + '|' + T.key[id].toLowerCase()).slice(0, 16) !== t.proofs[id]) { unv++; return; }
+      pts += c.pts; n++;
+    });
+    var used = t.status === 'running' ? Date.now() - t.start : t.timeUsedMs;
+    var left = t.status === 'running' ? Math.max(0, t.minutes * 60000 - (Date.now() - t.start)) : 0;
+    if (t.status === 'running' && !left) t.status = 'timeup';
+    return { app: 'MrButlersCTF-Test', pid: t.pid, name: t.name || '(no name)', exported: t.exported, score: pts, solvedCount: n, paperSize: t.paperSize,
+      timeUsedMs: Math.min(used, t.minutes * 60000), left: left, status: t.status, wrong: t.wrong || 0, unv: unv, seen: seen, live: true };
+  }
+  function mmss(ms) { var s = Math.round(ms / 1000); return Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2); }
+  function renderLiveTests(list) {
+    var box = $('#liveTestTable'); if (!box) return;
+    if (window.CTFEventLive) try { window.CTFEventLive(list); } catch (e) { }
+    if (!list.length) { box.innerHTML = ''; return; }
+    list.sort(function (a, b) { return (b.score - a.score) || (a.timeUsedMs - b.timeUsedMs); });
+    var running = list.filter(function (d) { return d.status === 'running'; }).length;
+    box.innerHTML = '<h2>🔒 Test area — live results</h2><p class="muted small">' + list.length + ' started · ' + running + ' still running. Ranked by points, then fastest. Also feeds the projector event scoreboard automatically.</p>' +
+      '<table class="lb"><thead><tr><th>#</th><th>Name / team</th><th>Points</th><th>Flags</th><th>Status</th><th>Time used</th><th>Wrong guesses</th><th></th></tr></thead><tbody>' +
+      list.map(function (d, i) {
+        var st = d.status === 'running' ? '<span class="badge live">running · ' + mmss(d.left) + ' left</span>' : d.status === 'finished' ? '<span class="badge good">finished</span>' : '<span class="badge">time up</span>';
+        return '<tr><td class="num">' + (i + 1) + '</td><td>' + esc(d.name) + '</td><td class="num">' + d.score + '</td><td class="num">' + d.solvedCount + '/' + d.paperSize + '</td><td>' + st +
+          '</td><td class="num">' + mmss(d.timeUsedMs) + '</td><td class="num">' + d.wrong + '</td><td>' + (d.unv ? '<span class="badge bad">' + d.unv + ' unverified</span>' : '') + '</td></tr>';
+      }).join('') + '</tbody></table>';
   }
   function startLive() {
     if (!LIVE.key && !askLiveKey()) return;

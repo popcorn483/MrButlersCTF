@@ -127,6 +127,16 @@
       });
   });
   $('#evClear').addEventListener('click', function () { rows = []; renderBoard(); });
+  // live results from the Teacher tab's live view (Google Sheet) — merged with any loaded files
+  window.CTFEventLive = function (list) {
+    rows = rows.filter(function (r) { return !r.data.live; });
+    list.forEach(function (d) {
+      var cur = rows.filter(function (r) { return r.data.pid === d.pid; })[0];
+      if (cur && cur.data.exported >= d.exported) return;
+      rows = rows.filter(function (r) { return r.data.pid !== d.pid; }); rows.push({ data: d, ok: true });
+    });
+    renderBoard();
+  };
   function renderBoard() {
     var box = $('#evBoard');
     if (!rows.length) { box.innerHTML = '<p class="ev-empty">No results loaded yet. As teams finish, load their result files and the scoreboard fills in.</p>'; return; }

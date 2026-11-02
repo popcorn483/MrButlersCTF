@@ -279,7 +279,7 @@
           <button class="btn danger small" id="liveClear">Clear live data</button>
         </div>
       </div>
-      <p>Live view refreshes itself every 20 seconds while this tab is open; a green dot means the pupil did something in the last 5 minutes. You can still load progress files below for pupils who worked offline or at home.</p>
+      <p>Live view lists every pupil who opens the site and refreshes itself every 20 seconds while this tab is open; a green dot means they're on the site right now. Test area attempts appear in their own table below. You can still load progress files below for pupils who worked offline or at home.</p>
       <p class="callout">🔒 <b>Staff answer book</b> — the full solutions and a downloadable PDF live on the password-protected <a href="teacher.html">Teacher Area</a> page.</p>
       <div class="progress-actions">
         <label class="btn primary" for="teacherFiles">Load pupil progress files</label>
@@ -291,6 +291,7 @@
       <p class="muted small">Each solve carries a proof code that only a real flag submission produces, so hand-edited files show up as <span class="badge bad">unverified</span>. Challenges solved after the pupil clicked <b>Show answer</b> count as flags but score 0 points.</p>
       <div id="teacherMsg" class="notice" hidden></div>
       <div id="teacherTable"></div>
+      <div id="liveTestTable"></div>
     </div>
   </section>
 </main>
@@ -453,7 +454,7 @@
         </div>
       </div>
       <div id="evBoard" class="ev-board"></div>
-      <p class="ev-hint">Pupils: open <b>🔒 Test area</b>, enter your <b>team name</b> and the password, and race the clock on this screen. When you finish, download your result and send it to your teacher to appear here.</p>
+      <p class="ev-hint">Pupils: open <b>🔒 Test area</b>, enter your <b>team name</b> and the password, and race the clock on this screen. With live view on, scores appear here automatically as teams solve. Otherwise, download your result when you finish and send it to your teacher.</p>
     </div>
   </div>
 </div>

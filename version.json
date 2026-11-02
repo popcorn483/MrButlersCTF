@@ -1,9 +1,9 @@
 {
-  "version": "mbctf-v15",
+  "version": "mbctf-v16",
   "date": "2026-11-02",
   "notes": [
-    "Your progress now goes to your teacher automatically as you solve \u2014 look for the \ud83d\udce1 note on My progress",
-    "Teacher tab: live class view that updates by itself, with a green dot for pupils active right now",
+    "Your teacher can now see your progress live as soon as you open the site \u2014 add your name when asked",
+    "Test area scores appear live on the Teacher tab and the projector scoreboard as you solve",
     "Resume codes and progress files still work exactly as before"
   ]
 }
