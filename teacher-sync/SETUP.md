@@ -31,7 +31,7 @@ Commit, wait a minute for GitHub Pages, and you're live.
 2. Save, then **Deploy → Manage deployments → ✏ Edit → Version: New version → Deploy**. The URL stays the same, so nothing on the site needs changing.
 
 ## Using it
-- Open the site → **Teacher** tab → **▶ Start live view** → enter your teacher key (remembered on that computer).
+- On the homepage press **👩‍🏫 Teacher access** and enter the Teacher Area password. That PC becomes a teacher screen: the Teacher tab appears (pupils never see it), live view starts by itself and the answer book opens without asking again. The live-view key is stored inside the encrypted answer book, so staff only need one password. (You can still type the key by hand with the **Teacher key** button.)
 - **Any number of PCs** can be teacher screens at once — your desk PC, the projector, a laptop walking round the room. Enter the key on each; they all see the same live data, and deleting or clearing on one shows on the others within 20 seconds. Teacher PCs are never counted as pupils.
 - Signed in on a pupil's PC? Press **Sign out of this PC** afterwards so it's tracked as a pupil again. (On C2k the key may be forgotten when you log off — just enter it again.)
 - The table refreshes every 20 seconds. 🟢 = the pupil did something in the last 5 minutes.

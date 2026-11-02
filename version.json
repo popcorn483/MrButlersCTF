@@ -1,10 +1,10 @@
 {
-  "version": "mbctf-v23",
+  "version": "mbctf-v24",
   "date": "2026-11-02",
   "notes": [
+    "Teachers: new \ud83d\udc69\u200d\ud83c\udfeb Teacher access button on the homepage \u2014 one password opens the live class view and the answer book",
+    "The Teacher tab is now only shown on signed-in teacher PCs",
     "Teacher: click any square or line in a pupil's breakdown to open that challenge, with their record and the answer",
-    "\ud83c\udfc6 Competition Grade: 11 Elite challenges for stronger pupils",
-    "Unlocks once you've solved 5 Hard or Expert challenges",
-    "273 challenges in total"
+    "\ud83c\udfc6 Competition Grade: 11 Elite challenges for stronger pupils"
   ]
 }

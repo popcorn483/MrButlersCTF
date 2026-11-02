@@ -88,6 +88,7 @@
     if (lm) lm.hidden = true; if (lt) lt.setAttribute('aria-expanded', 'false');
   }
   function show(view) {
+    if (view === 'teacher' && !teacherSignedIn()) { openTeacherSignIn(); return; }
     $$('.tab').forEach(function (t) { t.classList.toggle('active', t.dataset.view === view); });
     $$('.view').forEach(function (v) { v.classList.toggle('active', v.id === 'view-' + view); });
     document.body.classList.toggle('view-board', view === 'board'); // drawer board-options only on the board
@@ -695,7 +696,7 @@
   // payload as the progress file, so the teacher view verifies it exactly like a file.
   var SYNC_URL = (window.CTF_CONFIG && window.CTF_CONFIG.syncUrl) || '';
   var syncTimer = null, syncState = { at: 0, ok: null };
-  function isTeacherDevice() { try { return !!localStorage.getItem('mbctf-teacher-livekey-v1'); } catch (e) { return false; } }
+  function isTeacherDevice() { try { return !!localStorage.getItem('mbctf-teacher-livekey-v1') || localStorage.getItem('mbctf-teacher-pc-v1') === '1'; } catch (e) { return false; } }
   function hasActivity() { return !isTeacherDevice(); }
   function syncBody() {
     var obj = JSON.parse(makeExport());
@@ -1020,7 +1021,7 @@
   // ---------- teacher: live class view from the Google Sheet ----------
   var LIVE = { on: false, timer: null, key: '' }, LIVE_KEY_STORE = 'mbctf-teacher-livekey-v1';
   try { LIVE.key = localStorage.getItem(LIVE_KEY_STORE) || ''; } catch (e) { }
-  function liveSignedIn() { var b = $('#liveSignOut'); if (b) b.hidden = !LIVE.key; }
+  function liveSignedIn() { var b = $('#liveSignOut'); if (b) b.hidden = !teacherSignedIn(); updateTeacherUI(); }
   function liveInfo(cls, html) { var el = $('#liveInfo'); if (!el) return; el.className = 'small ' + (cls || 'muted'); el.innerHTML = html; }
   function askLiveKey() {
     var k = prompt('Teacher key (the TEACHER_KEY you set in the Google Apps Script):', LIVE.key || '');
@@ -1095,6 +1096,49 @@
     var b = $('#liveBtn'); if (b) b.textContent = '▶ Start live view';
     liveInfo('muted', 'Live view paused.');
   }
+  // ---------- teacher access: one password (the Teacher Area password) signs a PC in ----------
+  var TEACHER_PC = 'mbctf-teacher-pc-v1', STAFF_SS = 'mbctf-staff-v1';
+  function teacherSignedIn() { var lk = !!(LIVE && LIVE.key); try { return lk || localStorage.getItem(TEACHER_PC) === '1'; } catch (e) { return lk; } }
+  function updateTeacherUI() {
+    var on = teacherSignedIn(), tab = $('#navTeacher'), hb = $('#homeTeacher'), fb = $('#footTeacher');
+    if (tab) tab.style.display = on ? '' : 'none';
+    if (hb) hb.textContent = on ? '👩‍🏫 Teacher dashboard' : '👩‍🏫 Teacher access';
+    if (fb) fb.textContent = on ? '👩‍🏫 Teacher dashboard' : '👩‍🏫 Teacher access';
+  }
+  function openTeacherSignIn() {
+    $('#tmMsg').textContent = ''; $('#tmPw').value = ''; openModal('#teacherModal');
+    setTimeout(function () { $('#tmPw').focus(); }, 50);
+  }
+  function teacherEntry() { if (teacherSignedIn()) show('teacher'); else openTeacherSignIn(); }
+  function b64bytes(s) { return Uint8Array.from(atob(s), function (c) { return c.charCodeAt(0); }); }
+  function openVault(password) {
+    if (!(window.crypto && crypto.subtle)) return Promise.reject(new Error('This browser can\'t check the password here.'));
+    return fetch('assets/teacher/vault.json', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (v) {
+      var te = new TextEncoder();
+      return crypto.subtle.importKey('raw', te.encode(password), 'PBKDF2', false, ['deriveKey']).then(function (km) {
+        return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b64bytes(v.salt), iterations: v.it, hash: 'SHA-256' }, km, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+      }).then(function (key) { return crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64bytes(v.iv) }, key, b64bytes(v.ct)); })
+        .then(function (pt) { return JSON.parse(new TextDecoder().decode(pt)); }, function () { throw new Error('wrong'); });
+    });
+  }
+  $('#tmForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var pw = $('#tmPw').value, msg = $('#tmMsg'); if (!pw) return;
+    msg.className = 'flag-msg'; msg.textContent = 'Checking…';
+    openVault(pw).then(function (data) {
+      try { localStorage.setItem(TEACHER_PC, '1'); sessionStorage.setItem(STAFF_SS, pw); } catch (err) { }
+      var lk = data.info && data.info.liveKey;
+      if (lk && !LIVE.key) { LIVE.key = lk; try { localStorage.setItem(LIVE_KEY_STORE, lk); } catch (err) { } }
+      closeModal($('#teacherModal')); liveSignedIn(); show('teacher');
+      if (SYNC_URL && LIVE.key && !LIVE.on) startLive();
+      toast('👩‍🏫 Signed in — this PC is now a teacher screen');
+    }).catch(function (err) {
+      msg.className = 'flag-msg bad'; msg.textContent = err.message === 'wrong' ? '✗ That password isn\'t right.' : '✗ ' + err.message;
+    });
+  });
+  ['#homeTeacher', '#footTeacher'].forEach(function (sel) { var b = $(sel); if (b) b.addEventListener('click', teacherEntry); });
+  updateTeacherUI();
+
   (function initLive() {
     var box = $('#liveBox'); if (!box) return;
     if (!SYNC_URL) {
@@ -1106,9 +1150,9 @@
     $('#liveKeyBtn').addEventListener('click', function () { if (askLiveKey() && LIVE.on) liveFetch(); });
     $('#liveSignOut').addEventListener('click', function () {
       if (!confirm('Sign this PC out of the teacher view?\n\nThe teacher key is forgotten here, and anyone using this PC afterwards is tracked as a pupil again.')) return;
-      stopLive(); LIVE.key = ''; try { localStorage.removeItem(LIVE_KEY_STORE); } catch (e) { }
+      stopLive(); LIVE.key = ''; try { localStorage.removeItem(LIVE_KEY_STORE); localStorage.removeItem(TEACHER_PC); sessionStorage.removeItem(STAFF_SS); } catch (e) { }
       T.rows = T.rows.filter(function (r) { return !r.seen; }); T.sel = null; renderTeacher(); renderLiveTests([]);
-      liveSignedIn(); liveInfo('muted', 'Signed out on this PC. Press <b>Start live view</b> and enter the teacher key to sign in again.');
+      liveSignedIn(); show('home'); toast('Signed out of teacher access on this PC');
     });
     liveSignedIn();
     $('#liveClear').addEventListener('click', function () {

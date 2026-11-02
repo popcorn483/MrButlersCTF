@@ -51,7 +51,7 @@
     <button class="tab" data-view="toolkit">Toolkit</button>
     <button class="tab tab-test" data-view="test">🔒 Test area</button>
     <button class="tab" data-view="progress">My progress</button>
-    <button class="tab" data-view="teacher">Teacher</button>
+    <button class="tab" data-view="teacher" id="navTeacher" style="display:none">👩‍🏫 Teacher</button>
 
     <div class="nav-extra" id="navExtra">
       <div class="nav-sep">Board options</div>
@@ -101,6 +101,7 @@
         <button type="button" class="home-s" id="homeShare">🔗 Share</button>
         <button type="button" class="home-s" id="homeInstall">📲 Install app</button>
         <button type="button" class="home-s" data-goto="progress">My progress</button>
+        <button type="button" class="home-s home-teacher" id="homeTeacher">👩‍🏫 Teacher access</button>
         <button type="button" class="home-s" id="homeAboutBtn" aria-expanded="false" aria-controls="homeAbout">About</button>
       </div>
       <div class="home-about" id="homeAbout" hidden>
@@ -302,11 +303,26 @@
   <span>Practice challenges written for this site. They are in the style of ZeroDays / Cyber-Schools events but are <b>not</b> the real competition tasks.</span>
   <button class="linkish" id="getAppBtn">📲 Get the app on your phone</button>
   <button class="linkish" id="viewSiteHtml">View this page's HTML</button>
+  <button class="linkish" id="footTeacher">👩‍🏫 Teacher access</button>
   <span class="app-ver" data-app-ver></span>
   <button class="linkish" data-app-check><span>Check for updates</span></button>
 </footer>
 
 <!-- ============ CHALLENGE MODAL ============ -->
+<div class="modal" id="teacherModal" hidden>
+  <div class="modal-card teacher-card" role="dialog" aria-modal="true" aria-labelledby="tmTitle">
+    <button class="modal-x" data-close aria-label="Close">✕</button>
+    <h2 id="tmTitle">👩‍🏫 Teacher access</h2>
+    <p class="muted small">Staff only. Signs this PC in to the live class view, the projector event screen and the answer book. This PC won't be counted as a pupil.</p>
+    <form id="tmForm" autocomplete="off">
+      <label class="field-label" for="tmPw">Teacher password</label>
+      <input class="io" id="tmPw" type="password" autocomplete="current-password">
+      <div id="tmMsg" class="flag-msg"></div>
+      <button class="btn primary" type="submit">Sign in</button>
+    </form>
+  </div>
+</div>
+
 <div class="modal" id="chalModal" hidden>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="chalTitle">
     <button class="modal-x" data-close aria-label="Close">✕</button>

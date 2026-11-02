@@ -971,3 +971,8 @@ button.pd-tile:hover { transform: scale(1.25); box-shadow: 0 0 0 2px var(--tc, v
 .pd-line[data-open]:hover { background: var(--panel2); }
 .teacher-note { margin: 10px 0; padding: 10px 12px; border: 1px dashed var(--cyan, var(--green)); border-radius: 8px; font-size: .9rem; background: var(--panel2); }
 .teacher-note details { margin-top: 6px; } .teacher-note summary { cursor: pointer; color: var(--muted); }
+
+/* teacher access */
+.home-s.home-teacher { border-style: dashed; }
+.teacher-card { max-width: 420px; }
+.teacher-card form { display: grid; gap: 8px; margin-top: 10px; }

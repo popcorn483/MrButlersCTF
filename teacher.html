@@ -107,6 +107,8 @@
     unlock($('#pw').value);
   });
 
+  try { var _ss = sessionStorage.getItem('mbctf-staff-v1'); if (_ss) setTimeout(function () { unlock(_ss); }, 0); } catch (e) { }
+
   function bin(s) { return Uint8Array.from(atob(s), function (c) { return c.charCodeAt(0); }); }
 
   async function unlock(password) {
@@ -132,6 +134,7 @@
     var info = DATA.info;
     $('#keys').innerHTML =
       '<div class="key star"><div class="kl">🔑 Test area password</div><div class="kv">' + esc(info.testPassword) + '</div></div>' +
+      (info.liveKey ? '<div class="key"><div class="kl">📡 Live view key</div><div class="kv">' + esc(info.liveKey) + '</div></div>' : '') +
       '<div class="key"><div class="kl">⏱️ Test length</div><div class="kv">' + info.testMinutes + ' minutes</div></div>' +
       '<div class="key"><div class="kl">🌐 Live site</div><a class="kv" href="' + info.siteUrl + '" target="_blank" rel="noopener">' + info.siteUrl.replace(/^https?:\/\//, '') + '</a></div>' +
       '<div class="key"><div class="kl">📦 Repository</div><a class="kv" href="' + info.repoUrl + '" target="_blank" rel="noopener">' + info.repoUrl.replace(/^https?:\/\//, '') + '</a></div>';
