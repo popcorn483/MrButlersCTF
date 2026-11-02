@@ -992,19 +992,20 @@
   // ---------- teacher: live class view from the Google Sheet ----------
   var LIVE = { on: false, timer: null, key: '' }, LIVE_KEY_STORE = 'mbctf-teacher-livekey-v1';
   try { LIVE.key = localStorage.getItem(LIVE_KEY_STORE) || ''; } catch (e) { }
+  function liveSignedIn() { var b = $('#liveSignOut'); if (b) b.hidden = !LIVE.key; }
   function liveInfo(cls, html) { var el = $('#liveInfo'); if (!el) return; el.className = 'small ' + (cls || 'muted'); el.innerHTML = html; }
   function askLiveKey() {
     var k = prompt('Teacher key (the TEACHER_KEY you set in the Google Apps Script):', LIVE.key || '');
     if (k === null || !k.trim()) return false;
     LIVE.key = k.trim(); try { localStorage.setItem(LIVE_KEY_STORE, LIVE.key); } catch (e) { }
-    return true;
+    liveSignedIn(); return true;
   }
   function liveUrl(extra) { return SYNC_URL + (SYNC_URL.indexOf('?') < 0 ? '?' : '&') + 'key=' + encodeURIComponent(LIVE.key) + (extra || '') + '&t=' + Date.now(); }
   function liveFetch() {
     if (!LIVE.on || document.hidden) return;
     fetch(liveUrl(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (res) {
       if (!res.ok) {
-        if (res.error === 'key') { stopLive(); try { localStorage.removeItem(LIVE_KEY_STORE); } catch (e) { } LIVE.key = ''; liveInfo('bad-text', 'That teacher key wasn\'t accepted. Press <b>Start live view</b> and enter it again.'); }
+        if (res.error === 'key') { stopLive(); try { localStorage.removeItem(LIVE_KEY_STORE); } catch (e) { } LIVE.key = ''; liveSignedIn(); liveInfo('bad-text', 'That teacher key wasn\'t accepted. Press <b>Start live view</b> and enter it again.'); }
         else liveInfo('bad-text', 'The sheet replied with an error: ' + esc(res.error || 'unknown'));
         return;
       }
@@ -1019,6 +1020,7 @@
           if (!cur || (cur.data.exported || 0) <= (r.data.exported || 0)) byPid[r.data.pid] = r;
         } catch (e) { bad++; }
       });
+      if (byPid[S.pid] && !Object.keys(S.solved).length && !S.name) delete byPid[S.pid];   // this teacher PC's own visit before signing in
       T.rows = Object.keys(byPid).map(function (k) { return byPid[k]; });
       renderTeacher(); renderLiveTests(tests);
       var n = (res.rows || []).length, active = (res.rows || []).filter(function (x) { return Date.now() - x.seen < 5 * 60000; }).length;
@@ -1074,6 +1076,13 @@
     }
     $('#liveBtn').addEventListener('click', function () { LIVE.on ? stopLive() : startLive(); });
     $('#liveKeyBtn').addEventListener('click', function () { if (askLiveKey() && LIVE.on) liveFetch(); });
+    $('#liveSignOut').addEventListener('click', function () {
+      if (!confirm('Sign this PC out of the teacher view?\n\nThe teacher key is forgotten here, and anyone using this PC afterwards is tracked as a pupil again.')) return;
+      stopLive(); LIVE.key = ''; try { localStorage.removeItem(LIVE_KEY_STORE); } catch (e) { }
+      T.rows = T.rows.filter(function (r) { return !r.seen; }); T.sel = null; renderTeacher(); renderLiveTests([]);
+      liveSignedIn(); liveInfo('muted', 'Signed out on this PC. Press <b>Start live view</b> and enter the teacher key to sign in again.');
+    });
+    liveSignedIn();
     $('#liveClear').addEventListener('click', function () {
       if (!LIVE.key && !askLiveKey()) return;
       if (!confirm('Clear ALL pupils\' live progress from the Google Sheet? Use this before a new group or a fresh competition. Pupils keep their progress on their own computers and it re-sends next time they solve.')) return;
