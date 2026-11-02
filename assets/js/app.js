@@ -64,7 +64,7 @@
 
   // ---------- header / rank ----------
   function refreshHeader() {
-    $('#playerName').textContent = S.name || 'Set your name';
+    $('#playerName').textContent = S.name ? S.name + (S.cls ? ' · ' + S.cls : '') : 'Sign in';
     $('#playerScore').textContent = score();
     $('#playerSolved').textContent = solvedCount();
     $('#playerTotal').textContent = CH.length;
@@ -76,10 +76,7 @@
     $('#rankNext').textContent = nxt ? (nxt[0] - sc) + ' pts to ' + nxt[1] : 'Top rank reached!';
   }
   $('#playerName').addEventListener('click', askName);
-  function askName() {
-    var n = prompt('Your name (or team name). This goes on your progress file for your teacher:', S.name || '');
-    if (n !== null) { S.name = n.trim().slice(0, 40); save(); refreshHeader(); }
-  }
+  function askName() { askWho(true); }
 
   // ---------- navigation ----------
   var LEARN_VIEWS = ['start', 'lessons', 'walkthrough', 'resources', 'reference', 'pack'];
@@ -655,7 +652,7 @@
   }
 
   function makeExport() {
-    var payload = { app: 'MrButlersCTF', v: 1, pid: S.pid, name: S.name, exported: Date.now(), score: score(), solved: S.solved, hints: S.hints, revealed: S.revealed, tries: S.tries, tut: S.tut, wrong: S.wrong, created: S.created };
+    var payload = { app: 'MrButlersCTF', v: 1, pid: S.pid, name: S.name, cls: S.cls || '', exported: Date.now(), score: score(), solved: S.solved, hints: S.hints, revealed: S.revealed, tries: S.tries, tut: S.tut, wrong: S.wrong, created: S.created };
     var body = JSON.stringify(payload);
     return JSON.stringify({ data: payload, check: sha256(body + SALT) }, null, 1);
   }
@@ -686,6 +683,7 @@
     if (!S.tries) S.tries = {}; Object.keys(d.tries || {}).forEach(function (id) { S.tries[id] = Math.max(S.tries[id] || 0, d.tries[id]); });
     S.wrong = Math.max(S.wrong, d.wrong || 0);
     if (!S.name && d.name) S.name = d.name;
+    if (!S.cls && d.cls) S.cls = d.cls;
     save(); markSaved(); refreshHeader(); renderBoard(); renderProgress();
     try { document.dispatchEvent(new CustomEvent('ctf:refresh')); } catch (e) { }
     return added;
@@ -697,7 +695,7 @@
   var SYNC_URL = (window.CTF_CONFIG && window.CTF_CONFIG.syncUrl) || '';
   var syncTimer = null, syncState = { at: 0, ok: null };
   function isTeacherDevice() { try { return !!localStorage.getItem('mbctf-teacher-livekey-v1') || localStorage.getItem('mbctf-teacher-pc-v1') === '1'; } catch (e) { return false; } }
-  function hasActivity() { return !isTeacherDevice(); }
+  function hasActivity() { return !isTeacherDevice() && !!S.name && !!S.cls; }
   function syncBody() {
     var obj = JSON.parse(makeExport());
     try { var t = window.TestArea && TestArea.liveSnapshot && TestArea.liveSnapshot(); if (t) obj.test = t; } catch (e) { }
@@ -729,15 +727,96 @@
   }
   if (SYNC_URL) {
     setTimeout(pushSync, 3000);
-    // ask for a name up front (after the first-visit welcome tour) so the teacher's list isn't full of '(no name)'
-    setTimeout(function () { var seenTour = false; try { seenTour = !!localStorage.getItem('mbctf-welcomed-v1'); } catch (e) { }
-      if (!S.name && seenTour && !isTeacherDevice()) askName(); }, 2500);
     // heartbeat so the teacher sees who is on the site right now, even before their first solve
     setInterval(function () { if (!document.hidden && !syncTimer) pushSync(); }, 3 * 60000);
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && syncTimer) pushSync(true); });
     window.addEventListener('pagehide', function () { if (syncTimer) pushSync(true); });
     window.addEventListener('online', function () { if (syncState.ok === false) pushSync(); });
   }
+
+  // ---------- pupil sign-in: first name + surname, form class and a 4-digit PIN (as on the Digital Technology site) ----------
+  // Required before using the site (teacher PCs excepted). The teacher's Google script checks the PIN, registers new
+  // pupils, and hands back an existing pupil's progress so it follows them to any PC.
+  var WHO_LATER = 'mbctf-who-later';
+  function whoDone() {
+    var later = false; try { later = !!sessionStorage.getItem(WHO_LATER); } catch (e) { }
+    return !!(S.name && S.cls && (S.pinOk || later || !SYNC_URL));
+  }
+  function adoptPid(newId) {   // this device joins an existing pupil: re-key this device's own solves to their ID
+    var old = S.pid; if (!newId || newId === old) return;
+    Object.keys(S.solved).forEach(function (id) {
+      var c = BY_ID[id], s = S.solved[id]; if (!c || !s.p) return;
+      if (sha256(old + '|' + c.f.toLowerCase()).slice(0, 16) === s.p) s.p = sha256(newId + '|' + c.f.toLowerCase()).slice(0, 16);
+    });
+    S.pid = newId;
+  }
+  function askWho(editing) {
+    if (document.getElementById('whoModal') || (isTeacherDevice() && !editing)) return;
+    editing = !!editing && whoDone();
+    var d = document.createElement('div'); d.id = 'whoModal'; d.className = 'who-modal';
+    d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.setAttribute('aria-labelledby', 'whoH');
+    d.innerHTML = '<form class="who-card" novalidate>' +
+      '<div class="who-flag">⚑</div><h2 id="whoH">Who’s practising?</h2>' +
+      '<p class="muted small">Enter your name, form class and a 4-digit PIN. Your progress is saved under your name, so it follows you to any computer, and your teacher can see how you’re getting on.</p>' +
+      '<label class="field-label" for="whoN">First name and surname</label><input class="io" id="whoN" autocomplete="name" maxlength="40">' +
+      '<label class="field-label" for="whoC">Form class</label><input class="io" id="whoC" maxlength="12" placeholder="e.g. 11B or 13D" autocomplete="off">' +
+      '<label class="field-label" for="whoP">PIN</label><input class="io" id="whoP" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="4 digits">' +
+      '<small class="muted">First time? Choose one you’ll remember. Use the same PIN on every computer.</small>' +
+      '<div class="who-btns">' + (editing ? '<button type="button" class="btn" id="whoCancel">Cancel</button>' : '') + '<button class="btn primary" id="whoGo">Continue</button></div>' +
+      '<p class="who-msg" aria-live="polite"></p>' +
+      '<button type="button" class="linkish who-teacher" id="whoTeacher">👩‍🏫 Teacher? Sign in here</button></form>';
+    document.body.appendChild(d); document.documentElement.style.overflow = 'hidden';
+    var n = $('#whoN', d), c = $('#whoC', d), pinI = $('#whoP', d), m = $('.who-msg', d), go = $('#whoGo', d);
+    n.value = S.name || ''; c.value = S.cls || '';
+    function close() { d.remove(); document.documentElement.style.overflow = ''; refreshHeader(); renderSyncStatus(); }
+    d.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (editing) close(); } }, true);
+    var cancel = $('#whoCancel', d); if (cancel) cancel.addEventListener('click', close);
+    $('#whoTeacher', d).addEventListener('click', function () { openTeacherSignIn(); });
+    $('form', d).addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = n.value.replace(/\s+/g, ' ').trim(), cls = c.value.replace(/\s+/g, '').toUpperCase(), pin = pinI.value.trim();
+      if (name.split(' ').length < 2) { m.textContent = 'Please enter your first name and surname.'; n.focus(); return; }
+      if (!/^[A-Z0-9]{1,12}$/.test(cls)) { m.textContent = 'Please enter your form class, e.g. 11B.'; c.focus(); return; }
+      if (!/^\d{4}$/.test(pin)) { m.textContent = 'Please enter a 4-digit PIN.'; pinI.focus(); return; }
+      // switching to a different pupil on this computer: start them from a clean slate (the old pupil's work is already on the sheet)
+      var other = S.name && (S.name.toLowerCase() !== name.toLowerCase() || (S.cls && S.cls !== cls));
+      if (other && solvedCount()) {
+        if (!confirm('Switch to ' + name + ' (' + cls + ')?\n\n' + S.name + '’s progress stays saved for them. This computer will show ' + name + '’s progress instead.')) return;
+        if (syncTimer) pushSync(true);
+      }
+      if (other) { S = blankState(); save(); }
+      go.disabled = true; m.textContent = 'Checking…';
+      function finish(found, offline) {
+        if (found) { adoptPid(found.id); S.name = found.name || name; S.cls = found.cls || cls; S.pinOk = 1; }
+        else { S.name = name; S.cls = cls; S.pinOk = 0; try { sessionStorage.setItem(WHO_LATER, '1'); } catch (x) { } }
+        var added = 0;
+        if (found && found.json) { try { var r = parseImport(found.json); if (r.ok && r.data.pid === S.pid) added = applyImport(r.data); } catch (x) { } }
+        save(); refreshHeader(); renderBoard(); renderProgress();
+        try { document.dispatchEvent(new CustomEvent('ctf:refresh')); } catch (x) { }
+        close(); pushSync();
+        toast(found && !found.fresh ? '👋 Welcome back, ' + S.name.split(' ')[0] + '!' + (added ? ' ' + added + ' solve' + (added === 1 ? '' : 's') + ' loaded from your other computer.' : '') : '👋 Hi ' + S.name.split(' ')[0] + ' — you’re signed in.', 4000);
+        void offline;
+      }
+      if (!SYNC_URL) return finish(null, true);
+      function call(retry) {
+        var ctl = window.AbortController ? new AbortController() : null, t = ctl && setTimeout(function () { ctl.abort(); }, 9000);
+        fetch(SYNC_URL + (SYNC_URL.indexOf('?') < 0 ? '?' : '&') + 'action=whois&name=' + encodeURIComponent(name) + '&cls=' + encodeURIComponent(cls) + '&pin=' + pin + '&id=' + encodeURIComponent(S.pid) + '&t=' + Date.now(),
+          { cache: 'no-store', credentials: 'omit', signal: ctl ? ctl.signal : undefined })
+          .then(function (x) { return x.json(); }).then(function (j) {
+            if (t) clearTimeout(t);
+            if (j && j.error === 'pin') { go.disabled = false; pinI.value = ''; pinI.focus(); m.textContent = 'That PIN doesn’t match the one for ' + name + '.' + (j.left != null ? ' ' + j.left + ' ' + (j.left === 1 ? 'try' : 'tries') + ' left.' : '') + ' Forgotten it? Ask your teacher to reset it.'; return; }
+            if (j && j.error === 'locked') { go.disabled = false; m.textContent = 'Too many wrong PINs. Try again in 15 minutes, or ask your teacher to reset your PIN.'; return; }
+            if (j && j.error === 'removed' && retry) { S.pid = randId(); return call(false); }
+            if (j && j.ok && j.id) return finish(j, false);
+            finish(null, true);   // older teacher script, or it said no: carry on, the PIN is checked next time
+          }).catch(function () { if (t) clearTimeout(t); finish(null, true); });   // offline or slow: carry on for now
+      }
+      call(true);
+    });
+    setTimeout(function () { (S.name ? (S.cls ? pinI : c) : n).focus(); }, 60);
+  }
+  window.CTFWho = askWho;
+  setTimeout(function () { if (!isTeacherDevice() && !whoDone()) askWho(false); }, 400);
 
   // ---------- resume code: the same signed progress data as the file, as copy-paste text ----------
   function b64uEnc(bytes) { var s = ''; for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
@@ -854,6 +933,7 @@
     if (!confirm('Delete ALL progress on this computer? Download a progress file first if you want to keep it.')) return;
     S = blankState(); save(); try { localStorage.removeItem(SAVE_KEY); } catch (e) { } resumeDismissed = true;
     refreshHeader(); renderBoard(); renderProgress(); toast('Progress reset');
+    if (!isTeacherDevice()) setTimeout(function () { askWho(false); }, 300);
     try { document.dispatchEvent(new CustomEvent('ctf:refresh')); } catch (e) { }
   });
 
@@ -876,6 +956,7 @@
         renderTeacher(); input.value = '';
       });
   });
+  $('#teacherClass').addEventListener('change', function () { T.cls = this.value; T.sel = null; renderTeacher(); });
   $('#teacherClear').addEventListener('click', function () { T.rows = []; T.sel = null; renderTeacher(); $('#teacherMsg').hidden = true; });
   function rowStats(r) {
     var d = r.data, pts = 0, n = 0, unv = 0, tiers = [0, 0, 0, 0, 0, 0, 0], last = 0;
@@ -888,7 +969,7 @@
     });
     var hints = Object.keys(d.hints || {}).reduce(function (s, k) { return s + d.hints[k]; }, 0), rev = Object.keys(d.revealed || {}).length;
     var tutIds = Object.keys(d.tut || {}).filter(function (id) { return BY_ID[id]; });
-    return { name: d.name || '(no name)', pts: pts, n: n, unv: unv, rev: rev, tiers: tiers, hints: hints, tut: tutIds.length, tutIds: tutIds, last: last, ok: r.ok, file: r.file, seen: r.seen || 0, pid: d.pid };
+    return { name: d.name || '(no name)', pts: pts, n: n, unv: unv, rev: rev, tiers: tiers, hints: hints, tut: tutIds.length, tutIds: tutIds, last: last, ok: r.ok, file: r.file, seen: r.seen || 0, pid: d.pid, cls: d.cls || '' };
   }
   // ---------- teacher: one pupil's challenge-by-challenge detail ----------
   function renderPupilDetail() {
@@ -930,13 +1011,23 @@
       return '<div class="pd-line" data-open="' + c.id + '" title="Open this challenge"><span class="when">' + (s ? fmtDate(s.t) : '') + '</span><span><b>' + esc(c.title) + '</b> <span class="muted small">' + esc(c.id) + ' · ' + bits.join(' · ') + '</span></span>' + flag + '</div>';
     }
     box.innerHTML = '<div class="pd-head"><div><h2>' + esc(st.name) + '</h2><p class="muted small">' + st.pts + ' pts · ' + st.n + ' flags · ' + st.hints + ' hints · ' + st.tut + ' tutorials · ' + st.rev + ' answers revealed' +
-      (r.seen ? ' · last on the site ' + fmtDate(r.seen) : '') + '</p></div><div class="pd-btns"><button class="btn danger small" id="pdDelete">🗑 Delete pupil</button><button class="btn small" id="pdClose">✕ Close</button></div></div>' +
+      (r.seen ? ' · last on the site ' + fmtDate(r.seen) : '') + '</p></div><div class="pd-btns">' + (r.seen && SYNC_URL ? '<button class="btn small" id="pdPin">🔑 Reset PIN</button>' : '') + '<button class="btn danger small" id="pdDelete">🗑 Delete pupil</button><button class="btn small" id="pdClose">✕ Close</button></div></div>' +
       '<p class="pd-key small muted"><span class="pd-tile ok">✓</span> solved <span class="pd-tile rev">👁</span> solved after revealing answer <span class="pd-tile tried">…</span> attempted <span class="pd-tile"></span> not started — hover a square for details</p>' +
       '<div class="pd-cats">' + cats + '</div>' +
       '<h3>Solved (' + solvedIds.length + ')</h3>' + (solvedIds.length ? solvedIds.map(function (id) { return line(BY_ID[id], solved[id]); }).join('') : '<p class="muted">Nothing solved yet.</p>') +
       (stuck.length ? '<h3>Tried but not solved yet (' + stuck.length + ')</h3>' + stuck.map(function (c) { return line(c, null); }).join('') : '');
     $('#pdClose').addEventListener('click', function () { T.sel = null; renderTeacher(); });
     $('#pdDelete').addEventListener('click', function () { deletePupil(r, st.name); });
+    var pinB = $('#pdPin');
+    if (pinB) pinB.addEventListener('click', function () {
+      if (!confirm('Reset ' + st.name + '\'s PIN?\n\nThe next time they sign in, whatever 4-digit PIN they type becomes their new PIN.')) return;
+      if (!LIVE.key && !askLiveKey()) return;
+      fetch(liveUrl('&action=resetpin&pid=' + encodeURIComponent(d.pid)), { cache: 'no-store' }).then(function (x) { return x.json(); }).then(function (res) {
+        if (res.ok && res.reset) toast('🔑 PIN reset — ' + st.name + ' can choose a new one when they next sign in', 4500);
+        else if (res.ok) toast('Your Google script needs updating to reset PINs — see teacher-sync/SETUP.md (step 4)', 6000);
+        else toast(res.error === 'not registered' ? st.name + ' hasn\'t signed in with a PIN yet' : 'Not reset: ' + (res.error || 'error'));
+      }).catch(function () { toast('Couldn\'t reach the sheet'); });
+    });
     $$('[data-open]', box).forEach(function (el) {
       el.addEventListener('click', function () { openChal(el.dataset.open); teacherNote(el.dataset.open, d, st.name); });
     });
@@ -989,15 +1080,23 @@
   function renderTeacher() {
     var box = $('#teacherTable');
     if (!T.rows.length) { box.innerHTML = '<p class="muted">' + (LIVE.on ? 'Live view is on — pupils will appear here as soon as they start.' : 'No files loaded yet.') + '</p>'; renderPupilDetail(); return; }
-    var rows = T.rows.map(rowStats);
+    var all = T.rows.map(rowStats);
+    var classes = all.map(function (r) { return r.cls; }).filter(function (c, i, a) { return c && a.indexOf(c) === i; }).sort();
+    var cf = $('#teacherClass');
+    if (cf) {
+      if (T.cls && classes.indexOf(T.cls) < 0) T.cls = '';
+      cf.innerHTML = '<option value="">All classes (' + all.length + ')</option>' + classes.map(function (c) { var n = all.filter(function (r) { return r.cls === c; }).length; return '<option value="' + esc(c) + '"' + (T.cls === c ? ' selected' : '') + '>' + esc(c) + ' (' + n + ')</option>'; }).join('');
+      cf.hidden = !classes.length;
+    }
+    var rows = T.cls ? all.filter(function (r) { return r.cls === T.cls; }) : all;
     var k = T.sort;
-    rows.sort(function (a, b) { return k === 'name' ? a.name.localeCompare(b.name) : (b[k] - a[k]) || (a.last - b.last); });
-    box.innerHTML = '<table class="lb"><thead><tr><th>#</th><th data-k="name">Name</th><th data-k="pts">Points</th><th data-k="n">Flags</th>' +
+    rows.sort(function (a, b) { return k === 'name' ? a.name.localeCompare(b.name) : k === 'cls' ? (a.cls.localeCompare(b.cls) || a.name.localeCompare(b.name)) : (b[k] - a[k]) || (a.last - b.last); });
+    box.innerHTML = '<table class="lb"><thead><tr><th>#</th><th data-k="name">Name</th><th data-k="cls">Class</th><th data-k="pts">Points</th><th data-k="n">Flags</th>' +
       TIER_NUMS.map(function (t) { return '<th>' + TIERS[t].name + '</th>'; }).join('') +
       '<th data-k="hints">Hints</th><th data-k="tut">Tutorials</th><th data-k="rev">Answers revealed</th><th>Last solve</th><th>Source</th></tr></thead><tbody>' +
       rows.map(function (r, i) {
         var active = r.seen && Date.now() - r.seen < 5 * 60000;
-        return '<tr class="pupil-row' + (T.sel === r.pid ? ' sel' : '') + '" data-pid="' + esc(r.pid) + '" title="Click to see their challenges"><td class="num">' + (i + 1) + '</td><td>' + (active ? '<span class="live-dot" title="Active in the last 5 minutes"></span>' : '') + esc(r.name) + '</td><td class="num">' + r.pts + '</td><td class="num">' + r.n + '</td>' +
+        return '<tr class="pupil-row' + (T.sel === r.pid ? ' sel' : '') + '" data-pid="' + esc(r.pid) + '" title="Click to see their challenges"><td class="num">' + (i + 1) + '</td><td>' + (active ? '<span class="live-dot" title="Active in the last 5 minutes"></span>' : '') + esc(r.name) + '</td><td>' + esc(r.cls || '–') + '</td><td class="num">' + r.pts + '</td><td class="num">' + r.n + '</td>' +
           TIER_NUMS.map(function (t) { return '<td class="num">' + r.tiers[t] + '</td>'; }).join('') +
           '<td class="num">' + r.hints + '</td><td class="num' + (r.tut ? ' tut-cell' : '') + '">' + r.tut + '</td><td class="num">' + r.rev + '</td><td class="num">' + (r.last ? fmtDate(r.last) : '-') + '</td><td>' +
           (r.seen ? '<span class="badge live" title="Sent automatically">live · ' + new Date(r.seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '</span> ' : '') +
@@ -1011,9 +1110,9 @@
   }
   $('#teacherCsv').addEventListener('click', function () {
     if (!T.lastRows) return toast('Load some files first');
-    var lines = [['Rank', 'Name', 'Points', 'Flags', 'Beginner', 'Easy', 'Medium', 'Hard', 'Expert', 'Elite', 'Hints', 'Tutorials used', 'Answers revealed', 'Unverified', 'Last solve'].join(',')];
+    var lines = [['Rank', 'Name', 'Class', 'Points', 'Flags', 'Beginner', 'Easy', 'Medium', 'Hard', 'Expert', 'Elite', 'Hints', 'Tutorials used', 'Answers revealed', 'Unverified', 'Last solve'].join(',')];
     T.lastRows.forEach(function (r, i) {
-      lines.push([i + 1, '"' + r.name.replace(/"/g, '""') + '"', r.pts, r.n, r.tiers[1], r.tiers[2], r.tiers[3], r.tiers[4], r.tiers[5], r.tiers[6], r.hints, r.tut, r.rev, r.unv, r.last ? new Date(r.last).toISOString() : ''].join(','));
+      lines.push([i + 1, '"' + r.name.replace(/"/g, '""') + '"', r.cls, r.pts, r.n, r.tiers[1], r.tiers[2], r.tiers[3], r.tiers[4], r.tiers[5], r.tiers[6], r.hints, r.tut, r.rev, r.unv, r.last ? new Date(r.last).toISOString() : ''].join(','));
     });
     download('MrButlersCTF-leaderboard.csv', lines.join('\n'), 'text/csv');
   });
@@ -1129,7 +1228,7 @@
       try { localStorage.setItem(TEACHER_PC, '1'); sessionStorage.setItem(STAFF_SS, pw); } catch (err) { }
       var lk = data.info && data.info.liveKey;
       if (lk && !LIVE.key) { LIVE.key = lk; try { localStorage.setItem(LIVE_KEY_STORE, lk); } catch (err) { } }
-      closeModal($('#teacherModal')); liveSignedIn(); show('teacher');
+      closeModal($('#teacherModal')); var wm = document.getElementById('whoModal'); if (wm) wm.remove(); document.documentElement.style.overflow = ''; liveSignedIn(); show('teacher');
       if (SYNC_URL && LIVE.key && !LIVE.on) startLive();
       toast('👩‍🏫 Signed in — this PC is now a teacher screen');
     }).catch(function (err) {

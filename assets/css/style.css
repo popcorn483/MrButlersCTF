@@ -976,3 +976,16 @@ button.pd-tile:hover { transform: scale(1.25); box-shadow: 0 0 0 2px var(--tc, v
 .home-s.home-teacher { border-style: dashed; }
 .teacher-card { max-width: 420px; }
 .teacher-card form { display: grid; gap: 8px; margin-top: 10px; }
+
+/* pupil sign-in */
+.who-modal { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-items: center; padding: 16px; background: rgba(4, 8, 16, .78); backdrop-filter: blur(4px); }
+.who-card { width: 100%; max-width: 400px; background: var(--panel); border: 1px solid var(--line2); border-radius: 14px; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,.5); display: grid; gap: 6px; }
+.who-card h2 { margin: 0; }
+.who-card p { margin: 0 0 6px; }
+.who-flag { font-size: 28px; color: var(--green); line-height: 1; }
+.who-btns { display: flex; gap: 8px; margin-top: 10px; }
+.who-btns .primary { flex: 1; }
+.who-msg { min-height: 1.2em; color: var(--amber); font-size: .88rem; margin: 4px 0 0; }
+.who-teacher { justify-self: center; font-size: .82rem; margin-top: 4px; }
+.teacher-filter { margin: 10px 0 0; } .teacher-filter select { width: auto; }
+#teacherModal { z-index: 2147483001; }

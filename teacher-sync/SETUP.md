@@ -35,7 +35,8 @@ Commit, wait a minute for GitHub Pages, and you're live.
 - **Any number of PCs** can be teacher screens at once — your desk PC, the projector, a laptop walking round the room. Enter the key on each; they all see the same live data, and deleting or clearing on one shows on the others within 20 seconds. Teacher PCs are never counted as pupils.
 - Signed in on a pupil's PC? Press **Sign out of this PC** afterwards so it's tracked as a pupil again. (On C2k the key may be forgotten when you log off — just enter it again.)
 - The table refreshes every 20 seconds. 🟢 = the pupil did something in the last 5 minutes.
-- Pupils see a 📡 note on **My progress** confirming it's being sent. Ask them to set their name (click *Set your name* at the top).
+- **Pupils must sign in** before using the site: first name and surname, form class and a 4-digit PIN (the same system as the Digital Technology revision site). The same details on another computer bring their progress with them. PINs are stored only as salted hashes on the *Pupils* tab; five wrong tries locks that pupil for 15 minutes. Forgotten PIN? Click the pupil → **🔑 Reset PIN**, and whatever they type next becomes their new PIN. Teacher PCs skip it ("Teacher? Sign in here").
+- Filter the leaderboard by **class** with the drop-down above it.
 - **Click any pupil** in the leaderboard to see every challenge they've solved, attempted, used hints or tutorials on, or revealed. **🗑 Delete pupil** removes them (e.g. test accounts); their device is listed on the *Removed* tab of the Sheet and ignored from then on — delete a row there to let it back in.
 - **Clear live data** empties the Sheet — use it before a new group. Pupils' own progress is untouched and re-sends when they next solve.
 - The Sheet itself is readable too (name, score, flags, last update), but the Teacher tab is better: it checks each solve's proof code, so anything tampered with shows as *edited* / *unverified*.
