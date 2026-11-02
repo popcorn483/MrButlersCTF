@@ -343,6 +343,7 @@
   var current = null;
   function openChal(id) {
     var c = BY_ID[id]; if (!c) return;
+    var tn = document.getElementById('chalTeacherNote'); if (tn) tn.remove();
     current = c;
     var cat = CATS.filter(function (x) { return x.id === c.cat; })[0];
     var card = $('#chalModal .modal-card');
@@ -911,7 +912,7 @@
         if (tut[c.id]) extra.push('tutorial');
         if (rev[c.id] && !s) extra.push('answer shown');
         if (extra.length) tip += ' (' + extra.join(', ') + ')';
-        return '<span class="' + cls + '" title="' + esc(tip) + '">' + (s ? (s.r ? '👁' : '✓') : (cls.indexOf('tried') >= 0 ? '…' : '')) + '</span>';
+        return '<button type="button" class="' + cls + '" data-open="' + c.id + '" title="' + esc(tip) + ' — click to open">' + (s ? (s.r ? '👁' : '✓') : (cls.indexOf('tried') >= 0 ? '…' : '')) + '</button>';
       }).join('');
       return '<div class="pd-cat"><div class="pd-cat-head"><span>' + cat.icon + ' ' + esc(cat.name) + '</span><span class="muted small">' + done + '/' + list.length + '</span></div><div class="pd-tiles">' + tiles + '</div></div>';
     }).join('');
@@ -925,7 +926,7 @@
       if (tut[c.id]) bits.push('used tutorial');
       if (rev[c.id]) bits.push('answer revealed');
       var flag = s ? (!verified(c.id) ? '<span class="badge bad">unverified</span>' : s.r ? '<span class="badge">0 pts</span>' : '<span class="badge good">+' + c.pts + '</span>') : '<span class="badge">not solved</span>';
-      return '<div class="pd-line"><span class="when">' + (s ? fmtDate(s.t) : '') + '</span><span><b>' + esc(c.title) + '</b> <span class="muted small">' + esc(c.id) + ' · ' + bits.join(' · ') + '</span></span>' + flag + '</div>';
+      return '<div class="pd-line" data-open="' + c.id + '" title="Open this challenge"><span class="when">' + (s ? fmtDate(s.t) : '') + '</span><span><b>' + esc(c.title) + '</b> <span class="muted small">' + esc(c.id) + ' · ' + bits.join(' · ') + '</span></span>' + flag + '</div>';
     }
     box.innerHTML = '<div class="pd-head"><div><h2>' + esc(st.name) + '</h2><p class="muted small">' + st.pts + ' pts · ' + st.n + ' flags · ' + st.hints + ' hints · ' + st.tut + ' tutorials · ' + st.rev + ' answers revealed' +
       (r.seen ? ' · last on the site ' + fmtDate(r.seen) : '') + '</p></div><div class="pd-btns"><button class="btn danger small" id="pdDelete">🗑 Delete pupil</button><button class="btn small" id="pdClose">✕ Close</button></div></div>' +
@@ -935,6 +936,25 @@
       (stuck.length ? '<h3>Tried but not solved yet (' + stuck.length + ')</h3>' + stuck.map(function (c) { return line(c, null); }).join('') : '');
     $('#pdClose').addEventListener('click', function () { T.sel = null; renderTeacher(); });
     $('#pdDelete').addEventListener('click', function () { deletePupil(r, st.name); });
+    $$('[data-open]', box).forEach(function (el) {
+      el.addEventListener('click', function () { openChal(el.dataset.open); teacherNote(el.dataset.open, d, st.name); });
+    });
+  }
+  // When the teacher opens a challenge from a pupil's breakdown: show that pupil's record and the answer
+  function teacherNote(id, d, name) {
+    var c = BY_ID[id], old = document.getElementById('chalTeacherNote'); if (old) old.remove();
+    if (!c) return;
+    var s = (d.solved || {})[id], tries = (d.tries || {})[id] || 0, hints = (d.hints || {})[id] || 0, tut = (d.tut || {})[id], rev = (d.revealed || {})[id];
+    var bits = [];
+    if (s) bits.push(s.r ? 'solved after revealing the answer (0 pts)' : 'solved ' + fmtDate(s.t)); else bits.push('not solved yet');
+    if (tries) bits.push(tries + ' wrong attempt' + (tries > 1 ? 's' : ''));
+    if (hints) bits.push(hints + ' hint' + (hints > 1 ? 's' : ''));
+    if (tut) bits.push('used the tutorial');
+    if (rev && !s) bits.push('revealed the answer');
+    var n = document.createElement('div'); n.id = 'chalTeacherNote'; n.className = 'teacher-note';
+    n.innerHTML = '<div><b>👩‍🏫 ' + esc(name) + ':</b> ' + bits.join(' · ') + '</div>' +
+      '<details><summary>Show answer (teacher)</summary><p class="small">' + (c.sol || '') + '</p><p>Flag: <code>' + esc(c.f) + '</code></p></details>';
+    var meta = document.getElementById('chalMeta'); meta.after(n);
   }
   function deletePupil(r, name) {
     var pid = r.data.pid;
