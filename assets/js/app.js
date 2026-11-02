@@ -764,6 +764,11 @@
       '<small class="muted">First time? Choose one you’ll remember. Use the same PIN on every computer.</small>' +
       '<div class="who-btns">' + (editing ? '<button type="button" class="btn" id="whoCancel">Cancel</button>' : '') + '<button class="btn primary" id="whoGo">Continue</button></div>' +
       '<p class="who-msg" aria-live="polite"></p>' +
+      '<details class="who-load"' + (editing ? ' hidden' : '') + '><summary>📂 Started before? Load your progress file or resume code</summary>' +
+      '<div class="who-load-body"><label class="btn small" for="whoFile">⬆ Choose progress file</label><input type="file" id="whoFile" accept=".json,application/json" hidden>' +
+      '<textarea class="io" id="whoCode" rows="2" placeholder="…or paste your resume code" spellcheck="false"></textarea>' +
+      '<button type="button" class="btn small" id="whoCodeGo">▶ Load resume code</button>' +
+      '<p class="who-load-msg small" aria-live="polite"></p></div></details>' +
       '<button type="button" class="linkish who-teacher" id="whoTeacher">👩‍🏫 Teacher? Sign in here</button></form>';
     document.body.appendChild(d); document.documentElement.style.overflow = 'hidden';
     var n = $('#whoN', d), c = $('#whoC', d), pinI = $('#whoP', d), m = $('.who-msg', d), go = $('#whoGo', d);
@@ -772,6 +777,27 @@
     d.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (editing) close(); } }, true);
     var cancel = $('#whoCancel', d); if (cancel) cancel.addEventListener('click', close);
     $('#whoTeacher', d).addEventListener('click', function () { openTeacherSignIn(); });
+    // bring in progress from before sign-in existed (a progress file or resume code), then sign in as normal
+    var lm = $('.who-load-msg', d);
+    function loaded(text) {
+      var r; try { r = parseImport(text); } catch (x) { lm.className = 'who-load-msg small bad-text'; lm.textContent = x.message || 'That isn’t a Mr Butler’s CTF progress file.'; return; }
+      if (!r.ok) { lm.className = 'who-load-msg small bad-text'; lm.textContent = 'This progress has been edited by hand, so it can’t be loaded.'; return; }
+      if (solvedCount() && r.data.pid !== S.pid && !confirm('This computer already has some progress. Add the solves from this file to it?')) return;
+      var added = applyImport(r.data), dn = String(r.data.name || '').replace(/\s+/g, ' ').trim();
+      if (dn.split(' ').length >= 2 && !n.value.trim()) n.value = dn;
+      if (r.data.cls && !c.value.trim()) c.value = r.data.cls;
+      lm.className = 'who-load-msg small good-text';
+      lm.textContent = '✓ Loaded ' + solvedCount() + ' solve' + (solvedCount() === 1 ? '' : 's') + (added ? ' (' + added + ' new)' : '') + '. Now check your name, add your form class and PIN, and press Continue.';
+      setTimeout(function () { (!n.value.trim() ? n : !c.value.trim() ? c : pinI).focus(); }, 50);
+    }
+    $('#whoFile', d).addEventListener('change', function () {
+      var f = this.files[0], inp = this; if (!f) return;
+      f.text().then(function (t) { loaded(t); inp.value = ''; });
+    });
+    $('#whoCodeGo', d).addEventListener('click', function () {
+      var code = $('#whoCode', d).value; if (!code.trim()) return;
+      decodeResumeCode(code).then(loaded).catch(function (x) { lm.className = 'who-load-msg small bad-text'; lm.textContent = x.message; });
+    });
     $('form', d).addEventListener('submit', function (e) {
       e.preventDefault();
       var name = n.value.replace(/\s+/g, ' ').trim(), cls = c.value.replace(/\s+/g, '').toUpperCase(), pin = pinI.value.trim();
@@ -779,7 +805,7 @@
       if (!/^[A-Z0-9]{1,12}$/.test(cls)) { m.textContent = 'Please enter your form class, e.g. 11B.'; c.focus(); return; }
       if (!/^\d{4}$/.test(pin)) { m.textContent = 'Please enter a 4-digit PIN.'; pinI.focus(); return; }
       // switching to a different pupil on this computer: start them from a clean slate (the old pupil's work is already on the sheet)
-      var other = S.name && (S.name.toLowerCase() !== name.toLowerCase() || (S.cls && S.cls !== cls));
+      var other = !editing ? false : S.name && (S.name.toLowerCase() !== name.toLowerCase() || (S.cls && S.cls !== cls));
       if (other && solvedCount()) {
         if (!confirm('Switch to ' + name + ' (' + cls + ')?\n\n' + S.name + '’s progress stays saved for them. This computer will show ' + name + '’s progress instead.')) return;
         if (syncTimer) pushSync(true);
