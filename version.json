@@ -1,10 +1,9 @@
 {
-  "version": "mbctf-v13",
-  "date": "2026-11-01",
+  "version": "mbctf-v14",
+  "date": "2026-11-02",
   "notes": [
-    "New welcome & demo slides for the first session — a projector deck that introduces CTF, tours the tools and walks pupils through solving a few starter challenges. In the teacher area, ready to show the class",
-    "Reference page explains what every tool does and how it works, with a printable cheat sheet",
-    "Logic & Thinking category and computational-thinking worksheets",
-    "262 challenges in total"
+    "Your progress now goes to your teacher automatically as you solve \u2014 look for the \ud83d\udce1 note on My progress",
+    "Teacher tab: live class view that updates by itself, with a green dot for pupils active right now",
+    "Resume codes and progress files still work exactly as before"
   ]
 }

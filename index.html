@@ -245,6 +245,7 @@
         </div>
       </div>
       <div id="importMsg" class="notice" hidden></div>
+      <p id="syncStatus" class="sync-status" hidden></p>
       <div class="reset-row"><button class="btn danger small" id="resetBtn">Reset everything</button></div>
       <div class="stat-grid" id="statGrid"></div>
       <div id="badgeShelf"></div>
@@ -267,7 +268,18 @@
         <button class="btn primary" id="openEvent">Open projector event screen →</button>
       </div>
       <h1>Teacher leaderboard</h1>
-      <p>Ask pupils to download their progress file and send it to you (Teams, shared drive or email). Load them all here at once to build a class leaderboard. Nothing is uploaded anywhere; it all stays on this computer.</p>
+      <div class="live-box callout" id="liveBox">
+        <div>
+          <b>📡 Live class progress</b>
+          <p id="liveInfo" class="small muted"></p>
+        </div>
+        <div class="live-btns" id="liveBtns">
+          <button class="btn primary" id="liveBtn">▶ Start live view</button>
+          <button class="btn small" id="liveKeyBtn">Teacher key</button>
+          <button class="btn danger small" id="liveClear">Clear live data</button>
+        </div>
+      </div>
+      <p>Live view refreshes itself every 20 seconds while this tab is open; a green dot means the pupil did something in the last 5 minutes. You can still load progress files below for pupils who worked offline or at home.</p>
       <p class="callout">🔒 <b>Staff answer book</b> — the full solutions and a downloadable PDF live on the password-protected <a href="teacher.html">Teacher Area</a> page.</p>
       <div class="progress-actions">
         <label class="btn primary" for="teacherFiles">Load pupil progress files</label>
@@ -449,6 +461,7 @@
 <canvas id="confetti" aria-hidden="true"></canvas>
 <div class="toast" id="toast" hidden></div>
 
+<script src="assets/js/config.js"></script>
 <script src="assets/js/challenges.js"></script>
 <script src="assets/js/hashes.js"></script>
 <script src="assets/js/content.js"></script>

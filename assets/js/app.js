@@ -43,7 +43,7 @@
   function blankState() { return { v: 1, pid: randId(), name: '', solved: {}, hints: {}, revealed: {}, tries: {}, tut: {}, wrong: 0, created: Date.now() }; }
   var S = blankState();
   try { var raw = localStorage.getItem(STORE_KEY); if (raw) S = Object.assign(blankState(), JSON.parse(raw)); } catch (e) { /* storage blocked */ }
-  function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { } }
+  function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { } if (typeof scheduleSync === 'function') scheduleSync(); }
   function score() { var p = 0; Object.keys(S.solved).forEach(function (id) { if (BY_ID[id] && !S.solved[id].r) p += BY_ID[id].pts; }); return p; }
   function solvedCount() { return Object.keys(S.solved).filter(function (id) { return BY_ID[id]; }).length; }
   // Hard (tier 4) and Expert (tier 5) challenges in a category stay locked until
@@ -681,6 +681,43 @@
     return added;
   }
 
+  // ---------- live sync: send progress to the teacher's Google Sheet automatically ----------
+  // Optional — switched on by setting syncUrl in assets/js/config.js. Sends the same signed
+  // payload as the progress file, so the teacher view verifies it exactly like a file.
+  var SYNC_URL = (window.CTF_CONFIG && window.CTF_CONFIG.syncUrl) || '';
+  var syncTimer = null, syncState = { at: 0, ok: null };
+  function hasActivity() { return Object.keys(S.solved).length + Object.keys(S.hints).length + Object.keys(S.revealed || {}).length + Object.keys(S.tut || {}).length > 0 || !!S.name; }
+  function syncBody() { return JSON.stringify(JSON.parse(makeExport())); }
+  function pushSync(leaving) {
+    clearTimeout(syncTimer); syncTimer = null;
+    if (!SYNC_URL || !hasActivity()) return;
+    if (navigator.onLine === false) { syncState.ok = false; renderSyncStatus(); syncTimer = setTimeout(pushSync, 60000); return; }
+    var body = syncBody();
+    if (leaving && navigator.sendBeacon) {
+      try { if (navigator.sendBeacon(SYNC_URL, new Blob([body], { type: 'text/plain' }))) return; } catch (e) { }
+    }
+    fetch(SYNC_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: body, keepalive: body.length < 60000 })
+      .then(function () { syncState = { at: Date.now(), ok: true }; renderSyncStatus(); })
+      .catch(function () { syncState.ok = false; renderSyncStatus(); syncTimer = setTimeout(pushSync, 60000); });
+  }
+  function scheduleSync() { if (!SYNC_URL) return; clearTimeout(syncTimer); syncTimer = setTimeout(pushSync, 4000); }
+  function renderSyncStatus() {
+    var el = document.getElementById('syncStatus'); if (!el) return;
+    if (!SYNC_URL) { el.hidden = true; return; }
+    el.hidden = false;
+    var who = S.name ? '' : ' <a href="#" id="syncNameLink">Add your name</a> so your teacher knows it\'s you.';
+    if (syncState.ok === false) el.innerHTML = '⚠ Couldn\'t reach your teacher\'s sheet just now — your progress is still on this computer and will send again shortly.' + who;
+    else if (syncState.at) el.innerHTML = '📡 Your teacher can see your progress — last sent ' + new Date(syncState.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '.' + who;
+    else el.innerHTML = '📡 Your progress is sent to your teacher automatically as you solve.' + who;
+    var a = document.getElementById('syncNameLink'); if (a) a.addEventListener('click', function (e) { e.preventDefault(); askName(); });
+  }
+  if (SYNC_URL) {
+    setTimeout(pushSync, 3000);
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && syncTimer) pushSync(true); });
+    window.addEventListener('pagehide', function () { if (syncTimer) pushSync(true); });
+    window.addEventListener('online', function () { if (syncState.ok === false) pushSync(); });
+  }
+
   // ---------- resume code: the same signed progress data as the file, as copy-paste text ----------
   function b64uEnc(bytes) { var s = ''; for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
   function b64uDec(str) { str = str.replace(/-/g, '+').replace(/_/g, '/'); while (str.length % 4) str += '='; var bin = atob(str), a = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; }
@@ -753,6 +790,7 @@
 
   // ---------- save status + banners (so nobody loses their work on a wiped school PC) ----------
   function renderSaveStatus() {
+    renderSyncStatus();
     var el = document.getElementById('saveStatus'); if (!el) return;
     var n = solvedCount(), u = unsavedCount();
     if (!n) { el.hidden = true; return; }
@@ -829,7 +867,7 @@
     });
     var hints = Object.keys(d.hints || {}).reduce(function (s, k) { return s + d.hints[k]; }, 0), rev = Object.keys(d.revealed || {}).length;
     var tutIds = Object.keys(d.tut || {}).filter(function (id) { return BY_ID[id]; });
-    return { name: d.name || '(no name)', pts: pts, n: n, unv: unv, rev: rev, tiers: tiers, hints: hints, tut: tutIds.length, tutIds: tutIds, last: last, ok: r.ok, file: r.file };
+    return { name: d.name || '(no name)', pts: pts, n: n, unv: unv, rev: rev, tiers: tiers, hints: hints, tut: tutIds.length, tutIds: tutIds, last: last, ok: r.ok, file: r.file, seen: r.seen || 0 };
   }
   function struggleSummary() {
     var count = {};
@@ -847,17 +885,19 @@
   }
   function renderTeacher() {
     var box = $('#teacherTable');
-    if (!T.rows.length) { box.innerHTML = '<p class="muted">No files loaded yet.</p>'; return; }
+    if (!T.rows.length) { box.innerHTML = '<p class="muted">' + (LIVE.on ? 'Live view is on — pupils will appear here as soon as they start.' : 'No files loaded yet.') + '</p>'; return; }
     var rows = T.rows.map(rowStats);
     var k = T.sort;
     rows.sort(function (a, b) { return k === 'name' ? a.name.localeCompare(b.name) : (b[k] - a[k]) || (a.last - b.last); });
     box.innerHTML = '<table class="lb"><thead><tr><th>#</th><th data-k="name">Name</th><th data-k="pts">Points</th><th data-k="n">Flags</th>' +
       [1, 2, 3, 4, 5].map(function (t) { return '<th>' + TIERS[t].name + '</th>'; }).join('') +
-      '<th data-k="hints">Hints</th><th data-k="tut">Tutorials</th><th data-k="rev">Answers revealed</th><th>Last solve</th><th>File</th></tr></thead><tbody>' +
+      '<th data-k="hints">Hints</th><th data-k="tut">Tutorials</th><th data-k="rev">Answers revealed</th><th>Last solve</th><th>Source</th></tr></thead><tbody>' +
       rows.map(function (r, i) {
-        return '<tr><td class="num">' + (i + 1) + '</td><td>' + esc(r.name) + '</td><td class="num">' + r.pts + '</td><td class="num">' + r.n + '</td>' +
+        var active = r.seen && Date.now() - r.seen < 5 * 60000;
+        return '<tr><td class="num">' + (i + 1) + '</td><td>' + (active ? '<span class="live-dot" title="Active in the last 5 minutes"></span>' : '') + esc(r.name) + '</td><td class="num">' + r.pts + '</td><td class="num">' + r.n + '</td>' +
           [1, 2, 3, 4, 5].map(function (t) { return '<td class="num">' + r.tiers[t] + '</td>'; }).join('') +
           '<td class="num">' + r.hints + '</td><td class="num' + (r.tut ? ' tut-cell' : '') + '">' + r.tut + '</td><td class="num">' + r.rev + '</td><td class="num">' + (r.last ? fmtDate(r.last) : '-') + '</td><td>' +
+          (r.seen ? '<span class="badge live" title="Sent automatically">live · ' + new Date(r.seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '</span> ' : '') +
           (r.ok ? '<span class="badge good">ok</span>' : '<span class="badge bad">edited</span>') +
           (r.unv ? ' <span class="badge bad">' + r.unv + ' unverified</span>' : '') + '</td></tr>';
       }).join('') + '</tbody></table>' + struggleSummary();
@@ -872,6 +912,73 @@
     });
     download('MrButlersCTF-leaderboard.csv', lines.join('\n'), 'text/csv');
   });
+
+  // ---------- teacher: live class view from the Google Sheet ----------
+  var LIVE = { on: false, timer: null, key: '' }, LIVE_KEY_STORE = 'mbctf-teacher-livekey-v1';
+  try { LIVE.key = localStorage.getItem(LIVE_KEY_STORE) || ''; } catch (e) { }
+  function liveInfo(cls, html) { var el = $('#liveInfo'); if (!el) return; el.className = 'small ' + (cls || 'muted'); el.innerHTML = html; }
+  function askLiveKey() {
+    var k = prompt('Teacher key (the TEACHER_KEY you set in the Google Apps Script):', LIVE.key || '');
+    if (k === null || !k.trim()) return false;
+    LIVE.key = k.trim(); try { localStorage.setItem(LIVE_KEY_STORE, LIVE.key); } catch (e) { }
+    return true;
+  }
+  function liveUrl(extra) { return SYNC_URL + (SYNC_URL.indexOf('?') < 0 ? '?' : '&') + 'key=' + encodeURIComponent(LIVE.key) + (extra || '') + '&t=' + Date.now(); }
+  function liveFetch() {
+    if (!LIVE.on || document.hidden) return;
+    fetch(liveUrl(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (res) {
+      if (!res.ok) {
+        if (res.error === 'key') { stopLive(); try { localStorage.removeItem(LIVE_KEY_STORE); } catch (e) { } LIVE.key = ''; liveInfo('bad-text', 'That teacher key wasn\'t accepted. Press <b>Start live view</b> and enter it again.'); }
+        else liveInfo('bad-text', 'The sheet replied with an error: ' + esc(res.error || 'unknown'));
+        return;
+      }
+      var byPid = {};
+      T.rows.forEach(function (r) { if (!r.seen) byPid[r.data.pid] = r; });   // keep any hand-loaded files
+      var bad = 0;
+      (res.rows || []).forEach(function (x) {
+        try {
+          var r = parseImport(x.json); r.file = 'live'; r.seen = x.seen;
+          var cur = byPid[r.data.pid];
+          if (!cur || (cur.data.exported || 0) <= (r.data.exported || 0)) byPid[r.data.pid] = r;
+        } catch (e) { bad++; }
+      });
+      T.rows = Object.keys(byPid).map(function (k) { return byPid[k]; });
+      renderTeacher();
+      var n = (res.rows || []).length, active = (res.rows || []).filter(function (x) { return Date.now() - x.seen < 5 * 60000; }).length;
+      liveInfo('good-text', '🔴 Live · ' + n + ' pupil' + (n === 1 ? '' : 's') + ' (' + active + ' active now) · refreshed ' + new Date().toLocaleTimeString() + (bad ? ' · ' + bad + ' unreadable row(s)' : ''));
+    }).catch(function () { liveInfo('bad-text', 'Couldn\'t reach the Google Sheet — trying again in a moment…'); });
+  }
+  function startLive() {
+    if (!LIVE.key && !askLiveKey()) return;
+    LIVE.on = true; $('#liveBtn').textContent = '⏸ Pause live view';
+    liveInfo('muted', 'Connecting to the sheet…');
+    liveFetch(); clearInterval(LIVE.timer); LIVE.timer = setInterval(liveFetch, 20000);
+  }
+  function stopLive() {
+    LIVE.on = false; clearInterval(LIVE.timer); LIVE.timer = null;
+    var b = $('#liveBtn'); if (b) b.textContent = '▶ Start live view';
+    liveInfo('muted', 'Live view paused.');
+  }
+  (function initLive() {
+    var box = $('#liveBox'); if (!box) return;
+    if (!SYNC_URL) {
+      $('#liveBtns').hidden = true;
+      liveInfo('muted', 'Not set up yet. Connect a Google Sheet once and every pupil\'s progress arrives here automatically — no files to collect. Follow <a href="https://github.com/popcorn483/MrButlersCTF/blob/main/teacher-sync/SETUP.md" target="_blank" rel="noopener">the 5-minute setup guide</a>.');
+      return;
+    }
+    $('#liveBtn').addEventListener('click', function () { LIVE.on ? stopLive() : startLive(); });
+    $('#liveKeyBtn').addEventListener('click', function () { if (askLiveKey() && LIVE.on) liveFetch(); });
+    $('#liveClear').addEventListener('click', function () {
+      if (!LIVE.key && !askLiveKey()) return;
+      if (!confirm('Clear ALL pupils\' live progress from the Google Sheet? Use this before a new group or a fresh competition. Pupils keep their progress on their own computers and it re-sends next time they solve.')) return;
+      fetch(liveUrl('&action=clear'), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (res) {
+        if (!res.ok) return toast('Not cleared — check the teacher key');
+        T.rows = T.rows.filter(function (r) { return !r.seen; }); renderTeacher(); toast('Live data cleared');
+      }).catch(function () { toast('Couldn\'t reach the sheet'); });
+    });
+    document.addEventListener('visibilitychange', function () { if (!document.hidden && LIVE.on) liveFetch(); });
+    if (LIVE.key) startLive(); else liveInfo('muted', 'Press <b>Start live view</b> and enter your teacher key.');
+  })();
 
   // ---------- getting started page ----------
   $('#startContent').innerHTML = window.CTF_START_HTML(CATS);

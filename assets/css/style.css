@@ -927,3 +927,15 @@ body.view-home .foot { display: none !important; }
 .share-qr svg { width: 100%; height: 100%; display: block; }
 .share-url { font-family: var(--mono); font-size: .85rem; color: var(--accent); text-align: center; word-break: break-all; background: var(--bg2); border: 1px solid var(--line2); border-radius: 8px; padding: 8px 10px; }
 .share-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 14px; }
+
+/* live class sync */
+.sync-status { margin: 10px 0; padding: 8px 12px; border-radius: 8px; border: 1px dashed var(--line2); font-size: .9rem; }
+.live-box { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.live-box > div:first-child { flex: 1 1 260px; }
+.live-box p { margin: 4px 0 0; }
+.live-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.good-text { color: var(--green); }
+.bad-text { color: var(--red); }
+.badge.live { color: var(--green); border-color: var(--green); }
+.live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-right: 6px; vertical-align: middle; }
+table.lb td:nth-child(2) { white-space: nowrap; }

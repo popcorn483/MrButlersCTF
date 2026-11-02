@@ -11,6 +11,7 @@ These are original practice challenges, not the real competition tasks.
 - Toolkit: CyberChef-style decoder, frequency analysis, hashes, hex viewer, image inspector, JS scratchpad, ASCII table
 - Progress saves in the browser; pupils download a progress file at the end of each lesson and reload it next time
 - Teacher tab: load every pupil's progress file to build a class leaderboard and export it as CSV
+- **Live class view** (optional): pupils' progress is sent automatically to a Google Sheet you own, and the Teacher tab updates itself every 20 seconds — see [`teacher-sync/SETUP.md`](teacher-sync/SETUP.md)
 
 ## Publish with GitHub Pages
 1. Open the repository on GitHub and go to **Settings → Pages**.
