@@ -80,7 +80,9 @@ function whois_(name, cls, pin, devId) {
   if (had && had !== pinHash_(id, pin)) { cache.put(fk, String(fails + 1), 900); return { ok: false, error: 'pin', left: 4 - fails }; }
   if (!had) sh.getRange(at + 2, 4).setValue(pinHash_(id, pin));
   cache.remove(fk);
-  return { ok: true, id: id, name: String(rows[at][1]).replace(/^'/, ''), cls: String(rows[at][2]), json: progressJson_(id) };
+  var kept = resolve_(id), nm = String(rows[at][1]).replace(/^'/, ''), cl = String(rows[at][2]);
+  if (kept !== id) for (var j = 0; j < rows.length; j++) if (String(rows[j][0]) === kept) { nm = String(rows[j][1]).replace(/^'/, ''); cl = String(rows[j][2]); break; }
+  return { ok: true, id: kept, name: nm, cls: cl, json: progressJson_(kept) };
 }
 
 /* Forgotten password: email the key to the fixed recovery address (never to an address the site supplies).
@@ -131,6 +133,54 @@ function setAward_(pid, cid, on) {
   return { ok: true, awarded: !!on, pid: pid, cid: cid };
 }
 
+// ---------- merging a pupil's second login into their first ----------
+var ALIAS_SHEET = 'Merged logins', SALT = 'mbctf-progress-v1';
+function aliasSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet(), sh = ss.getSheetByName(ALIAS_SHEET);
+  if (!sh) { sh = ss.insertSheet(ALIAS_SHEET); sh.appendRow(['Old login ID', 'Merged into', 'Old name', 'When']); sh.setFrozenRows(1); }
+  return sh;
+}
+function aliases_() { var sh = aliasSheet_(), n = sh.getLastRow() - 1, m = {}; if (n > 0) sh.getRange(2, 1, n, 2).getValues().forEach(function (r) { if (r[0]) m[String(r[0])] = String(r[1]); }); return m; }
+function resolve_(id, A) { A = A || aliases_(); var k = 0; while (A[id] && k++ < 20) id = A[id]; return id; }
+function hex_(bytes) { return bytes.map(function (b) { return ('0' + (b & 255).toString(16)).slice(-2); }).join(''); }
+function sign_(data) { return { data: data, check: hex_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, JSON.stringify(data) + SALT, Utilities.Charset.UTF_8)) }; }
+function rowFor_(sh, id) { var c = sh.getRange('A:A').createTextFinder(id).matchEntireCell(true).findNext(); return c ? c.getRow() : 0; }
+/* add everything in `old` that `cur` is missing (solves, hints, tutorials…). Teacher marks (a:1) are left to the Marked complete tab. */
+function union_(old, cur) {
+  ['solved', 'hints', 'tries', 'tut', 'revealed'].forEach(function (f) { cur[f] = cur[f] || {}; });
+  Object.keys(old.solved || {}).forEach(function (k) {
+    var o = old.solved[k], c = cur.solved[k]; if (!o || o.a) return;
+    if (!c || (c.r && !o.r) || (c.a && !o.a)) cur.solved[k] = o;
+  });
+  ['hints', 'tries', 'tut'].forEach(function (f) { Object.keys(old[f] || {}).forEach(function (k) { cur[f][k] = Math.max(+cur[f][k] || 0, +old[f][k] || 0); }); });
+  Object.keys(old.revealed || {}).forEach(function (k) { if (!cur.revealed[k]) cur.revealed[k] = old.revealed[k]; });
+  cur.wrong = Math.max(+cur.wrong || 0, +old.wrong || 0);
+  if (old.created && (!cur.created || old.created < cur.created)) cur.created = old.created;
+  return cur;
+}
+function merge_(from, to) {
+  if (!/^[0-9a-f]{16}$/.test(from) || !/^[0-9a-f]{16}$/.test(to) || from === to) return { ok: false, error: 'bad request' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var A = aliases_(); to = resolve_(to, A); if (resolve_(from, A) === to) return { ok: true, merged: true };
+    var sh = sheet_(), rf = rowFor_(sh, from), rt = rowFor_(sh, to);
+    if (!rt) return { ok: false, error: 'keep pupil not found' };
+    var keep = JSON.parse(String(sh.getRange(rt, 6).getValue()) || '{}').data, oldName = '';
+    if (rf) {
+      var gone = JSON.parse(String(sh.getRange(rf, 6).getValue()) || '{}').data || {}; oldName = gone.name || '';
+      keep = union_(gone, keep); keep.exported = Date.now();
+      var body = JSON.stringify(sign_(keep));
+      sh.getRange(rt, 1, 1, 7).setValues([[to, sh.getRange(rt, 2).getValue(), sh.getRange(rt, 3).getValue(), Object.keys(keep.solved || {}).length, new Date(), body, sh.getRange(rt, 7).getValue()]]);
+      sh.deleteRow(rf);
+    }
+    aliasSheet_().appendRow([from, to, safeText_(oldName), new Date()]);
+    var aw = awardsSheet_(), n = aw.getLastRow() - 1;   // the old login's teacher marks move across
+    if (n > 0) { var ids = aw.getRange(2, 1, n, 1).getValues(); ids.forEach(function (r, i) { if (String(r[0]) === from) aw.getRange(i + 2, 1).setValue(to); }); }
+    CacheService.getScriptCache().remove('fail:' + from);
+    return { ok: true, merged: true, from: from, to: to };
+  } finally { lock.releaseLock(); }
+}
+
 function removedSheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(REMOVED_SHEET);
@@ -161,19 +211,19 @@ function doPost(e) {
     return out_({ ok: false, error: 'not ctf progress' });
   }
   if (isRemoved_(d.pid)) return out_({ ok: true, removed: true });
-  var json = JSON.stringify(body);
-  if (json.length > MAX_JSON) return out_({ ok: false, error: 'too large' });
-
-  var flags = Object.keys(d.solved || {}).length;
-  var row = [d.pid, safeText_(d.name), Number(d.score) || 0, flags, new Date(), json, safeText_(String(d.cls || '')).slice(0, 12)];
+  if (JSON.stringify(body).length > MAX_JSON) return out_({ ok: false, error: 'too large' });
 
   var lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
-    var sh = sheet_();
-    var found = sh.getRange('A:A').createTextFinder(d.pid).matchEntireCell(true).findNext();
-    if (found) sh.getRange(found.getRow(), 1, 1, row.length).setValues([row]);
-    else sh.appendRow(row);
+    var sh = sheet_(), id = resolve_(String(d.pid)), r = rowFor_(sh, id), merged = id !== String(d.pid);
+    // combine with what's already on the sheet (another computer, or a merged login), so solves are never lost
+    if (r) { try { var prev = JSON.parse(String(sh.getRange(r, 6).getValue()) || '{}').data; if (prev) d = union_(prev, d); } catch (x) { } }
+    if (merged) { d.pid = id; if (r) { d.name = String(sh.getRange(r, 2).getValue()).replace(/^'/, ''); d.cls = String(sh.getRange(r, 7).getValue()); } }
+    var json = (r || merged) ? JSON.stringify(sign_(d)) : JSON.stringify(body);
+    if (json.length > MAX_JSON) return out_({ ok: false, error: 'too large' });
+    var row = [id, safeText_(d.name), Number(d.score) || 0, Object.keys(d.solved || {}).length, new Date(), json, safeText_(String(d.cls || '')).slice(0, 12)];
+    if (r) sh.getRange(r, 1, 1, row.length).setValues([row]); else sh.appendRow(row);
   } finally {
     lock.releaseLock();
   }
@@ -185,11 +235,18 @@ function doGet(e) {
   var p = (e && e.parameter) || {};
   if (p.action === 'whois') return out_(whois_(p.name, p.cls, p.pin, p.id));   // pupils signing in (no key)
   if (p.action === 'forgot') return out_(forgot_());
-  if (p.action === 'myawards') return out_({ ok: true, awards: /^[0-9a-f]{16}$/.test(String(p.id)) ? (awards_(String(p.id))[String(p.id)] || {}) : {} });   // a pupil's own teacher-marked flags   // emails the key to RECOVERY_EMAIL only
+  if (p.action === 'myawards') {   // a pupil's own teacher-marked flags (+ where a merged login now lives)
+    if (!/^[0-9a-f]{16}$/.test(String(p.id))) return out_({ ok: true, awards: {} });
+    var me = String(p.id), kid = resolve_(me), o = { ok: true, awards: awards_(kid)[kid] || {} };
+    if (kid !== me) { o.movedTo = kid; var s0 = sheet_(), rr = rowFor_(s0, kid); if (rr) { o.name = String(s0.getRange(rr, 2).getValue()).replace(/^'/, ''); o.cls = String(s0.getRange(rr, 7).getValue()); } }
+    o.json = progressJson_(kid);
+    return out_(o);
+  }   // emails the key to RECOVERY_EMAIL only
   if (p.key !== TEACHER_KEY) return out_({ ok: false, error: 'key' });
 
   var sh = sheet_();
   if (sh.getRange(1, 7).getValue() !== 'Class') sh.getRange(1, 7).setValue('Class');
+  if (p.action === 'merge') return out_(merge_(String(p.from), String(p.to)));
   if (p.action === 'award' || p.action === 'unaward') return out_(setAward_(String(p.pid), String(p.cid), p.action === 'award'));
   if (p.action === 'resetpin') {   // the pupil chooses a new PIN next time they sign in
     var ps = pupilsSheet_(), c = ps.getRange('A:A').createTextFinder(String(p.pid)).matchEntireCell(true).findNext();
@@ -227,5 +284,5 @@ function doGet(e) {
       rows.push({ seen: r[4] instanceof Date ? r[4].getTime() : 0, json: r[5] });
     });
   }
-  return out_({ ok: true, now: Date.now(), rows: rows, awards: awards_() });
+  return out_({ ok: true, now: Date.now(), rows: rows, awards: awards_(), aliases: aliases_() });
 }

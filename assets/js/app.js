@@ -719,7 +719,13 @@
     fetch(SYNC_URL + (SYNC_URL.indexOf('?') < 0 ? '?' : '&') + 'action=myawards&id=' + encodeURIComponent(S.pid) + '&t=' + Date.now(), { cache: 'no-store', credentials: 'omit' })
       .then(function (r) { return r.json(); }).then(function (j) {
         if (!j || !j.ok || !j.awards) return;
-        var a = j.awards, added = [], changed = false;
+        var a = j.awards, added = [], changed = false, moved = false;
+        if (j.movedTo && /^[0-9a-f]{16}$/.test(j.movedTo) && j.movedTo !== S.pid) {   // the teacher merged this login into another
+          adoptPid(j.movedTo); if (j.name) S.name = j.name; if (j.cls) S.cls = j.cls; S.pinOk = 1; moved = changed = true;
+        }
+        if (j.json) { try { var R = parseImport(j.json);
+          if (R.ok && R.data.pid === S.pid) Object.keys(R.data.solved || {}).forEach(function (cid) { var o = R.data.solved[cid]; if (BY_ID[cid] && !o.a && (!S.solved[cid] || (S.solved[cid].r && !o.r))) { S.solved[cid] = o; changed = true; } });
+        } catch (x) { } }
         Object.keys(a).forEach(function (cid) {
           if (!BY_ID[cid]) return; var s = S.solved[cid];
           if (!s || s.r) { S.solved[cid] = { t: a[cid], p: '', h: S.hints[cid] || 0, r: 0, a: 1 }; added.push(BY_ID[cid].title); changed = true; }
@@ -728,7 +734,8 @@
         if (!changed) return;
         save(); refreshHeader(); renderBoard(); renderProgress();
         try { document.dispatchEvent(new CustomEvent('ctf:refresh')); } catch (e) { }
-        if (added.length) toast('✅ Your teacher marked ' + (added.length === 1 ? '“' + added[0] + '”' : added.length + ' challenges') + ' as completed!', 5000);
+        if (moved) toast('🔗 Your teacher joined your two logins together — you’re ' + S.name + ' (' + S.cls + ').', 5000);
+        else if (added.length) toast('✅ Your teacher marked ' + (added.length === 1 ? '“' + added[0] + '”' : added.length + ' challenges') + ' as completed!', 5000);
       }).catch(function () { });
   }
   window.CTFFetchAwards = fetchAwards;
@@ -1009,7 +1016,7 @@
     Object.keys(d.solved || {}).forEach(function (id) {
       var c = BY_ID[id]; if (!c) return;
       var s = d.solved[id], valid = true;
-      if (T.key && T.key[id]) valid = isAwarded(d.pid, id) || (!!s.p && sha256(d.pid + '|' + T.key[id].toLowerCase()).slice(0, 16) === s.p);
+      if (T.key && T.key[id]) valid = isAwarded(d.pid, id) || proofOk(d.pid, id, s.p);
       if (!valid) { unv++; return; }
       if (!s.r) pts += c.pts; n++; tiers[c.tier]++; last = Math.max(last, s.t);
     });
@@ -1024,7 +1031,7 @@
     if (!r) { box.innerHTML = ''; box.hidden = true; return; }
     box.hidden = false;
     var d = r.data, st = rowStats(r), solved = d.solved || {}, tries = d.tries || {}, hints = d.hints || {}, tut = d.tut || {}, rev = d.revealed || {};
-    function verified(id) { return !T.key[id] || isAwarded(d.pid, id) || (!!solved[id].p && sha256(d.pid + '|' + T.key[id].toLowerCase()).slice(0, 16) === solved[id].p); }
+    function verified(id) { return !T.key[id] || isAwarded(d.pid, id) || proofOk(d.pid, id, solved[id].p); }
     var cats = CATS.map(function (cat) {
       var list = CH.filter(function (c) { return c.cat === cat.id; });
       var done = list.filter(function (c) { return solved[c.id]; }).length;
@@ -1058,13 +1065,14 @@
       return '<div class="pd-line" data-open="' + c.id + '" title="Open this challenge"><span class="when">' + (s ? fmtDate(s.t) : '') + '</span><span><b>' + esc(c.title) + '</b> <span class="muted small">' + esc(c.id) + ' · ' + bits.join(' · ') + '</span></span>' + flag + '</div>';
     }
     box.innerHTML = '<div class="pd-head"><div><h2>' + esc(st.name) + '</h2><p class="muted small">' + st.pts + ' pts · ' + st.n + ' flags · ' + st.hints + ' hints · ' + st.tut + ' tutorials · ' + st.rev + ' answers revealed' +
-      (r.seen ? ' · last on the site ' + fmtDate(r.seen) : '') + '</p></div><div class="pd-btns">' + (r.seen && SYNC_URL ? '<button class="btn small" id="pdPin">🔑 Reset PIN</button>' : '') + '<button class="btn danger small" id="pdDelete">🗑 Delete pupil</button><button class="btn small" id="pdClose">✕ Close</button></div></div>' +
+      (r.seen ? ' · last on the site ' + fmtDate(r.seen) : '') + '</p></div><div class="pd-btns">' + (r.seen && SYNC_URL ? '<button class="btn small" id="pdPin">🔑 Reset PIN</button>' : '') + (r.seen && SYNC_URL ? '<button class="btn small" id="pdMerge">🔗 Merge a second login</button>' : '') + '<button class="btn danger small" id="pdDelete">🗑 Delete pupil</button><button class="btn small" id="pdClose">✕ Close</button></div></div>' +
       '<p class="pd-key small muted"><span class="pd-tile ok">✓</span> solved <span class="pd-tile ok awd">✓</span> marked by teacher <span class="pd-tile rev">👁</span> solved after revealing answer <span class="pd-tile tried">…</span> attempted <span class="pd-tile"></span> not started — hover a square for details</p>' +
       '<div class="pd-cats">' + cats + '</div>' +
       '<h3>Solved (' + solvedIds.length + ')</h3>' + (solvedIds.length ? solvedIds.map(function (id) { return line(BY_ID[id], solved[id]); }).join('') : '<p class="muted">Nothing solved yet.</p>') +
       (stuck.length ? '<h3>Tried but not solved yet (' + stuck.length + ')</h3>' + stuck.map(function (c) { return line(c, null); }).join('') : '');
     $('#pdClose').addEventListener('click', function () { T.sel = null; renderTeacher(); });
     $('#pdDelete').addEventListener('click', function () { deletePupil(r, st.name); });
+    var mgB = $('#pdMerge'); if (mgB) mgB.addEventListener('click', function () { mergePanel(r, st.name); });
     var pinB = $('#pdPin');
     if (pinB) pinB.addEventListener('click', function () {
       if (!confirm('Reset ' + st.name + '\'s PIN?\n\nThe next time they sign in, whatever 4-digit PIN they type becomes their new PIN.')) return;
@@ -1095,7 +1103,7 @@
     n.innerHTML = '<div><b>👩‍🏫 ' + esc(name) + ':</b> ' + bits.join(' · ') + '</div>' +
       '<details><summary>Show answer (teacher)</summary><p class="small">' + (c.sol || '') + '</p><p>Flag: <code>' + esc(c.f) + '</code></p></details>';
     var meta = document.getElementById('chalMeta'); meta.after(n);
-    var ok = s && !s.r && (isAwarded(d.pid, id) || (!!s.p && sha256(d.pid + '|' + c.f.toLowerCase()).slice(0, 16) === s.p));
+    var ok = s && !s.r && (isAwarded(d.pid, id) || proofOk(d.pid, id, s.p));
     if (SYNC_URL && LIVE.key) {
       var row = document.createElement('div'); row.className = 'tn-mark';
       if (isAwarded(d.pid, id)) row.innerHTML = '<span class="badge good">✓ Marked completed by you</span> <button type="button" class="btn small" id="tnUnmark">Undo</button>';
@@ -1106,6 +1114,13 @@
       if (mk) mk.addEventListener('click', function () { setAward(d, id, true, name); });
       if (un) un.addEventListener('click', function () { setAward(d, id, false, name); });
     }
+  }
+  // a solve is genuine if its proof matches this pupil's ID, or the ID of a login merged into them
+  function proofOk(pid, cid, p) {
+    var c = BY_ID[cid]; if (!c || !p) return false;
+    var ids = [pid].concat((T.aliasOf && T.aliasOf[pid]) || []);
+    for (var i = 0; i < ids.length; i++) if (sha256(ids[i] + '|' + c.f.toLowerCase()).slice(0, 16) === p) return true;
+    return false;
   }
   function isAwarded(pid, cid) { return !!(T.awards && T.awards[pid] && T.awards[pid][cid]); }
   function injectAwards(d) {   // an awarded flag counts as solved, even before the pupil's computer has picked it up
@@ -1125,6 +1140,32 @@
         renderTeacher(); teacherNote(cid, row ? row.data : d, name);
         toast(on ? '✅ Marked completed for ' + name : 'Mark removed', 3500);
       }).catch(function () { toast('Couldn\'t reach the sheet'); });
+  }
+  // ---------- merge a pupil's second login into this one ----------
+  function mergePanel(r, name) {
+    var box = $('#pupilDetail'), old = $('#mergeBox'); if (old) { old.remove(); return; }
+    var others = T.rows.filter(function (x) { return x.seen && x.data.pid !== r.data.pid; }).map(rowStats);
+    var cls = r.data.cls || '';
+    others.sort(function (a, b) { return ((b.cls === cls) - (a.cls === cls)) || a.name.localeCompare(b.name); });
+    var m = document.createElement('div'); m.id = 'mergeBox'; m.className = 'merge-box';
+    if (!others.length) { m.innerHTML = '<p class="muted small">There are no other pupils to merge.</p>'; }
+    else m.innerHTML = '<b>🔗 Merge a second login into ' + esc(name) + '</b>' +
+      '<p class="small muted">Pick the other login this pupil made (e.g. a misspelt name or wrong class). Its solves, hints and teacher marks move into <b>' + esc(name) + '</b>, it disappears from the list, and signing in with either name opens ' + esc(name) + '’s progress from now on.</p>' +
+      '<div class="merge-row"><select class="io" id="mergeFrom">' + others.map(function (o) {
+        return '<option value="' + esc(o.pid) + '">' + esc(o.name) + (o.cls ? ' · ' + esc(o.cls) : '') + ' — ' + o.pts + ' pts, ' + o.n + ' flag' + (o.n === 1 ? '' : 's') + (o.last ? ', last solve ' + fmtDate(o.last) : '') + '</option>';
+      }).join('') + '</select><button class="btn primary small" id="mergeGo">Merge into ' + esc(name.split(' ')[0]) + '</button></div>';
+    box.querySelector('.pd-head').after(m);
+    var go = $('#mergeGo'); if (!go) return;
+    go.addEventListener('click', function () {
+      var sel = $('#mergeFrom'), from = sel.value, label = sel.options[sel.selectedIndex].textContent.split(' — ')[0];
+      if (!confirm('Merge "' + label + '" into ' + name + '?\n\n' + label + ' will be removed from the list and everything they did moves to ' + name + '. This can’t be undone from here.')) return;
+      if (!LIVE.key && !askLiveKey()) return;
+      go.disabled = true; go.textContent = 'Merging…';
+      fetch(liveUrl('&action=merge&from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(r.data.pid)), { cache: 'no-store' }).then(function (x) { return x.json(); }).then(function (res) {
+        if (res.ok && res.merged) { toast('🔗 Merged ' + label + ' into ' + name, 4000); T.rows = T.rows.filter(function (x) { return x.data.pid !== from; }); liveFetch(); }
+        else { go.disabled = false; go.textContent = 'Merge into ' + name.split(' ')[0]; toast(res.error === 'key' ? 'Teacher key not accepted' : res.ok ? 'Your Google script needs updating to merge pupils — see teacher-sync/SETUP.md (step 4)' : 'Not merged: ' + (res.error || 'error'), 6000); }
+      }).catch(function () { go.disabled = false; go.textContent = 'Merge into ' + name.split(' ')[0]; toast('Couldn’t reach the sheet'); });
+    });
   }
   function deletePupil(r, name) {
     var pid = r.data.pid;
@@ -1228,6 +1269,8 @@
       });
       if (byPid[S.pid] && !Object.keys(S.solved).length && !S.name) delete byPid[S.pid];   // this teacher PC's own visit before signing in
       T.awards = res.awards || {};
+      T.aliasOf = {}; var AL = res.aliases || {};
+      Object.keys(AL).forEach(function (old) { var k = AL[old], n = 0; while (AL[k] && n++ < 20) k = AL[k]; (T.aliasOf[k] = T.aliasOf[k] || []).push(old); });
       Object.keys(byPid).forEach(function (k) { injectAwards(byPid[k].data); });
       T.rows = Object.keys(byPid).map(function (k) { return byPid[k]; });
       renderTeacher(); renderLiveTests(tests);

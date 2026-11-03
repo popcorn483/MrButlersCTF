@@ -1,10 +1,10 @@
 {
-  "version": "mbctf-v28",
+  "version": "mbctf-v29",
   "date": "2026-11-02",
   "notes": [
+    "Signed in twice by mistake? Your teacher can now join your two logins together",
     "Your teacher can now mark a challenge as completed for you \u2014 it appears with a message on your computer",
     "Teachers: new staff password, and an Email it to me link if you forget it",
-    "Started before? Load your progress file or resume code right on the sign-in screen",
-    "Sign in with your name, form class and a 4-digit PIN \u2014 your progress now follows you to any computer"
+    "Started before? Load your progress file or resume code right on the sign-in screen"
   ]
 }

@@ -1000,3 +1000,7 @@ button.pd-tile:hover { transform: scale(1.25); box-shadow: 0 0 0 2px var(--tc, v
 /* teacher: mark completed */
 .tn-mark { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 2px; }
 .pd-tile.ok.awd { background: transparent; color: var(--green); border: 2px solid var(--green); }
+
+.merge-box { margin: 12px 0; padding: 12px; border: 1px dashed var(--line2); border-radius: 10px; background: var(--panel2); }
+.merge-box p { margin: 6px 0 8px; }
+.merge-row { display: flex; flex-wrap: wrap; gap: 8px; } .merge-row select { flex: 1 1 260px; width: auto; }
