@@ -1,10 +1,10 @@
 {
-  "version": "mbctf-v30",
-  "date": "2026-11-02",
+  "version": "mbctf-v31",
+  "date": "2026-11-03",
   "notes": [
-    "\ud83c\udf73 The full CyberChef is now in the Toolkit \u2014 the same tool used at real CTF events, and it works on C2k",
-    "Decoder: \u201cOpen input in full CyberChef\u201d sends your text straight across",
-    "Signed in twice by mistake? Your teacher can now join your two logins together",
-    "Your teacher can now mark a challenge as completed for you \u2014 it appears with a message on your computer"
+    "140 new challenges \u2014 413 in total",
+    "75 new Hard and Expert challenges across every category",
+    "\ud83c\udfc6 40 more Competition Grade challenges built around the full CyberChef: AES, RC4, Enigma, gzip, QR codes, hidden image bits and more",
+    "\ud83c\udf0c New Unreal tier (1,000 points each): 25 multi-stage puzzles with no help at all. Unlocks after 3 Competition Grade solves"
   ]
 }

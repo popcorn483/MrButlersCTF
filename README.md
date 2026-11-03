@@ -5,8 +5,10 @@ Practice capture-the-flag challenges for pupils getting ready for a ZeroDays / C
 These are original practice challenges, not the real competition tasks.
 
 ## Features
-- Challenge board by category, with six difficulty tiers (Beginner → Elite)
-- **🏆 Competition Grade** — 11 Elite challenges (500–600 pts) with no instructions, hints or walkthroughs; unlocks after 5 Hard/Expert solves
+- Challenge board by category, with seven difficulty tiers (Beginner → Unreal)
+- **🏆 Competition Grade** — 51 Elite challenges (500–600 pts), 40 of them built around the full CyberChef; no hints or walkthroughs; unlocks after 5 Hard/Expert solves
+- **🌌 Unreal** — 25 multi-stage challenges (1,000 pts) with decoys and no help at all; unlocks after 3 Competition Grade solves
+- 413 challenges in total, every generated one solved again automatically from its own published puzzle
 - **View HTML** button on every challenge (Inspect Element is blocked on C2k)
 - Practice-only hints, plus a **Show answer & solution** button (revealed challenges score 0 points)
 - Toolkit: the full **CyberChef** v11.5 (GCHQ, Apache-2.0, served from `assets/cyberchef` with analytics removed), plus a guided CyberChef-style decoder, frequency analysis, hashes, hex viewer, image inspector, JS scratchpad, ASCII table
