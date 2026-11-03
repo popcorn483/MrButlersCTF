@@ -1034,3 +1034,6 @@ button.pd-tile.picked { outline: 2px solid var(--green); outline-offset: 1px; ba
 table.lbp td { font-size: .95rem; }
 table.lbp tr.lbp-mine td { background: color-mix(in srgb, var(--green) 14%, transparent); font-weight: 700; }
 table.lbp th { cursor: default; }
+
+/* homepage: Teacher login card spans the full width under the two pupil cards */
+.home-c-teacher { grid-column: 1 / -1; }

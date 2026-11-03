@@ -1470,7 +1470,9 @@
   function updateTeacherUI() {
     var on = teacherSignedIn(), tab = $('#navTeacher'), hb = $('#homeTeacher'), fb = $('#footTeacher');
     if (tab) tab.style.display = on ? '' : 'none';
-    if (hb) hb.textContent = on ? '👩‍🏫 Teacher dashboard' : '👩‍🏫 Teacher access';
+    if (hb) { var ht = $('#homeTeacherT'), hu = $('#homeTeacherU');
+      if (ht) { ht.textContent = on ? 'Teacher dashboard' : 'Teacher login'; hu.textContent = on ? 'You’re signed in on this computer — open the live class view' : 'Staff only: live class progress, marking and the answer book'; }
+      else hb.textContent = on ? '👩‍🏫 Teacher dashboard' : '👩‍🏫 Teacher access'; }
     if (fb) fb.textContent = on ? '👩‍🏫 Teacher dashboard' : '👩‍🏫 Teacher access';
   }
   function openTeacherSignIn() {
@@ -1516,7 +1518,7 @@
   }
   window.CTFForgotPassword = forgotPassword;
   $('#tmForgot').addEventListener('click', function () { forgotPassword($('#tmMsg')); });
-  ['#homeTeacher', '#footTeacher'].forEach(function (sel) { var b = $(sel); if (b) b.addEventListener('click', teacherEntry); });
+  ['#homeTeacher', '#footTeacher'].forEach(function (sel) { var b = $(sel); if (b) b.addEventListener('click', function (e) { e.preventDefault(); teacherEntry(); }); });
   updateTeacherUI();
 
   (function initLive() {
