@@ -104,6 +104,33 @@ function forgot_() {
   return { ok: true, sent: true, to: to.charAt(0) + '•••' + (at > 0 ? to.slice(at) : '') };
 }
 
+// ---------- teacher-confirmed flags ("Mark completed") ----------
+var AWARDS_SHEET = 'Marked complete';
+function awardsSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet(), sh = ss.getSheetByName(AWARDS_SHEET);
+  if (!sh) { sh = ss.insertSheet(AWARDS_SHEET); sh.appendRow(['Pupil ID', 'Challenge', 'Marked']); sh.setFrozenRows(1); }
+  return sh;
+}
+function awards_(onlyPid) {   // { pupilId: { challengeId: time } }
+  var sh = awardsSheet_(), n = sh.getLastRow() - 1, out = {};
+  if (n < 1) return out;
+  sh.getRange(2, 1, n, 3).getValues().forEach(function (r) {
+    var pid = String(r[0]), cid = String(r[1]); if (!pid || !cid || (onlyPid && pid !== onlyPid)) return;
+    (out[pid] = out[pid] || {})[cid] = r[2] instanceof Date ? r[2].getTime() : Date.now();
+  });
+  return out;
+}
+function setAward_(pid, cid, on) {
+  if (!/^[0-9a-f]{16}$/.test(String(pid)) || !/^[a-z0-9-]{2,20}$/.test(String(cid))) return { ok: false, error: 'bad request' };
+  var lock = LockService.getScriptLock(); lock.waitLock(15000);
+  try {
+    var sh = awardsSheet_(), n = sh.getLastRow() - 1, rows = n > 0 ? sh.getRange(2, 1, n, 2).getValues() : [];
+    for (var i = rows.length - 1; i >= 0; i--) if (String(rows[i][0]) === pid && String(rows[i][1]) === cid) sh.deleteRow(i + 2);
+    if (on) sh.appendRow([pid, cid, new Date()]);
+  } finally { lock.releaseLock(); }
+  return { ok: true, awarded: !!on, pid: pid, cid: cid };
+}
+
 function removedSheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(REMOVED_SHEET);
@@ -157,11 +184,13 @@ function doPost(e) {
 function doGet(e) {
   var p = (e && e.parameter) || {};
   if (p.action === 'whois') return out_(whois_(p.name, p.cls, p.pin, p.id));   // pupils signing in (no key)
-  if (p.action === 'forgot') return out_(forgot_());   // emails the key to RECOVERY_EMAIL only
+  if (p.action === 'forgot') return out_(forgot_());
+  if (p.action === 'myawards') return out_({ ok: true, awards: /^[0-9a-f]{16}$/.test(String(p.id)) ? (awards_(String(p.id))[String(p.id)] || {}) : {} });   // a pupil's own teacher-marked flags   // emails the key to RECOVERY_EMAIL only
   if (p.key !== TEACHER_KEY) return out_({ ok: false, error: 'key' });
 
   var sh = sheet_();
   if (sh.getRange(1, 7).getValue() !== 'Class') sh.getRange(1, 7).setValue('Class');
+  if (p.action === 'award' || p.action === 'unaward') return out_(setAward_(String(p.pid), String(p.cid), p.action === 'award'));
   if (p.action === 'resetpin') {   // the pupil chooses a new PIN next time they sign in
     var ps = pupilsSheet_(), c = ps.getRange('A:A').createTextFinder(String(p.pid)).matchEntireCell(true).findNext();
     if (!c) return out_({ ok: false, error: 'not registered' });
@@ -198,5 +227,5 @@ function doGet(e) {
       rows.push({ seen: r[4] instanceof Date ? r[4].getTime() : 0, json: r[5] });
     });
   }
-  return out_({ ok: true, now: Date.now(), rows: rows });
+  return out_({ ok: true, now: Date.now(), rows: rows, awards: awards_() });
 }

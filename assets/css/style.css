@@ -996,3 +996,7 @@ button.pd-tile:hover { transform: scale(1.25); box-shadow: 0 0 0 2px var(--tc, v
 .who-load-body .btn { justify-self: start; }
 .who-load-msg { margin: 0; }
 .tm-forgot { margin: 10px 0 0; }
+
+/* teacher: mark completed */
+.tn-mark { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 2px; }
+.pd-tile.ok.awd { background: transparent; color: var(--green); border: 2px solid var(--green); }

@@ -713,6 +713,25 @@
       .then(function () { syncState = { at: Date.now(), ok: true }; renderSyncStatus(); })
       .catch(function () { syncState.ok = false; renderSyncStatus(); syncTimer = setTimeout(pushSync, 60000); });
   }
+  // flags the teacher has marked completed for this pupil (Teacher tab › pupil › challenge › Mark completed)
+  function fetchAwards() {
+    if (!SYNC_URL || !hasActivity() || navigator.onLine === false) return;
+    fetch(SYNC_URL + (SYNC_URL.indexOf('?') < 0 ? '?' : '&') + 'action=myawards&id=' + encodeURIComponent(S.pid) + '&t=' + Date.now(), { cache: 'no-store', credentials: 'omit' })
+      .then(function (r) { return r.json(); }).then(function (j) {
+        if (!j || !j.ok || !j.awards) return;
+        var a = j.awards, added = [], changed = false;
+        Object.keys(a).forEach(function (cid) {
+          if (!BY_ID[cid]) return; var s = S.solved[cid];
+          if (!s || s.r) { S.solved[cid] = { t: a[cid], p: '', h: S.hints[cid] || 0, r: 0, a: 1 }; added.push(BY_ID[cid].title); changed = true; }
+        });
+        Object.keys(S.solved).forEach(function (cid) { if (S.solved[cid].a && !a[cid]) { delete S.solved[cid]; changed = true; } });
+        if (!changed) return;
+        save(); refreshHeader(); renderBoard(); renderProgress();
+        try { document.dispatchEvent(new CustomEvent('ctf:refresh')); } catch (e) { }
+        if (added.length) toast('✅ Your teacher marked ' + (added.length === 1 ? '“' + added[0] + '”' : added.length + ' challenges') + ' as completed!', 5000);
+      }).catch(function () { });
+  }
+  window.CTFFetchAwards = fetchAwards;
   function scheduleSync(ms) { if (!SYNC_URL) return; clearTimeout(syncTimer); syncTimer = setTimeout(pushSync, ms || 4000); }
   window.CTFSyncSoon = function () { scheduleSync(1500); };
   function renderSyncStatus() {
@@ -728,7 +747,8 @@
   if (SYNC_URL) {
     setTimeout(pushSync, 3000);
     // heartbeat so the teacher sees who is on the site right now, even before their first solve
-    setInterval(function () { if (!document.hidden && !syncTimer) pushSync(); }, 3 * 60000);
+    setInterval(function () { if (!document.hidden && !syncTimer) pushSync(); if (!document.hidden) fetchAwards(); }, 3 * 60000);
+    setTimeout(fetchAwards, 5000);
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && syncTimer) pushSync(true); });
     window.addEventListener('pagehide', function () { if (syncTimer) pushSync(true); });
     window.addEventListener('online', function () { if (syncState.ok === false) pushSync(); });
@@ -819,7 +839,7 @@
         if (found && found.json) { try { var r = parseImport(found.json); if (r.ok && r.data.pid === S.pid) added = applyImport(r.data); } catch (x) { } }
         save(); refreshHeader(); renderBoard(); renderProgress();
         try { document.dispatchEvent(new CustomEvent('ctf:refresh')); } catch (x) { }
-        close(); pushSync();
+        close(); pushSync(); setTimeout(fetchAwards, 1500);
         toast(found && !found.fresh ? '👋 Welcome back, ' + S.name.split(' ')[0] + '!' + (added ? ' ' + added + ' solve' + (added === 1 ? '' : 's') + ' loaded from your other computer.' : '') : '👋 Hi ' + S.name.split(' ')[0] + ' — you’re signed in.', 4000);
         void offline;
       }
@@ -989,7 +1009,7 @@
     Object.keys(d.solved || {}).forEach(function (id) {
       var c = BY_ID[id]; if (!c) return;
       var s = d.solved[id], valid = true;
-      if (T.key && T.key[id]) valid = !!s.p && sha256(d.pid + '|' + T.key[id].toLowerCase()).slice(0, 16) === s.p;
+      if (T.key && T.key[id]) valid = isAwarded(d.pid, id) || (!!s.p && sha256(d.pid + '|' + T.key[id].toLowerCase()).slice(0, 16) === s.p);
       if (!valid) { unv++; return; }
       if (!s.r) pts += c.pts; n++; tiers[c.tier]++; last = Math.max(last, s.t);
     });
@@ -1004,7 +1024,7 @@
     if (!r) { box.innerHTML = ''; box.hidden = true; return; }
     box.hidden = false;
     var d = r.data, st = rowStats(r), solved = d.solved || {}, tries = d.tries || {}, hints = d.hints || {}, tut = d.tut || {}, rev = d.revealed || {};
-    function verified(id) { return !T.key[id] || (!!solved[id].p && sha256(d.pid + '|' + T.key[id].toLowerCase()).slice(0, 16) === solved[id].p); }
+    function verified(id) { return !T.key[id] || isAwarded(d.pid, id) || (!!solved[id].p && sha256(d.pid + '|' + T.key[id].toLowerCase()).slice(0, 16) === solved[id].p); }
     var cats = CATS.map(function (cat) {
       var list = CH.filter(function (c) { return c.cat === cat.id; });
       var done = list.filter(function (c) { return solved[c.id]; }).length;
@@ -1012,6 +1032,7 @@
         var s = solved[c.id], cls = 'pd-tile ' + TIERS[c.tier].cls, tip = c.title + ' · ' + TIERS[c.tier].name + ' · ' + c.pts + ' pts';
         if (s && !verified(c.id)) { cls += ' unv'; tip += ' — UNVERIFIED solve'; }
         else if (s && s.r) { cls += ' rev'; tip += ' — solved after revealing the answer (0 pts)'; }
+        else if (s && isAwarded(d.pid, c.id)) { cls += ' ok awd'; tip += ' — marked completed by teacher'; }
         else if (s) { cls += ' ok'; tip += ' — solved ' + fmtDate(s.t); }
         else if (tries[c.id] || hints[c.id] || tut[c.id] || rev[c.id]) { cls += ' tried'; tip += ' — attempted, not solved'; }
         var extra = [];
@@ -1038,7 +1059,7 @@
     }
     box.innerHTML = '<div class="pd-head"><div><h2>' + esc(st.name) + '</h2><p class="muted small">' + st.pts + ' pts · ' + st.n + ' flags · ' + st.hints + ' hints · ' + st.tut + ' tutorials · ' + st.rev + ' answers revealed' +
       (r.seen ? ' · last on the site ' + fmtDate(r.seen) : '') + '</p></div><div class="pd-btns">' + (r.seen && SYNC_URL ? '<button class="btn small" id="pdPin">🔑 Reset PIN</button>' : '') + '<button class="btn danger small" id="pdDelete">🗑 Delete pupil</button><button class="btn small" id="pdClose">✕ Close</button></div></div>' +
-      '<p class="pd-key small muted"><span class="pd-tile ok">✓</span> solved <span class="pd-tile rev">👁</span> solved after revealing answer <span class="pd-tile tried">…</span> attempted <span class="pd-tile"></span> not started — hover a square for details</p>' +
+      '<p class="pd-key small muted"><span class="pd-tile ok">✓</span> solved <span class="pd-tile ok awd">✓</span> marked by teacher <span class="pd-tile rev">👁</span> solved after revealing answer <span class="pd-tile tried">…</span> attempted <span class="pd-tile"></span> not started — hover a square for details</p>' +
       '<div class="pd-cats">' + cats + '</div>' +
       '<h3>Solved (' + solvedIds.length + ')</h3>' + (solvedIds.length ? solvedIds.map(function (id) { return line(BY_ID[id], solved[id]); }).join('') : '<p class="muted">Nothing solved yet.</p>') +
       (stuck.length ? '<h3>Tried but not solved yet (' + stuck.length + ')</h3>' + stuck.map(function (c) { return line(c, null); }).join('') : '');
@@ -1064,7 +1085,8 @@
     if (!c) return;
     var s = (d.solved || {})[id], tries = (d.tries || {})[id] || 0, hints = (d.hints || {})[id] || 0, tut = (d.tut || {})[id], rev = (d.revealed || {})[id];
     var bits = [];
-    if (s) bits.push(s.r ? 'solved after revealing the answer (0 pts)' : 'solved ' + fmtDate(s.t)); else bits.push('not solved yet');
+    if (s && isAwarded(d.pid, id)) bits.push('marked completed by you ' + fmtDate((T.awards[d.pid] || {})[id]));
+    else if (s) bits.push(s.r ? 'solved after revealing the answer (0 pts)' : 'solved ' + fmtDate(s.t)); else bits.push('not solved yet');
     if (tries) bits.push(tries + ' wrong attempt' + (tries > 1 ? 's' : ''));
     if (hints) bits.push(hints + ' hint' + (hints > 1 ? 's' : ''));
     if (tut) bits.push('used the tutorial');
@@ -1073,6 +1095,36 @@
     n.innerHTML = '<div><b>👩‍🏫 ' + esc(name) + ':</b> ' + bits.join(' · ') + '</div>' +
       '<details><summary>Show answer (teacher)</summary><p class="small">' + (c.sol || '') + '</p><p>Flag: <code>' + esc(c.f) + '</code></p></details>';
     var meta = document.getElementById('chalMeta'); meta.after(n);
+    var ok = s && !s.r && (isAwarded(d.pid, id) || (!!s.p && sha256(d.pid + '|' + c.f.toLowerCase()).slice(0, 16) === s.p));
+    if (SYNC_URL && LIVE.key) {
+      var row = document.createElement('div'); row.className = 'tn-mark';
+      if (isAwarded(d.pid, id)) row.innerHTML = '<span class="badge good">✓ Marked completed by you</span> <button type="button" class="btn small" id="tnUnmark">Undo</button>';
+      else if (ok) row.innerHTML = '<span class="badge good">✓ Solved by the pupil (verified)</span>';
+      else row.innerHTML = '<button type="button" class="btn primary small" id="tnMark">✅ Mark completed for ' + esc(name.split(' ')[0]) + '</button> <span class="muted small">Full ' + c.pts + ' points' + (s && s.r ? ' (they had revealed the answer)' : '') + '.</span>';
+      n.insertBefore(row, n.querySelector('details'));
+      var mk = row.querySelector('#tnMark'), un = row.querySelector('#tnUnmark');
+      if (mk) mk.addEventListener('click', function () { setAward(d, id, true, name); });
+      if (un) un.addEventListener('click', function () { setAward(d, id, false, name); });
+    }
+  }
+  function isAwarded(pid, cid) { return !!(T.awards && T.awards[pid] && T.awards[pid][cid]); }
+  function injectAwards(d) {   // an awarded flag counts as solved, even before the pupil's computer has picked it up
+    var a = (T.awards || {})[d.pid] || {}; d.solved = d.solved || {};
+    Object.keys(a).forEach(function (cid) { if (BY_ID[cid] && (!d.solved[cid] || d.solved[cid].r)) d.solved[cid] = { t: a[cid], p: '', h: (d.hints || {})[cid] || 0, r: 0, a: 1 }; });
+    Object.keys(d.solved).forEach(function (cid) { if (d.solved[cid].a && !a[cid]) delete d.solved[cid]; });
+  }
+  function setAward(d, cid, on, name) {
+    if (!LIVE.key && !askLiveKey()) return;
+    var c = BY_ID[cid]; if (on && !confirm('Mark "' + c.title + '" as completed for ' + name + '?\n\nThey get the full ' + c.pts + ' points, and it shows on their computer as marked by you.')) return;
+    fetch(liveUrl('&action=' + (on ? 'award' : 'unaward') + '&pid=' + encodeURIComponent(d.pid) + '&cid=' + encodeURIComponent(cid)), { cache: 'no-store' })
+      .then(function (x) { return x.json(); }).then(function (res) {
+        if (!res.ok || res.awarded === undefined) { toast(res.error === 'key' ? 'Teacher key not accepted' : 'Your Google script needs updating to mark flags — see teacher-sync/SETUP.md (step 4)', 6000); return; }
+        T.awards = T.awards || {}; T.awards[d.pid] = T.awards[d.pid] || {};
+        if (on) T.awards[d.pid][cid] = Date.now(); else delete T.awards[d.pid][cid];
+        var row = T.rows.filter(function (x) { return x.data.pid === d.pid; })[0]; if (row) injectAwards(row.data);
+        renderTeacher(); teacherNote(cid, row ? row.data : d, name);
+        toast(on ? '✅ Marked completed for ' + name : 'Mark removed', 3500);
+      }).catch(function () { toast('Couldn\'t reach the sheet'); });
   }
   function deletePupil(r, name) {
     var pid = r.data.pid;
@@ -1175,6 +1227,8 @@
         } catch (e) { bad++; }
       });
       if (byPid[S.pid] && !Object.keys(S.solved).length && !S.name) delete byPid[S.pid];   // this teacher PC's own visit before signing in
+      T.awards = res.awards || {};
+      Object.keys(byPid).forEach(function (k) { injectAwards(byPid[k].data); });
       T.rows = Object.keys(byPid).map(function (k) { return byPid[k]; });
       renderTeacher(); renderLiveTests(tests);
       var n = (res.rows || []).length, active = (res.rows || []).filter(function (x) { return Date.now() - x.seen < 5 * 60000; }).length;
