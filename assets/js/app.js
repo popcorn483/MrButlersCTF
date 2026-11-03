@@ -886,13 +886,32 @@
     if (LB.busy) return; LB.busy = true;
     if (show && !LB.rows) $('#lbpInfo').textContent = 'Loading…';
     fetch(SYNC_URL + (SYNC_URL.indexOf('?') < 0 ? '?' : '&') + 'action=board&t=' + Date.now(), { cache: 'no-store', credentials: 'omit' })
-      .then(function (r) { return r.json(); }).then(function (j) {
-        LB.busy = false;
-        if (!j || !j.ok) { $('#lbpInfo').textContent = j && j.error === 'off' ? 'Your teacher has turned the leaderboard off for now.' : 'The leaderboard isn’t switched on yet — your teacher needs to update the class sheet.'; $('#lbpTable').innerHTML = ''; return; }
+      .then(function (r) { return r.text(); }).then(function (txt) {
+        LB.busy = false; var j = null; try { j = JSON.parse(txt); } catch (e) { }
+        var teacher = isTeacherDevice();
+        if (!j) { $('#lbpInfo').textContent = 'The leaderboard isn’t working yet.' + (teacher ? ' Teacher: the Google script needs permission — in Apps Script choose the “authorise” function and press Run once (see SETUP step 5).' : ' Your teacher has been told.'); teacherBoard('pupils can’t see it until the script has permission (run “authorise” once)'); return; }
+        if (!j.ok) { $('#lbpInfo').textContent = j.error === 'off' ? 'Your teacher has turned the leaderboard off for now.' : j.error === 'script' ? 'The leaderboard hit a problem.' + (teacher ? ' Script said: ' + (j.detail || '') : '') : 'The leaderboard isn’t switched on yet — your teacher needs to update the class sheet.'; $('#lbpTable').innerHTML = ''; teacherBoard(j.error === 'off' ? 'hidden from pupils (BOARD_PUBLIC = false)' : j.error === 'script' ? 'script error: ' + (j.detail || '') : 'pupils need the updated script'); return; }
         LB.rows = j.rows || []; LB.at = j.at || Date.now(); renderLb();
-      }).catch(function () { LB.busy = false; $('#lbpInfo').textContent = 'Couldn’t reach the leaderboard just now. It will try again shortly.'; });
+      }).catch(function () { LB.busy = false; $('#lbpInfo').textContent = 'Couldn’t reach the leaderboard just now. It will try again shortly.'; teacherBoard('pupils can’t see it yet: the Google script returned an error. Usually that means it needs permission — in Apps Script run the “authorise” function once, then deploy a new version'); });
     clearTimeout(LB.timer);
     LB.timer = setTimeout(function () { if (document.getElementById('view-leaderboard').classList.contains('active') && !document.hidden) loadBoard(); }, 30000);
+  }
+  function teacherBoard(note) {
+    if (!(isTeacherDevice() && LIVE.key && SYNC_URL)) return false;
+    fetch(liveUrl(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (res) {
+      if (!res.ok) return;
+      T.awards = res.awards || T.awards || {}; T.aliasOf = {}; var AL = res.aliases || {};
+      Object.keys(AL).forEach(function (old) { var k = AL[old], n = 0; while (AL[k] && n++ < 20) k = AL[k]; (T.aliasOf[k] = T.aliasOf[k] || []).push(old); });
+      var rows = [];
+      (res.rows || []).forEach(function (x) {
+        try { var r = parseImport(x.json); r.seen = x.seen; injectAwards(r.data); var st = rowStats(r), nm = st.name.trim().split(/\s+/);
+          rows.push({ n: nm[0] + (nm.length > 1 ? ' ' + nm[nm.length - 1].charAt(0) + '.' : ''), c: st.cls, p: st.pts, f: st.n, t: st.last, k: sha256('board|' + r.data.pid).slice(0, 10) }); } catch (e) { }
+      });
+      rows.sort(function (a, b) { return (b.p - a.p) || (a.t - b.t); });
+      LB.rows = rows; LB.at = Date.now(); renderLb();
+      $('#lbpInfo').textContent += ' · teacher preview from your live data' + (note ? ' — ' + note : '');
+    }).catch(function () { });
+    return true;
   }
   function renderLb() {
     var rows = LB.rows || [], me = myTag(), mine = rows.filter(function (r) { return r.k === me; })[0];

@@ -30,6 +30,9 @@ Commit, wait a minute for GitHub Pages, and you're live.
 1. In Apps Script, replace `Code.gs` with the new version from this folder — **keep your own `TEACHER_KEY` line**.
 2. Save, then **Deploy → Manage deployments → ✏ Edit → Version: New version → Deploy**. The URL stays the same, so nothing on the site needs changing.
 
+## 5. Give the script its permissions (once, after each update that adds a feature)
+In Apps Script, pick **authorise** from the function drop-down at the top, press **Run**, and allow everything Google asks for (your Sheet, sending you email, connecting to an external service — that is your own CTF site). The log should say “All set: the script can read … challenges”. Then deploy a **New version** as in step 4.
+
 ## Using it
 - On the homepage press **👩‍🏫 Teacher access** and enter the Teacher Area password. That PC becomes a teacher screen: the Teacher tab appears (pupils never see it), live view starts by itself and the answer book opens without asking again. The live-view key is stored inside the encrypted answer book, so staff only need one password. (You can still type the key by hand with the **Teacher key** button.)
 - **Forgotten the password?** Press **Email it to me** on the Teacher access box (or on the Teacher Area page). The Google script emails the password to `RECOVERY_EMAIL` in the script — the Google account that owns the script if that's left empty — and never to anyone else. At most one email every 10 minutes. The first time after updating the script, Google asks you to allow it to send email as you.

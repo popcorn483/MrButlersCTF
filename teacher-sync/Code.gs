@@ -184,6 +184,15 @@ function merge_(from, to) {
   } finally { lock.releaseLock(); }
 }
 
+/* Run this ONCE from the Apps Script editor (choose 'authorise' in the function menu, press Run) after pasting in a new version.
+   Google then asks for every permission the script needs: the Sheet, sending you the password email, and reading your site. */
+function authorise() {
+  sheet_();
+  MailApp.getRemainingDailyQuota();
+  var t = flagTable_();
+  Logger.log('All set: the script can read ' + Object.keys(t).length + ' challenges from ' + SITE_URL);
+}
+
 // ---------- pupil leaderboard: scores the script has checked itself ----------
 /* Read the challenge list from the live site (cached for 6 hours) so every solve can be checked against its proof code. */
 function flagTable_() {
@@ -279,7 +288,9 @@ function doGet(e) {
   var p = (e && e.parameter) || {};
   if (p.action === 'whois') return out_(whois_(p.name, p.cls, p.pin, p.id));   // pupils signing in (no key)
   if (p.action === 'forgot') return out_(forgot_());
-  if (p.action === 'board') return out_(board_());   // pupils' leaderboard: checked scores only, no proofs or IDs
+  if (p.action === 'board') {   // pupils' leaderboard: checked scores only, no proofs or IDs
+    try { return out_(board_()); } catch (err) { return out_({ ok: false, error: 'script', detail: String(err && err.message || err).slice(0, 200) }); }
+  }
   if (p.action === 'myawards') {   // a pupil's own teacher-marked flags (+ where a merged login now lives)
     if (!/^[0-9a-f]{16}$/.test(String(p.id))) return out_({ ok: true, awards: {} });
     var me = String(p.id), kid = resolve_(me), o = { ok: true, awards: awards_(kid)[kid] || {} };
