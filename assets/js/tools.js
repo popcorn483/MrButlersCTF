@@ -70,7 +70,7 @@
       '</div></div><div><span class="field-label">Input</span><textarea class="io" id="decIn" spellcheck="false"></textarea>' +
       '<span class="field-label">Recipe</span><div class="recipe" id="recipe"></div>' +
       '<span class="field-label">Output</span><div class="out-box" id="decOut"></div>' +
-      '<div class="row"><button class="btn small" id="decCopy">Copy output</button><button class="btn small" id="decMove">Output → Input</button><button class="btn small" id="decClear">Clear recipe</button></div></div></div>';
+      '<div class="row"><button class="btn small" id="decCopy">Copy output</button><button class="btn small" id="decMove">Output → Input</button><button class="btn small" id="decClear">Clear recipe</button><button class="btn small" id="decCC">🍳 Open input in full CyberChef</button></div></div></div>';
     if (typeof payload === 'string') { $('#decIn').value = payload; lastDecIn = payload; recipe = []; }
     else { $('#decIn').value = lastDecIn; }
     $('#opsList').addEventListener('click', function (e) { var b = e.target.closest('[data-op]'); if (!b) return; var o = OP_BY[b.dataset.op]; recipe.push({ id: o.id, arg: o.def || '' }); drawRecipe(); });
@@ -78,6 +78,7 @@
     $('#decCopy').addEventListener('click', function () { window.CTFCopy($('#decOut').textContent); });
     $('#decMove').addEventListener('click', function () { $('#decIn').value = $('#decOut').textContent; recipe = []; drawRecipe(); });
     $('#decClear').addEventListener('click', function () { recipe = []; drawRecipe(); });
+    $('#decCC').addEventListener('click', function () { open('cyberchef', $('#decIn').value); });
     drawRecipe();
   }
   function drawRecipe() {
@@ -212,10 +213,21 @@
     panel.innerHTML = '<p class="muted small">Character · decimal · hex · binary</p><div class="ascii-grid">' + cells.join('') + '</div>';
   }
 
-  var TOOLS = { decoder: tool_decoder, freq: tool_freq, hash: tool_hash, hex: tool_hex, image: tool_image, scratch: tool_scratch, ascii: tool_ascii };
+  var TOOLS = { decoder: tool_decoder, cyberchef: tool_cyberchef, freq: tool_freq, hash: tool_hash, hex: tool_hex, image: tool_image, scratch: tool_scratch, ascii: tool_ascii };
+  // ---------- full CyberChef (assets/cyberchef, Apache-2.0) in a frame that stays loaded while you switch tools ----------
+  var CC_BASE = 'assets/cyberchef/index.html';
+  function ccHash(text) {
+    try { var b = new TextEncoder().encode(text), s = ''; for (var i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return '#input=' + encodeURIComponent(btoa(s)); } catch (e) { return ''; }
+  }
+  function tool_cyberchef(payload) {
+    var f = $('#ccFrame'), want = typeof payload === 'string' && payload ? CC_BASE + ccHash(payload) : null;
+    if (want) { f.src = want; $('#ccNewTab').href = want; }
+    else if (!f.getAttribute('src')) f.src = CC_BASE;
+  }
   function open(name, payload) {
     active = name; built = true;
     $$('.subtab').forEach(function (t) { t.classList.toggle('active', t.dataset.tool === name); });
+    var cc = name === 'cyberchef'; $('#ccWrap').hidden = !cc; panel.hidden = cc;
     TOOLS[name](payload);
   }
   $$('.subtab').forEach(function (t) { t.addEventListener('click', function () { open(t.dataset.tool); }); });

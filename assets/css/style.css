@@ -1004,3 +1004,10 @@ button.pd-tile:hover { transform: scale(1.25); box-shadow: 0 0 0 2px var(--tc, v
 .merge-box { margin: 12px 0; padding: 12px; border: 1px dashed var(--line2); border-radius: 10px; background: var(--panel2); }
 .merge-box p { margin: 6px 0 8px; }
 .merge-row { display: flex; flex-wrap: wrap; gap: 8px; } .merge-row select { flex: 1 1 260px; width: auto; }
+
+/* full CyberChef */
+.cc-wrap { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); }
+.cc-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.cc-bar span { flex: 1 1 300px; }
+#ccFrame { display: block; width: 100%; height: max(620px, calc(100vh - 190px)); border: 0; background: #fff; }
+.subtab-cc { font-weight: 700; }

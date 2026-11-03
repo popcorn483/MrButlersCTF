@@ -1,0 +1,4 @@
+CyberChef v11.5.0 — © Crown Copyright (GCHQ), https://github.com/gchq/CyberChef
+Licensed under the Apache License, Version 2.0 (see LICENSE in this folder).
+Included unmodified in Mr Butler's CTF, except that the Google Analytics tag was removed from index.html
+so pupils' use is not tracked. Third-party notices are in the *.LICENSE.txt files.
