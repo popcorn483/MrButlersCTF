@@ -1012,3 +1012,25 @@ button.pd-tile:hover { transform: scale(1.25); box-shadow: 0 0 0 2px var(--tc, v
 #ccFrame { display: block; width: 100%; height: max(620px, calc(100vh - 190px)); border: 0; background: #fff; }
 .subtab-cc { font-weight: 700; }
 .tile.t7 { border-color: color-mix(in srgb, var(--t7) 55%, var(--line2)); background: linear-gradient(160deg, color-mix(in srgb, var(--t7) 16%, var(--panel)), color-mix(in srgb, #000 30%, var(--panel))); }
+
+/* teacher: select several challenges */
+.pick-bar { margin: 10px 0 4px; padding: 10px 12px; border: 1px dashed var(--line2); border-radius: 10px; }
+.pick-bar.on { border-style: solid; border-color: var(--green); background: color-mix(in srgb, var(--green) 7%, var(--panel)); }
+.pick-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.pick-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.pick-who { margin-top: 8px; } .pick-who summary { cursor: pointer; font-size: .88rem; }
+.pick-tools { display: flex; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
+.pick-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 12px; max-height: 220px; overflow: auto; font-size: .88rem; }
+.pick-list label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+.pick-progress { margin-top: 6px; color: var(--muted); min-height: 1em; }
+.pd-cats.picking button.pd-tile { cursor: copy; }
+button.pd-tile.picked { outline: 2px solid var(--green); outline-offset: 1px; background: color-mix(in srgb, var(--green) 35%, transparent); }
+
+/* pupils' leaderboard */
+.lbp-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.lbp-head h1 { margin-bottom: 2px; }
+.lbp-tools { display: flex; gap: 8px; } .lbp-tools select { width: auto; }
+.lbp-me { margin: 12px 0 4px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--green); background: color-mix(in srgb, var(--green) 8%, var(--panel)); }
+table.lbp td { font-size: .95rem; }
+table.lbp tr.lbp-mine td { background: color-mix(in srgb, var(--green) 14%, transparent); font-weight: 700; }
+table.lbp th { cursor: default; }

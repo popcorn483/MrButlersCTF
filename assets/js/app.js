@@ -101,6 +101,7 @@
     if (view === 'home') renderHome();
     if (view === 'board') { renderRecommend(); renderBanners(); }
     if (view === 'progress') renderProgress();
+    if (view === 'leaderboard') loadBoard(true);
     if (view === 'toolkit' && window.Toolkit) Toolkit.ensure();
     if (view === 'test' && window.TestArea) TestArea.enter();
     if (view !== 'toolkit') returnTo = null;
@@ -877,6 +878,46 @@
   window.CTFWho = askWho;
   setTimeout(function () { if (!isTeacherDevice() && !whoDone()) askWho(false); }, 400);
 
+  // ---------- pupils' leaderboard (scores checked by the teacher's Google script) ----------
+  var LB = { rows: null, at: 0, cls: null, timer: null, busy: false };
+  function myTag() { return sha256('board|' + S.pid).slice(0, 10); }
+  function loadBoard(show) {
+    if (!SYNC_URL) { $('#lbpInfo').textContent = 'The leaderboard needs your teacher’s live class sheet, which isn’t set up on this site.'; return; }
+    if (LB.busy) return; LB.busy = true;
+    if (show && !LB.rows) $('#lbpInfo').textContent = 'Loading…';
+    fetch(SYNC_URL + (SYNC_URL.indexOf('?') < 0 ? '?' : '&') + 'action=board&t=' + Date.now(), { cache: 'no-store', credentials: 'omit' })
+      .then(function (r) { return r.json(); }).then(function (j) {
+        LB.busy = false;
+        if (!j || !j.ok) { $('#lbpInfo').textContent = j && j.error === 'off' ? 'Your teacher has turned the leaderboard off for now.' : 'The leaderboard isn’t switched on yet — your teacher needs to update the class sheet.'; $('#lbpTable').innerHTML = ''; return; }
+        LB.rows = j.rows || []; LB.at = j.at || Date.now(); renderLb();
+      }).catch(function () { LB.busy = false; $('#lbpInfo').textContent = 'Couldn’t reach the leaderboard just now. It will try again shortly.'; });
+    clearTimeout(LB.timer);
+    LB.timer = setTimeout(function () { if (document.getElementById('view-leaderboard').classList.contains('active') && !document.hidden) loadBoard(); }, 30000);
+  }
+  function renderLb() {
+    var rows = LB.rows || [], me = myTag(), mine = rows.filter(function (r) { return r.k === me; })[0];
+    var classes = rows.map(function (r) { return r.c; }).filter(function (c, i, a) { return c && a.indexOf(c) === i; }).sort();
+    if (LB.cls === null) LB.cls = '';
+    var sel = $('#lbpClass');
+    sel.innerHTML = '<option value="">Everyone (' + rows.length + ')</option>' + classes.map(function (c) { return '<option value="' + esc(c) + '"' + (LB.cls === c ? ' selected' : '') + '>' + esc(c) + (mine && mine.c === c ? ' (my class)' : '') + '</option>'; }).join('');
+    var list = LB.cls ? rows.filter(function (r) { return r.c === LB.cls; }) : rows;
+    var rank = 0, prev = null;
+    list = list.map(function (r, i) { if (!prev || r.p !== prev.p) rank = i + 1; prev = r; return Object.assign({ rank: rank }, r); });
+    var meRow = list.filter(function (r) { return r.k === me; })[0];
+    $('#lbpInfo').textContent = list.length + ' pupil' + (list.length === 1 ? '' : 's') + (LB.cls ? ' in ' + LB.cls : '') + ' · updated ' + new Date(LB.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    $('#lbpMe').innerHTML = meRow ? '<div class="lbp-me">You are <b>#' + meRow.rank + '</b> of ' + list.length + ' with <b>' + meRow.p + '</b> points' + (meRow.rank > 1 ? ' — <b>' + (list[meRow.rank - 2] ? list.filter(function (x) { return x.rank < meRow.rank; }).slice(-1)[0].p - meRow.p : 0) + '</b> behind the next place up.' : '. Top of the table! 🎉') + '</div>'
+      : (S.name ? '<div class="lbp-me muted">Solve a flag and you’ll appear here within a minute or two.</div>' : '');
+    var top = list.slice(0, 50);
+    if (meRow && meRow.rank > 50) top.push(meRow);
+    $('#lbpTable').innerHTML = list.length ? '<table class="lb lbp"><thead><tr><th>#</th><th>Name</th><th>Class</th><th>Points</th><th>Flags</th></tr></thead><tbody>' + top.map(function (r) {
+      var medal = r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : r.rank;
+      return '<tr class="' + (r.k === me ? 'lbp-mine' : '') + '"><td class="num">' + medal + '</td><td>' + esc(r.n) + (r.k === me ? ' <span class="badge good">you</span>' : '') + '</td><td>' + esc(r.c || '–') + '</td><td class="num">' + r.p + '</td><td class="num">' + r.f + '</td></tr>';
+    }).join('') + '</tbody></table>' + (list.length > 50 ? '<p class="muted small">Showing the top 50.</p>' : '') : '<p class="muted">Nobody has scored yet. Be the first!</p>';
+  }
+  $('#lbpClass').addEventListener('change', function () { LB.cls = this.value; renderLb(); });
+  $('#lbpRefresh').addEventListener('click', function () { loadBoard(true); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && document.getElementById('view-leaderboard').classList.contains('active')) loadBoard(); });
+
   // ---------- resume code: the same signed progress data as the file, as copy-paste text ----------
   function b64uEnc(bytes) { var s = ''; for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
   function b64uDec(str) { str = str.replace(/-/g, '+').replace(/_/g, '/'); while (str.length % 4) str += '='; var bin = atob(str), a = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; }
@@ -1073,7 +1114,8 @@
     box.innerHTML = '<div class="pd-head"><div><h2>' + esc(st.name) + '</h2><p class="muted small">' + st.pts + ' pts · ' + st.n + ' flags · ' + st.hints + ' hints · ' + st.tut + ' tutorials · ' + st.rev + ' answers revealed' +
       (r.seen ? ' · last on the site ' + fmtDate(r.seen) : '') + '</p></div><div class="pd-btns">' + (r.seen && SYNC_URL ? '<button class="btn small" id="pdPin">🔑 Reset PIN</button>' : '') + (r.seen && SYNC_URL ? '<button class="btn small" id="pdMerge">🔗 Merge a second login</button>' : '') + '<button class="btn danger small" id="pdDelete">🗑 Delete pupil</button><button class="btn small" id="pdClose">✕ Close</button></div></div>' +
       '<p class="pd-key small muted"><span class="pd-tile ok">✓</span> solved <span class="pd-tile ok awd">✓</span> marked by teacher <span class="pd-tile rev">👁</span> solved after revealing answer <span class="pd-tile tried">…</span> attempted <span class="pd-tile"></span> not started — hover a square for details</p>' +
-      '<div class="pd-cats">' + cats + '</div>' +
+      (SYNC_URL ? '<div class="pick-bar' + (T.pickMode ? ' on' : '') + '" id="pickBar"></div>' : '') +
+      '<div class="pd-cats' + (T.pickMode ? ' picking' : '') + '">' + cats + '</div>' +
       '<h3>Solved (' + solvedIds.length + ')</h3>' + (solvedIds.length ? solvedIds.map(function (id) { return line(BY_ID[id], solved[id]); }).join('') : '<p class="muted">Nothing solved yet.</p>') +
       (stuck.length ? '<h3>Tried but not solved yet (' + stuck.length + ')</h3>' + stuck.map(function (c) { return line(c, null); }).join('') : '');
     $('#pdClose').addEventListener('click', function () { T.sel = null; renderTeacher(); });
@@ -1090,7 +1132,86 @@
       }).catch(function () { toast('Couldn\'t reach the sheet'); });
     });
     $$('[data-open]', box).forEach(function (el) {
-      el.addEventListener('click', function () { openChal(el.dataset.open); teacherNote(el.dataset.open, d, st.name); });
+      el.addEventListener('click', function () {
+        if (T.pickMode && el.classList.contains('pd-tile')) { togglePick(el.dataset.open, el); return; }
+        openChal(el.dataset.open); teacherNote(el.dataset.open, d, st.name);
+      });
+    });
+    if (T.pickMode) $$('button.pd-tile[data-open]', box).forEach(function (el) { if (T.pick[el.dataset.open]) el.classList.add('picked'); });
+    drawPickBar(r, st.name);
+  }
+  // ---------- teacher: select several challenges and mark them completed together (for one or more pupils) ----------
+  T.pick = {}; T.pickMode = false; T.pickFor = {};
+  function pickCount() { return Object.keys(T.pick).length; }
+  function togglePick(cid, el) { if (T.pick[cid]) delete T.pick[cid]; else T.pick[cid] = 1; if (el) el.classList.toggle('picked', !!T.pick[cid]); drawPickBar(); }
+  var pickCtx = null;
+  function drawPickBar(r, name) {
+    if (r) pickCtx = { r: r, name: name };
+    var bar = $('#pickBar'); if (!bar || !pickCtx) return;
+    r = pickCtx.r; name = pickCtx.name;
+    if (!T.pickMode) {
+      bar.innerHTML = '<button class="btn small" id="pickStart">☑ Select challenges to mark completed</button> <span class="muted small">Tick several squares, then mark them all at once — for ' + esc(name.split(' ')[0]) + ' or for a whole group.</span>';
+      $('#pickStart').addEventListener('click', function () { T.pickMode = true; T.pick = {}; T.pickFor = {}; T.pickFor[r.data.pid] = 1; renderPupilDetail(); });
+      return;
+    }
+    var n = pickCount(), others = T.rows.filter(function (x) { return x.seen && x.data.pid !== r.data.pid; }).map(rowStats);
+    var cls = r.data.cls || ''; others.sort(function (a, b) { return ((b.cls === cls) - (a.cls === cls)) || a.cls.localeCompare(b.cls) || a.name.localeCompare(b.name); });
+    var who = Object.keys(T.pickFor).length;
+    bar.innerHTML = '<div class="pick-row"><b>' + n + ' challenge' + (n === 1 ? '' : 's') + ' selected</b>' +
+      '<span class="muted small">Click squares to tick or untick. Already-solved ones are skipped.</span>' +
+      '<span class="pick-acts"><button class="btn small" id="pickAllTried">Tick all attempted</button><button class="btn small" id="pickClear">Clear</button>' +
+      '<button class="btn primary small" id="pickGo"' + (n ? '' : ' disabled') + '>✅ Mark ' + n + ' completed for ' + (who === 1 ? esc(name.split(' ')[0]) : who + ' pupils') + '</button>' +
+      '<button class="btn small" id="pickUndo"' + (n ? '' : ' disabled') + '>Undo marks</button><button class="btn small" id="pickDone">Done</button></span></div>' +
+      (others.length ? '<details class="pick-who"' + (who > 1 ? ' open' : '') + '><summary>Also mark for other pupils (' + (who - 1) + ' chosen)</summary><div class="pick-tools">' +
+        (cls ? '<button class="btn small" id="pickClass">Tick everyone in ' + esc(cls) + '</button>' : '') + '<button class="btn small" id="pickNone">Just ' + esc(name.split(' ')[0]) + '</button></div><div class="pick-list">' +
+        others.map(function (o) { return '<label><input type="checkbox" data-pid="' + esc(o.pid) + '"' + (T.pickFor[o.pid] ? ' checked' : '') + '> ' + esc(o.name) + (o.cls ? ' <span class="muted small">' + esc(o.cls) + '</span>' : '') + '</label>'; }).join('') + '</div></details>' : '') +
+      '<div class="pick-progress small" id="pickProg"></div>';
+    $('#pickClear').addEventListener('click', function () { T.pick = {}; renderPupilDetail(); });
+    $('#pickDone').addEventListener('click', function () { T.pickMode = false; T.pick = {}; renderPupilDetail(); });
+    $('#pickAllTried').addEventListener('click', function () {
+      var d = r.data, sv = d.solved || {};
+      CH.forEach(function (c) { if (!sv[c.id] && ((d.tries || {})[c.id] || (d.hints || {})[c.id] || (d.tut || {})[c.id] || (d.revealed || {})[c.id])) T.pick[c.id] = 1; });
+      renderPupilDetail();
+    });
+    $$('.pick-list input', bar).forEach(function (cb) { cb.addEventListener('change', function () { if (cb.checked) T.pickFor[cb.dataset.pid] = 1; else delete T.pickFor[cb.dataset.pid]; drawPickBar(); }); });
+    var pc = $('#pickClass'); if (pc) pc.addEventListener('click', function () { others.forEach(function (o) { if (o.cls === cls) T.pickFor[o.pid] = 1; }); drawPickBar(); var dd = $('.pick-who', bar); if (dd) dd.open = true; });
+    var pn = $('#pickNone'); if (pn) pn.addEventListener('click', function () { T.pickFor = {}; T.pickFor[r.data.pid] = 1; drawPickBar(); });
+    $('#pickGo').addEventListener('click', function () { bulkAward(true); });
+    $('#pickUndo').addEventListener('click', function () { bulkAward(false); });
+  }
+  function bulkAward(on) {
+    if (!LIVE.key && !askLiveKey()) return;
+    var cids = Object.keys(T.pick), pids = Object.keys(T.pickFor), jobs = [];
+    pids.forEach(function (pid) {
+      var row = T.rows.filter(function (x) { return x.data.pid === pid; })[0]; if (!row) return;
+      var sv = row.data.solved || {};
+      cids.forEach(function (cid) {
+        var mine = isAwarded(pid, cid), self = sv[cid] && !sv[cid].a && !sv[cid].r && proofOk(pid, cid, sv[cid].p);
+        if (on && !mine && !self) jobs.push([row, cid]);
+        if (!on && mine) jobs.push([row, cid]);
+      });
+    });
+    var names = pids.length === 1 ? (T.rows.filter(function (x) { return x.data.pid === pids[0]; })[0] || { data: {} }).data.name : pids.length + ' pupils';
+    if (!jobs.length) { toast(on ? 'Nothing to mark — those are already solved or marked' : 'None of those are marked by you'); return; }
+    if (!confirm((on ? 'Mark ' : 'Remove the mark from ') + jobs.length + ' challenge' + (jobs.length === 1 ? '' : 's') + (on ? ' as completed' : '') + ' for ' + names + '?' + (on ? '\n\nThey get the full points, and it appears on their computers within a few minutes.' : ''))) return;
+    var done = 0, fail = 0, i = 0, prog = $('#pickProg'), btns = $$('#pickBar button'); btns.forEach(function (b) { b.disabled = true; });
+    function show() { if (prog) prog.textContent = (on ? 'Marking… ' : 'Removing… ') + (done + fail) + ' / ' + jobs.length + (fail ? ' (' + fail + ' failed)' : ''); }
+    function next() {
+      if (i >= jobs.length) return Promise.resolve();
+      var j = jobs[i++], row = j[0], cid = j[1], pid = row.data.pid;
+      return fetch(liveUrl('&action=' + (on ? 'award' : 'unaward') + '&pid=' + encodeURIComponent(pid) + '&cid=' + encodeURIComponent(cid)), { cache: 'no-store' })
+        .then(function (x) { return x.json(); }).then(function (res) {
+          if (!res.ok || res.awarded === undefined) throw new Error(res.error || 'old script');
+          T.awards = T.awards || {}; T.awards[pid] = T.awards[pid] || {};
+          if (on) T.awards[pid][cid] = Date.now(); else delete T.awards[pid][cid];
+          done++;
+        }).catch(function () { fail++; }).then(function () { show(); return next(); });
+    }
+    show();
+    Promise.all([next(), next(), next()]).then(function () {   // three at a time
+      T.rows.forEach(function (x) { if (T.pickFor[x.data.pid]) injectAwards(x.data); });
+      T.pick = {}; renderTeacher();
+      toast(fail ? (done + ' done, ' + fail + ' failed — check the teacher key and try again') : (on ? '✅ Marked ' : 'Removed ') + done + ' challenge' + (done === 1 ? '' : 's') + (on ? ' as completed' : '') + ' for ' + names, 5000);
     });
   }
   // When the teacher opens a challenge from a pupil's breakdown: show that pupil's record and the answer

@@ -1,10 +1,10 @@
 {
-  "version": "mbctf-v31",
+  "version": "mbctf-v32",
   "date": "2026-11-03",
   "notes": [
+    "\ud83c\udfc6 New Leaderboard tab: see how you rank against everyone, or just your class",
+    "Teachers: tick several challenges and mark them completed at once, for one pupil or a whole group",
     "140 new challenges \u2014 413 in total",
-    "75 new Hard and Expert challenges across every category",
-    "\ud83c\udfc6 40 more Competition Grade challenges built around the full CyberChef: AES, RC4, Enigma, gzip, QR codes, hidden image bits and more",
-    "\ud83c\udf0c New Unreal tier (1,000 points each): 25 multi-stage puzzles with no help at all. Unlocks after 3 Competition Grade solves"
+    "75 new Hard and Expert challenges across every category"
   ]
 }

@@ -51,6 +51,7 @@
     <button class="tab" data-view="toolkit">Toolkit</button>
     <button class="tab tab-test" data-view="test">🔒 Test area</button>
     <button class="tab" data-view="progress">My progress</button>
+    <button class="tab" data-view="leaderboard">🏆 Leaderboard</button>
     <button class="tab" data-view="teacher" id="navTeacher" style="display:none">👩‍🏫 Teacher</button>
 
     <div class="nav-extra" id="navExtra">
@@ -101,6 +102,7 @@
         <button type="button" class="home-s" id="homeShare">🔗 Share</button>
         <button type="button" class="home-s" id="homeInstall">📲 Install app</button>
         <button type="button" class="home-s" data-goto="progress">My progress</button>
+        <button type="button" class="home-s" data-goto="leaderboard">🏆 Leaderboard</button>
         <button type="button" class="home-s home-teacher" id="homeTeacher">👩‍🏫 Teacher access</button>
         <button type="button" class="home-s" id="homeAboutBtn" aria-expanded="false" aria-controls="homeAbout">About</button>
       </div>
@@ -217,6 +219,19 @@
     <div id="ccWrap" class="cc-wrap" hidden>
       <div class="cc-bar"><span class="small muted">The full <b>CyberChef</b> (v11.5, by GCHQ) &mdash; the same tool used at real CTF events, with 400+ operations and <b>Magic</b> to auto-detect encodings. It runs from this site, so it works on C2k.</span><a class="btn small" id="ccNewTab" href="assets/cyberchef/index.html" target="_blank" rel="noopener">Open in a new tab ↗</a></div>
       <iframe id="ccFrame" title="CyberChef"></iframe>
+    </div>
+  </section>
+
+  <!-- ============ LEADERBOARD ============ -->
+  <section class="view" id="view-leaderboard">
+    <div class="prose wide">
+      <div class="lbp-head">
+        <div><h1>🏆 Leaderboard</h1><p class="muted" id="lbpInfo">Loading…</p></div>
+        <div class="lbp-tools"><select class="io" id="lbpClass" aria-label="Show class"></select><button class="btn small" id="lbpRefresh">↻ Refresh</button></div>
+      </div>
+      <div id="lbpMe"></div>
+      <div id="lbpTable"></div>
+      <p class="muted small">Only flags your teacher’s sheet has checked are counted, so editing your own progress won’t help. Answers you revealed score 0. Ties go to whoever got there first.</p>
     </div>
   </section>
 

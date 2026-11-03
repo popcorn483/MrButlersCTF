@@ -23,6 +23,9 @@ var MAX_JSON = 45000; // a Sheets cell holds 50,000 characters
 // Forgotten password: 'Email it to me' on the site sends TEACHER_KEY here, and nowhere else.
 // Leave empty to use the Google account that owns this script.
 var RECOVERY_EMAIL = '';
+// Pupil leaderboard: set to false to hide it from pupils. Names show as first name + surname initial.
+var BOARD_PUBLIC = true;
+var SITE_URL = 'https://popcorn483.github.io/MrButlersCTF/';   // the script reads the challenge list from here to check scores
 var REMOVED_SHEET = 'Removed'; // pupil IDs the teacher deleted — their devices are ignored from then on
 
 function sheet_() {
@@ -181,6 +184,47 @@ function merge_(from, to) {
   } finally { lock.releaseLock(); }
 }
 
+// ---------- pupil leaderboard: scores the script has checked itself ----------
+/* Read the challenge list from the live site (cached for 6 hours) so every solve can be checked against its proof code. */
+function flagTable_() {
+  var cache = CacheService.getScriptCache(), hit = cache.get('flags');
+  if (hit) return JSON.parse(hit);
+  var js = UrlFetchApp.fetch(SITE_URL + 'assets/js/challenges.js?t=' + Date.now(), { muteHttpExceptions: true }).getContentText();
+  var key = /CTF_KEY="([^"]+)"/.exec(js)[1], b = Utilities.base64Decode(/CTF_BUNDLE="([^"]+)"/.exec(js)[1]);
+  for (var i = 0; i < b.length; i++) b[i] = b[i] ^ key.charCodeAt(i % key.length);
+  var data = JSON.parse(Utilities.newBlob(b).getDataAsString('UTF-8')), t = {};
+  data.challenges.forEach(function (c) { t[c.id] = [String(c.f).toLowerCase(), c.pts]; });
+  try { cache.put('flags', JSON.stringify(t), 21600); } catch (x) { }
+  return t;
+}
+function short_(id) { return hex_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, 'board|' + id, Utilities.Charset.UTF_8)).slice(0, 10); }
+function board_() {
+  if (!BOARD_PUBLIC) return { ok: false, error: 'off' };
+  var cache = CacheService.getScriptCache(), hit = cache.get('board');
+  if (hit) return JSON.parse(hit);
+  var F = flagTable_(), A = aliases_(), olds = {}, AW = awards_(), sh = sheet_(), n = sh.getLastRow() - 1, out = [];
+  Object.keys(A).forEach(function (o) { var k = resolve_(o, A); (olds[k] = olds[k] || []).push(o); });
+  if (n > 0) sh.getRange(2, 1, n, 7).getValues().forEach(function (r) {
+    var id = String(r[0]); if (!id || !r[5]) return;
+    var d; try { d = JSON.parse(String(r[5])).data; } catch (x) { return; }
+    var ids = [id].concat(olds[id] || []), pts = 0, flags = 0, last = 0, aw = AW[id] || {};
+    Object.keys(d.solved || {}).forEach(function (cid) {
+      var s = d.solved[cid], f = F[cid]; if (!f) return;
+      var ok = !!aw[cid];
+      if (!ok && s.p) for (var i = 0; i < ids.length && !ok; i++) ok = hex_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, ids[i] + '|' + f[0], Utilities.Charset.UTF_8)).slice(0, 16) === s.p;
+      if (!ok) return;
+      flags++; if (!s.r || aw[cid]) pts += f[1]; last = Math.max(last, +s.t || 0);
+    });
+    Object.keys(aw).forEach(function (cid) { if (F[cid] && !(d.solved || {})[cid]) { flags++; pts += F[cid][1]; last = Math.max(last, aw[cid]); } });
+    var nm = String(d.name || r[1] || '').replace(/^'/, '').trim().split(/\s+/);
+    out.push({ n: nm[0] + (nm.length > 1 ? ' ' + nm[nm.length - 1].charAt(0) + '.' : ''), c: String(d.cls || r[6] || ''), p: pts, f: flags, t: last, k: short_(id) });
+  });
+  out.sort(function (a, b) { return (b.p - a.p) || (a.t - b.t); });
+  var res = { ok: true, at: Date.now(), rows: out };
+  try { cache.put('board', JSON.stringify(res), 60); } catch (x) { }
+  return res;
+}
+
 function removedSheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(REMOVED_SHEET);
@@ -235,6 +279,7 @@ function doGet(e) {
   var p = (e && e.parameter) || {};
   if (p.action === 'whois') return out_(whois_(p.name, p.cls, p.pin, p.id));   // pupils signing in (no key)
   if (p.action === 'forgot') return out_(forgot_());
+  if (p.action === 'board') return out_(board_());   // pupils' leaderboard: checked scores only, no proofs or IDs
   if (p.action === 'myawards') {   // a pupil's own teacher-marked flags (+ where a merged login now lives)
     if (!/^[0-9a-f]{16}$/.test(String(p.id))) return out_({ ok: true, awards: {} });
     var me = String(p.id), kid = resolve_(me), o = { ok: true, awards: awards_(kid)[kid] || {} };
