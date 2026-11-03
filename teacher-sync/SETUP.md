@@ -32,6 +32,8 @@ Commit, wait a minute for GitHub Pages, and you're live.
 
 ## Using it
 - On the homepage press **👩‍🏫 Teacher access** and enter the Teacher Area password. That PC becomes a teacher screen: the Teacher tab appears (pupils never see it), live view starts by itself and the answer book opens without asking again. The live-view key is stored inside the encrypted answer book, so staff only need one password. (You can still type the key by hand with the **Teacher key** button.)
+- **Forgotten the password?** Press **Email it to me** on the Teacher access box (or on the Teacher Area page). The Google script emails the password to `RECOVERY_EMAIL` in the script — the Google account that owns the script if that's left empty — and never to anyone else. At most one email every 10 minutes. The first time after updating the script, Google asks you to allow it to send email as you.
+- The Teacher access password and the live-view key (`TEACHER_KEY`) are the **same**, so the email always gives you the one password you need. If you change it, change `TEACHER_KEY` and ask Claude to re-lock the answer book with the new password.
 - **Any number of PCs** can be teacher screens at once — your desk PC, the projector, a laptop walking round the room. Enter the key on each; they all see the same live data, and deleting or clearing on one shows on the others within 20 seconds. Teacher PCs are never counted as pupils.
 - Signed in on a pupil's PC? Press **Sign out of this PC** afterwards so it's tracked as a pupil again. (On C2k the key may be forgotten when you log off — just enter it again.)
 - The table refreshes every 20 seconds. 🟢 = the pupil did something in the last 5 minutes.

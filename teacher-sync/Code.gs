@@ -20,6 +20,9 @@ var TEACHER_KEY = 'change-me-to-something-secret';
 var SHEET_NAME = 'Progress';
 var HEADER = ['Pupil ID', 'Name', 'Score', 'Flags', 'Last update', 'Data (do not edit)', 'Class'];
 var MAX_JSON = 45000; // a Sheets cell holds 50,000 characters
+// Forgotten password: 'Email it to me' on the site sends TEACHER_KEY here, and nowhere else.
+// Leave empty to use the Google account that owns this script.
+var RECOVERY_EMAIL = '';
 var REMOVED_SHEET = 'Removed'; // pupil IDs the teacher deleted — their devices are ignored from then on
 
 function sheet_() {
@@ -80,6 +83,27 @@ function whois_(name, cls, pin, devId) {
   return { ok: true, id: id, name: String(rows[at][1]).replace(/^'/, ''), cls: String(rows[at][2]), json: progressJson_(id) };
 }
 
+/* Forgotten password: email the key to the fixed recovery address (never to an address the site supplies).
+   At most one email every 10 minutes, so the button can't be used to flood your inbox. */
+function forgot_() {
+  var cache = CacheService.getScriptCache();
+  if (cache.get('forgot')) return { ok: true, sent: false, wait: true };
+  var to = RECOVERY_EMAIL || Session.getEffectiveUser().getEmail();
+  if (!to) return { ok: false, error: 'no recovery email' };
+  MailApp.sendEmail({
+    to: to,
+    subject: "Mr Butler's CTF: your teacher password",
+    body: "Someone pressed 'Email it to me' on the Teacher access screen of Mr Butler's CTF.\n\n" +
+          'Teacher password / live view key: ' + TEACHER_KEY + '\n\n' +
+          "If that wasn't you, nothing has changed: this email only ever comes to you.\n" +
+          'To change the password, edit TEACHER_KEY in the Apps Script (and ask Claude to re-lock the answer book with the same password).',
+    name: "Mr Butler's CTF"
+  });
+  cache.put('forgot', '1', 600);
+  var at = to.indexOf('@');
+  return { ok: true, sent: true, to: to.charAt(0) + '•••' + (at > 0 ? to.slice(at) : '') };
+}
+
 function removedSheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(REMOVED_SHEET);
@@ -133,6 +157,7 @@ function doPost(e) {
 function doGet(e) {
   var p = (e && e.parameter) || {};
   if (p.action === 'whois') return out_(whois_(p.name, p.cls, p.pin, p.id));   // pupils signing in (no key)
+  if (p.action === 'forgot') return out_(forgot_());   // emails the key to RECOVERY_EMAIL only
   if (p.key !== TEACHER_KEY) return out_({ ok: false, error: 'key' });
 
   var sh = sheet_();

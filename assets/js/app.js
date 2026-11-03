@@ -1159,7 +1159,7 @@
     if (!LIVE.on || document.hidden) return;
     fetch(liveUrl(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (res) {
       if (!res.ok) {
-        if (res.error === 'key') { stopLive(); try { localStorage.removeItem(LIVE_KEY_STORE); } catch (e) { } LIVE.key = ''; liveSignedIn(); liveInfo('bad-text', 'That teacher key wasn\'t accepted. Press <b>Start live view</b> and enter it again.'); }
+        if (res.error === 'key') { stopLive(); try { localStorage.removeItem(LIVE_KEY_STORE); } catch (e) { } LIVE.key = ''; try { localStorage.removeItem(TEACHER_PC); sessionStorage.removeItem(STAFF_SS); } catch (e) { } liveSignedIn(); liveInfo('bad-text', 'The teacher password has changed. Sign in again with the new one.'); openTeacherSignIn(); $('#tmMsg').className = 'flag-msg'; $('#tmMsg').textContent = 'The teacher password has changed — enter the new one.'; }
         else liveInfo('bad-text', 'The sheet replied with an error: ' + esc(res.error || 'unknown'));
         return;
       }
@@ -1261,6 +1261,18 @@
       msg.className = 'flag-msg bad'; msg.textContent = err.message === 'wrong' ? '✗ That password isn\'t right.' : '✗ ' + err.message;
     });
   });
+  function forgotPassword(msgEl) {
+    if (!SYNC_URL) { msgEl.className = 'flag-msg bad'; msgEl.textContent = 'Password emails need the live class Google script set up.'; return; }
+    msgEl.className = 'flag-msg'; msgEl.textContent = 'Sending…';
+    fetch(SYNC_URL + (SYNC_URL.indexOf('?') < 0 ? '?' : '&') + 'action=forgot&t=' + Date.now(), { cache: 'no-store', credentials: 'omit' })
+      .then(function (r) { return r.json(); }).then(function (j) {
+        if (j && j.ok && j.sent) { msgEl.className = 'flag-msg ok'; msgEl.textContent = '📧 Sent to ' + j.to + '. Check your inbox (and junk folder).'; }
+        else if (j && j.ok && j.wait) { msgEl.className = 'flag-msg'; msgEl.textContent = 'An email was sent a few minutes ago. Check your inbox (and junk folder), or try again in 10 minutes.'; }
+        else { msgEl.className = 'flag-msg bad'; msgEl.textContent = 'Couldn’t send it — the Google script may need updating (see teacher-sync/SETUP.md).'; }
+      }).catch(function () { msgEl.className = 'flag-msg bad'; msgEl.textContent = 'Couldn’t reach the Google script. Check the internet connection and try again.'; });
+  }
+  window.CTFForgotPassword = forgotPassword;
+  $('#tmForgot').addEventListener('click', function () { forgotPassword($('#tmMsg')); });
   ['#homeTeacher', '#footTeacher'].forEach(function (sel) { var b = $(sel); if (b) b.addEventListener('click', teacherEntry); });
   updateTeacherUI();
 

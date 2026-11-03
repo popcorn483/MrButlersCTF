@@ -63,6 +63,7 @@
     <button class="btn primary big" type="submit">Unlock</button>
   </form>
   <div class="msg" id="msg"></div>
+  <p class="small muted">Forgotten it? <button type="button" class="linkish" id="forgotBtn">Email it to me</button></p>
   <p class="small muted">Everything here is encrypted — the password is the only way to read it, even for someone with the site's files.</p>
   <p class="small"><a class="linkish" href="index.html">← Back to the CTF site</a></p>
 </div>
@@ -96,6 +97,7 @@
   <div id="abList"></div>
 </div>
 
+<script src="assets/js/config.js"></script>
 <script>
 (function () {
   var $ = function (s) { return document.querySelector(s); };
@@ -107,7 +109,18 @@
     unlock($('#pw').value);
   });
 
-  try { var _ss = sessionStorage.getItem('mbctf-staff-v1'); if (_ss) setTimeout(function () { unlock(_ss); }, 0); } catch (e) { }
+  var AUTO = false;
+  try { var _ss = sessionStorage.getItem('mbctf-staff-v1'); if (_ss) { AUTO = true; setTimeout(function () { unlock(_ss); }, 0); } } catch (e) { }
+  $('#forgotBtn').addEventListener('click', function () {
+    var msg = $('#msg'), url = (window.CTF_CONFIG && window.CTF_CONFIG.syncUrl) || '';
+    if (!url) { msg.textContent = 'Password emails need the live class Google script set up.'; return; }
+    msg.style.color = 'var(--muted)'; msg.textContent = 'Sending…';
+    fetch(url + (url.indexOf('?') < 0 ? '?' : '&') + 'action=forgot&t=' + Date.now(), { cache: 'no-store', credentials: 'omit' }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j && j.ok && j.sent) { msg.style.color = 'var(--green)'; msg.textContent = '📧 Sent to ' + j.to + '. Check your inbox (and junk folder).'; }
+      else if (j && j.ok && j.wait) { msg.textContent = 'An email was sent a few minutes ago. Check your inbox, or try again in 10 minutes.'; }
+      else { msg.style.color = 'var(--red)'; msg.textContent = 'Couldn\u2019t send it — the Google script may need updating.'; }
+    }).catch(function () { msg.style.color = 'var(--red)'; msg.textContent = 'Couldn\u2019t reach the Google script.'; });
+  });
 
   function bin(s) { return Uint8Array.from(atob(s), function (c) { return c.charCodeAt(0); }); }
 
@@ -124,6 +137,7 @@
       var pt = td.decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bin(vault.iv) }, key, bin(vault.ct)));
       DATA = JSON.parse(pt);
     } catch (err) {
+      if (AUTO) { AUTO = false; try { sessionStorage.removeItem('mbctf-staff-v1'); } catch (x) { } msg.textContent = ''; return; }
       msg.textContent = '✗ Wrong password. Try again.'; msg.style.color = 'var(--red)'; return;
     }
     $('#gate').hidden = true; $('#content').hidden = false;

@@ -1,10 +1,10 @@
 {
-  "version": "mbctf-v26",
+  "version": "mbctf-v27",
   "date": "2026-11-02",
   "notes": [
+    "Teachers: new staff password, and an Email it to me link if you forget it",
     "Started before? Load your progress file or resume code right on the sign-in screen",
     "Sign in with your name, form class and a 4-digit PIN \u2014 your progress now follows you to any computer",
-    "Teachers: class column and class filter on the leaderboard, and Reset PIN for any pupil",
-    "Teachers: new \ud83d\udc69\u200d\ud83c\udfeb Teacher access button on the homepage \u2014 one password opens the live class view and the answer book"
+    "Teachers: class column and class filter on the leaderboard, and Reset PIN for any pupil"
   ]
 }

@@ -995,3 +995,4 @@ button.pd-tile:hover { transform: scale(1.25); box-shadow: 0 0 0 2px var(--tc, v
 .who-load-body { display: grid; gap: 6px; margin-top: 8px; }
 .who-load-body .btn { justify-self: start; }
 .who-load-msg { margin: 0; }
+.tm-forgot { margin: 10px 0 0; }
