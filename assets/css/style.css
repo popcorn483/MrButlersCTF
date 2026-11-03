@@ -1035,5 +1035,14 @@ table.lbp td { font-size: .95rem; }
 table.lbp tr.lbp-mine td { background: color-mix(in srgb, var(--green) 14%, transparent); font-weight: 700; }
 table.lbp th { cursor: default; }
 
-/* homepage: Teacher login card spans the full width under the two pupil cards */
-.home-c-teacher { grid-column: 1 / -1; }
+
+/* homepage: the Challenge board is the main card */
+.home-c-main { grid-column: 1 / -1; padding: clamp(24px, 4vw, 34px) clamp(22px, 4vw, 34px); align-items: center; gap: 22px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--wc) 18%, var(--panel)), var(--panel) 70%); outline: 2px solid color-mix(in srgb, var(--wc) 55%, transparent);
+  box-shadow: 0 18px 40px -22px color-mix(in srgb, var(--wc) 70%, transparent), var(--card-shadow); }
+.home-c-main .home-ic { width: 76px; height: 76px; border-radius: 18px; font-size: 40px; }
+.home-c-main b { font-size: clamp(28px, 4.4vw, 40px); }
+.home-c-main .home-u { font-size: 16px; margin-top: 8px; }
+.home-cta { display: inline-block; margin-top: 14px; padding: 9px 18px; border-radius: 999px; font-weight: 800; font-size: 15px; color: #06140d; background: var(--wc); }
+.home-c-main:hover .home-cta { filter: brightness(1.08); }
+@media (max-width: 640px) { .home-c-main { flex-direction: column; align-items: flex-start; } }
