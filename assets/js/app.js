@@ -203,7 +203,9 @@
   };
   function contentNote() {
     var m = CONTENT_MSG[CONTENT_STATE] || CONTENT_MSG.loading;
-    return '<div class="callout content-note"><div class="cn-ic">' + m[0] + '</div><h3>' + m[1] + '</h3><p class="muted">' + m[2] + '</p></div>';
+    var t = isTeacherDevice() && CONTENT_STATE !== 'loading';
+    return '<div class="callout content-note"><div class="cn-ic">' + m[0] + '</div><h3>' + m[1] + '</h3><p class="muted">' + m[2] + '</p>' +
+      (t ? '<p class="small">Teacher PC: unlock them here with your Teacher password (this also installs the answers on your Google script once it’s updated).</p><button type="button" class="btn primary" data-unlock>🔑 Unlock with Teacher password</button>' : '') + '</div>';
   }
   function renderBoard() {
     var board = $('#board'); board.innerHTML = '';
@@ -299,6 +301,7 @@
   }
   function renderRecommend() {
     var box = document.getElementById('recommend'); if (!box) return;
+    if (!CONTENT_READY) { box.innerHTML = ''; return; }
     var n = solvedCount();
     var pick = nextRecommended();
     if (!pick) {
@@ -966,7 +969,7 @@
     var lk = ''; try { lk = localStorage.getItem('mbctf-teacher-livekey-v1') || ''; } catch (e) { }
     var getKey = givenKey ? Promise.resolve(givenKey) : stored ? Promise.resolve(stored) : !SYNC_URL ? Promise.reject(new Error('offline')) :
       api('action=ckey&' + (isTeacherDevice() && lk ? 'key=' + encodeURIComponent(lk) : 'id=' + encodeURIComponent(S.pid))).then(function (j) {
-        if (j && j.ok && j.k) return j.k; throw new Error((j && j.error) || 'offline');
+        if (j && j.ok && j.k) return j.k; throw new Error(j && j.ok ? 'setup' : ((j && j.error) || 'offline'));
       });
     getKey.then(function (k) {
       return fetch(META.url).then(function (r) { if (!r.ok) throw new Error('offline'); return r.arrayBuffer(); })
@@ -991,6 +994,11 @@
       clearTimeout(contentRetry); if (m !== 'storage') contentRetry = setTimeout(function () { if (!document.hidden) ensureContent(); else contentRetry = setTimeout(ensureContent, 30000); }, m === 'setup' ? 30000 : 20000);
     });
   }
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest || !e.target.closest('[data-unlock]')) return;
+    var pw = prompt('Teacher password:'); if (!pw) return;
+    openVault(pw).then(function (d) { try { sessionStorage.setItem(STAFF_SS, pw); } catch (x) { } useVault(d, pw); }, function () { alert('That password isn’t right.'); });
+  });
   setTimeout(function () { if (!CONTENT_READY && (isTeacherDevice() || (!accessBlocked() && !needsSignIn() && S.name))) ensureContent(); }, 600);
 
   // ---------- access approval: new pupils wait until a teacher lets them in ----------
