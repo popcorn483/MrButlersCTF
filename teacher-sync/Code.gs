@@ -482,10 +482,30 @@ function install_(b) {
   });
   return { ok: true, installed: ids.length, ver: installed_(), cleaned: cleaned };
 }
+/* Test area passwords: each paper (p1, p2, p3) can have its own, set on the Teacher tab › Test passwords.
+   A paper with none of its own uses the one from the answer book (installed with the answers). */
+var TEST_PAPERS = ['p1', 'p2', 'p3'];
+function testpwFor_(paper) {
+  var pr = PropertiesService.getScriptProperties();
+  return (TEST_PAPERS.indexOf(paper) >= 0 && pr.getProperty('testPassword_' + paper)) || pr.getProperty('testPassword') || '';
+}
 function testpass_(q) {
-  var pw = PropertiesService.getScriptProperties().getProperty('testPassword');
+  var pw = testpwFor_(String(q.paper || ''));
   if (!pw) return { ok: false, error: 'setup' };
   return { ok: true, pass: String(q.pw || '').trim() === pw };
+}
+function testpws_() {
+  var pr = PropertiesService.getScriptProperties(), out = {};
+  TEST_PAPERS.forEach(function (p) { out[p] = pr.getProperty('testPassword_' + p) || ''; });
+  return { ok: true, papers: out, fallback: pr.getProperty('testPassword') || '' };
+}
+function setTestpw_(paper, pw) {
+  if (TEST_PAPERS.indexOf(paper) < 0) return { ok: false, error: 'bad paper' };
+  pw = String(pw || '').trim();
+  if (pw.length > 40) return { ok: false, error: 'too long' };
+  var pr = PropertiesService.getScriptProperties();
+  if (pw) pr.setProperty('testPassword_' + paper, pw); else pr.deleteProperty('testPassword_' + paper);   // blank: back to the answer-book one
+  return testpws_();
 }
 
 function removedSheet_() {
@@ -566,6 +586,8 @@ function doGet(e) {
   var sh = sheet_();
   if (sh.getRange(1, 7).getValue() !== 'Class') sh.getRange(1, 7).setValue('Class');
   if (p.action === 'testmail') return out_(testEmail());
+  if (p.action === 'testpws') return out_(testpws_());                                   // Teacher tab › Test passwords
+  if (p.action === 'settestpw') return out_(setTestpw_(String(p.paper || ''), p.pw));
   if (p.action === 'answer') { var a = solution_(String(p.cid || '')); return out_(a ? { ok: true, f: a.f, sol: a.sol, walk: a.walk } : { ok: false, error: 'setup' }); }
   if (p.action === 'approve' || p.action === 'decline') return out_(decide_(p.pids, p.action === 'approve' ? 'approved' : 'declined'));   // the teacher answers sign-up requests
   if (p.action === 'merge') return out_(merge_(String(p.from), String(p.to)));

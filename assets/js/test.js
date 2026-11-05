@@ -117,7 +117,7 @@
       '<li>🚫 There are <b>no hints and no walkthroughs</b> — here or anywhere on the site — while the test runs.</li>' +
       '<li>🧰 You <b>can</b> use the Toolkit (Decoder, Hex viewer and so on), just like on the day.</li>' +
       '<li>🏁 There are ' + PAPER.length + ' challenges worth ' + TOTAL_PTS + ' points. Do the easy ones first.</li>' +
-      '<li>🔑 You need the <b>password from your teacher</b> to begin.</li>' +
+      '<li>🔑 You need the <b>password for this paper</b> from your teacher to begin.</li>' +
       '</ul>' +
       '<form id="testStartForm" class="test-start-form">' +
       '<label class="field-label">Your name or team</label><input class="io" id="testName" maxlength="40" placeholder="e.g. Team Alpha" value="' + esc(TS.name || '') + '">' +
@@ -134,10 +134,10 @@
       if (!pass) return;
       if (!window.CTFApi) { m.textContent = '✗ The test needs the internet connection to Mr Butler\'s script.'; return; }
       btn.disabled = true; m.className = 'flag-msg'; m.textContent = 'Checking…';
-      window.CTFApi('action=testpass&pw=' + encodeURIComponent(pass)).then(function (j) {
+      window.CTFApi('action=testpass&paper=' + P.id + '&pw=' + encodeURIComponent(pass)).then(function (j) {
         btn.disabled = false; m.className = 'flag-msg bad';
         if (!j || !j.ok) { m.textContent = j && j.error === 'setup' ? '✗ The test isn\'t set up yet — ask your teacher.' : '✗ Couldn\'t check the password. Try again.'; return; }
-        if (!j.pass) { m.textContent = '✗ That password is not right. Ask your teacher for today\'s password.'; return; }
+        if (!j.pass) { m.textContent = '✗ That password is not right for ' + P.title + '. Ask your teacher.'; return; }
         begin(nm);
       }, function () { btn.disabled = false; m.className = 'flag-msg bad'; m.textContent = '✗ Couldn\'t reach Mr Butler\'s script. Check the internet and try again.'; });
     });
@@ -377,5 +377,5 @@
     d.status = TS.finished ? 'finished' : (remaining() > 0 ? 'running' : 'timeup');
     return d;
   }
-  window.TestArea = { enter: enter, isLive: isLive, open: openTest, liveSnapshot: liveSnapshot };
+  window.TestArea = { papers: function () { return PAPERS.map(function (p) { return { id: p.id, icon: p.icon, title: p.title, level: p.level }; }); }, enter: enter, isLive: isLive, open: openTest, liveSnapshot: liveSnapshot };
 })();

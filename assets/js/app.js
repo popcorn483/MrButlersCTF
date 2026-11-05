@@ -1848,6 +1848,41 @@
         else if (msg) { $('#installBox').hidden = false; msg.className = 'small bad-text'; msg.textContent = j && j.error === 'key' ? 'The script rejected the teacher key.' : 'Your Google script needs updating first (see teacher-sync/SETUP.md).'; }
       }).catch(function () { T.installing = false; if (msg) { $('#installBox').hidden = false; msg.className = 'small bad-text'; msg.textContent = 'Couldn’t reach the script (it may need updating — see teacher-sync/SETUP.md).'; } });
   }
+  // ---------- teacher: a password for each practice test paper (kept on the Google script, never on this site) ----------
+  function openTestPw() {
+    var box = $('#testPwBox'); if (!box) return;
+    if (!box.hidden) { box.hidden = true; return; }
+    if (!LIVE.key && !askLiveKey()) return;
+    var papers = (window.TestArea && TestArea.papers) ? TestArea.papers() : [];
+    box.hidden = false; box.className = 'tpw-card';
+    box.innerHTML = '<div class="tpw-head"><h3>🔑 Test passwords</h3><button class="ibtn" id="tpwClose" aria-label="Close" title="Close">✕</button></div><p class="muted small">Loading…</p>';
+    $('#tpwClose').addEventListener('click', function () { box.hidden = true; });
+    box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    fetch(liveUrl('&action=testpws'), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || !j.ok || !j.papers) { box.querySelector('p').outerHTML = '<p class="bad-text small">' + (j && j.error === 'key' ? 'Teacher key not accepted.' : 'Your Google script needs updating for per-paper passwords: paste in the latest teacher-sync/Code.gs, then Deploy › Manage deployments › New version.') + '</p>'; return; }
+      var fb = j.fallback || '';
+      box.innerHTML = '<div class="tpw-head"><h3>🔑 Test passwords</h3><button class="ibtn" id="tpwClose" aria-label="Close" title="Close">✕</button></div>' +
+        '<p class="muted small">Pupils need the password for the paper they choose. Leave one blank to use the answer-book password' + (fb ? ' (<code>' + esc(fb) + '</code>)' : '') + '. Changes work straight away.</p>' +
+        papers.map(function (p) {
+          return '<form class="tpw-row" data-paper="' + p.id + '"><span class="tpw-name"><b>' + p.icon + ' ' + esc(p.title) + '</b><span class="muted small">' + esc(p.level) + '</span></span>' +
+            '<input class="io" maxlength="40" autocomplete="off" spellcheck="false" placeholder="' + esc(fb ? 'blank = ' + fb : 'set a password') + '" value="' + esc(j.papers[p.id] || '') + '" aria-label="Password for ' + esc(p.title) + '">' +
+            '<button class="btn small primary" type="submit">Save</button><span class="tpw-msg small"></span></form>';
+        }).join('');
+      $('#tpwClose').addEventListener('click', function () { box.hidden = true; });
+      $$('.tpw-row', box).forEach(function (f) {
+        f.addEventListener('submit', function (e) {
+          e.preventDefault();
+          var inp = f.querySelector('input'), btn = f.querySelector('button'), m = f.querySelector('.tpw-msg'), pw = inp.value.trim();
+          btn.disabled = true; m.className = 'tpw-msg small muted'; m.textContent = 'Saving…';
+          fetch(liveUrl('&action=settestpw&paper=' + f.dataset.paper + '&pw=' + encodeURIComponent(pw)), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (r) {
+            btn.disabled = false;
+            if (r && r.ok) { m.className = 'tpw-msg small good-text'; m.textContent = pw ? '✓ Saved' : '✓ Using the answer-book password'; }
+            else { m.className = 'tpw-msg small bad-text'; m.textContent = r && r.error === 'too long' ? 'Keep it under 40 characters.' : 'Not saved — update your Google script.'; }
+          }).catch(function () { btn.disabled = false; m.className = 'tpw-msg small bad-text'; m.textContent = 'Couldn’t reach the script.'; });
+        });
+      });
+    }).catch(function () { var p = box.querySelector('p'); if (p) { p.className = 'bad-text small'; p.textContent = 'Couldn’t reach the Google script.'; } });
+  }
   function renderInstall(ver) {
     var box = $('#installBox'); if (!box) return;
     if (ver === undefined) { box.hidden = true; return; }   // older script: nothing to show
@@ -1902,7 +1937,7 @@
     document.addEventListener('click', function (e) { if (!menu.hidden && !e.target.closest('.tmenu')) closeMenu(); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !menu.hidden) closeMenu(); });
     if (!SYNC_URL) {
-      ['#liveBtn', '#tdReq', '#tdInstall', '#tdMail', '#liveKeyBtn', '#liveClear'].forEach(function (k) { var e = $(k); if (e) e.hidden = true; });
+      ['#liveBtn', '#tdReq', '#tdInstall', '#tdTestPw', '#tdMail', '#liveKeyBtn', '#liveClear'].forEach(function (k) { var e = $(k); if (e) e.hidden = true; });
       liveInfo('muted', 'Not set up yet. Connect a Google Sheet once and every pupil\'s progress arrives here automatically — no files to collect. Follow <a href="https://github.com/popcorn483/MrButlersCTF/blob/main/teacher-sync/SETUP.md" target="_blank" rel="noopener">the 5-minute setup guide</a>.');
       return;
     }
@@ -1910,6 +1945,7 @@
     liveBtnIcon();
     $('#tdReq').addEventListener('click', function () { PEND.open = !PEND.open; renderPending(PEND.list || []); var pb = $('#pendBox'); if (PEND.open && pb.firstChild) pb.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); });
     $('#tdInstall').addEventListener('click', function () { installAnswers(true); });
+    $('#tdTestPw').addEventListener('click', function () { openTestPw(); });
     $('#tdMail').addEventListener('click', function () { PEND.open = true; renderPending(PEND.list || []); var m = $('#pendMail'); if (m) m.click(); });
     $('#liveKeyBtn').addEventListener('click', function () { if (askLiveKey() && LIVE.on) liveFetch(); });
     $('#liveSignOut').addEventListener('click', function () {

@@ -38,7 +38,7 @@ The public site has **no flags, answers or walkthroughs** in it, and the challen
 1. On the site, press **Teacher login** and enter the Teacher Area password.
 2. That's it: the teacher PC reads the answers from the password-protected answer book and installs them on your script (Teacher tab shows **🔐 Answers are installed**). If it says **Answers need installing**, press **Install answers now**.
 
-Until this is done pupils see “The challenges aren’t ready yet”. The answers go on an **Answers** tab of your Sheet; the challenge key and the Test area password go in the script's properties. Installing also re-checks every pupil's stored progress, and drops any solve that can't be proved.
+Until this is done pupils see “The challenges aren’t ready yet”. The answers go on an **Answers** tab of your Sheet; the challenge key and the default Test area password go in the script's properties. Each practice paper can also have its own password: Teacher tab › ⋯ › 🔑 Test passwords (leave one blank to use the default). Installing also re-checks every pupil's stored progress, and drops any solve that can't be proved.
 
 ## Using it
 - On the homepage press **👩‍🏫 Teacher access** and enter the Teacher Area password. That PC becomes a teacher screen: the Teacher tab appears (pupils never see it), live view starts by itself and the answer book opens without asking again. The live-view key is stored inside the encrypted answer book, so staff only need one password. (You can still type the key by hand with the **Teacher key** button.)
