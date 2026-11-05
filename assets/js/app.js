@@ -562,6 +562,7 @@
 
   $('#flagForm').addEventListener('submit', function (e) {
     e.preventDefault();
+    if (typeof accessBlocked === 'function' && (accessBlocked() || needsSignIn())) { guard(); return; }
     var c = current; if (!c) return;
     var raw = $('#flagInput').value.trim(), msg = $('#flagMsg');
     if (!raw) return;
@@ -876,6 +877,7 @@
     setTimeout(function () { (S.name ? (S.cls ? pinI : c) : n).focus(); }, 60);
   }
   window.CTFWho = askWho;
+  if (accessBlocked()) { lockdown(true); setTimeout(showWaiting, 0); }
   setTimeout(function () { if (!isTeacherDevice() && !whoDone()) askWho(false); else if (!isTeacherDevice() && S.name) checkAccess(); }, 400);
 
   // ---------- access approval: new pupils wait until a teacher lets them in ----------
@@ -887,13 +889,45 @@
         // only pending / declined block; anything else (approved, an older script, offline) lets them in, so nobody is locked out by a fault
         var st = j && j.ok && /^(pending|declined)$/.test(j.status || '') ? j.status : 'approved';
         var was = S.access; S.access = st; if (was !== st) save();
-        if (st === 'approved') { var w = document.getElementById('waitModal'); if (w) { w.remove(); document.documentElement.style.overflow = ''; clearInterval(waitTimer); toast('🎉 You’re in! Your teacher has approved you.', 4500); pushSync(); fetchAwards(); } }
+        if (st === 'approved') { lockdown(false); var w = document.getElementById('waitModal'); if (w) { w.remove(); document.documentElement.style.overflow = ''; clearInterval(waitTimer); toast('🎉 You’re in! Your teacher has approved you.', 4500); pushSync(); fetchAwards(); } }
         else showWaiting();
         if (cb) cb(st);
       }).catch(function () { });
   }
-  function showWaiting() {
+  // ---------- lockdown: while a pupil is waiting (or declined, or not signed in) the site stays hidden ----------
+  // Removing or hiding the waiting / sign-in box only brings it straight back, and the page behind it is hidden too.
+  // (The real protection is on the teacher's sheet: nothing from an unapproved pupil is saved or counted.)
+  function accessBlocked() { return !isTeacherDevice() && /^(pending|declined)$/.test(S.access || ''); }
+  function needsSignIn() { return !!SYNC_URL && !isTeacherDevice() && !whoDone(); }
+  function lockdown(on) { document.documentElement.classList.toggle('mb-locked', !!on); }
+  function fixBox(el) {   // only touch what has actually been tampered with, so the guard never triggers itself
+    if (el.hasAttribute('hidden')) el.removeAttribute('hidden');
+    if (el.hasAttribute('style')) el.removeAttribute('style');
+    if (el.className !== 'who-modal') el.className = 'who-modal';
+  }
+  var guardBusy = false;
+  function guard() {
+    if (guardBusy) return; guardBusy = true;
+    try {
+      var tm = document.getElementById('teacherModal'), teacherOpen = tm && !tm.hidden;
+      if (accessBlocked()) {
+        lockdown(true);
+        var w = document.getElementById('waitModal');
+        if (!w || !document.body.contains(w)) showWaiting();
+        else { fixBox(w); if (!w.querySelector('.wait-card')) showWaiting(true); }
+      } else if (needsSignIn()) {
+        lockdown(true);
+        var s = document.getElementById('whoModal');
+        if (!s && !teacherOpen) askWho(false);
+        else if (s) fixBox(s);
+      } else lockdown(false);
+    } finally { guardBusy = false; }
+  }
+  new MutationObserver(function () { guard(); }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'hidden'] });
+  setInterval(guard, 1500);
+  function showWaiting(redraw) {
     var d = document.getElementById('waitModal'), declined = S.access === 'declined';
+    lockdown(true);
     if (!d) {
       d = document.createElement('div'); d.id = 'waitModal'; d.className = 'who-modal'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
       document.body.appendChild(d); document.documentElement.style.overflow = 'hidden';
@@ -911,7 +945,7 @@
     if (wc) wc.addEventListener('click', function () { var b = this, m = d.querySelector('.who-msg'); b.disabled = true; m.textContent = 'Checking…';
       checkAccess(function (st) { b.disabled = false; if (document.getElementById('waitModal')) m.textContent = st === 'pending' ? 'Not approved yet — this page will open by itself when it is.' : ''; }); });
     d.querySelector('#waitOther').addEventListener('click', function () {
-      clearInterval(waitTimer); d.remove(); document.documentElement.style.overflow = '';
+      clearInterval(waitTimer); S = blankState(); save(); d.remove(); document.documentElement.style.overflow = '';
       S = blankState(); save(); refreshHeader(); renderBoard(); renderProgress(); askWho(false);
     });
     d.querySelector('#waitTeacher').addEventListener('click', function () { openTeacherSignIn(); });
@@ -1585,7 +1619,7 @@
       try { localStorage.setItem(TEACHER_PC, '1'); sessionStorage.setItem(STAFF_SS, pw); } catch (err) { }
       var lk = data.info && data.info.liveKey;
       if (lk && !LIVE.key) { LIVE.key = lk; try { localStorage.setItem(LIVE_KEY_STORE, lk); } catch (err) { } }
-      closeModal($('#teacherModal')); var wm = document.getElementById('whoModal'); if (wm) wm.remove(); var wt = document.getElementById('waitModal'); if (wt) { wt.remove(); clearInterval(waitTimer); } document.documentElement.style.overflow = ''; liveSignedIn(); show('teacher');
+      closeModal($('#teacherModal')); var wm = document.getElementById('whoModal'); if (wm) wm.remove(); var wt = document.getElementById('waitModal'); if (wt) { wt.remove(); clearInterval(waitTimer); } lockdown(false); document.documentElement.style.overflow = ''; liveSignedIn(); show('teacher');
       if (SYNC_URL && LIVE.key && !LIVE.on) startLive();
       toast('👩‍🏫 Signed in — this PC is now a teacher screen');
     }).catch(function (err) {

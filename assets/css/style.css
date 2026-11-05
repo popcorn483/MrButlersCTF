@@ -1056,3 +1056,8 @@ table.lbp th { cursor: default; }
 .pend-btns { display: flex; gap: 6px; }
 .pend-declined { margin-top: 8px; } .pend-declined summary { cursor: pointer; color: var(--muted); font-size: .88rem; }
 .pend-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--amber); color: #1a1205; font-size: .75rem; font-weight: 800; margin-left: 4px; }
+
+/* lockdown: while waiting for approval (or not signed in) only the sign-in / waiting / teacher boxes are shown */
+html.mb-locked body > *:not(#waitModal):not(#whoModal):not(#teacherModal):not(#toast):not(script):not(style) { display: none !important; }
+html.mb-locked body { overflow: hidden !important; }
+html.mb-locked #waitModal, html.mb-locked #whoModal { display: grid !important; visibility: visible !important; opacity: 1 !important; }
