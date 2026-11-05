@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>404 — lost in cyberspace</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; overflow: hidden; background: #05070b; color: #E5E8EE; font: 16px/1.55 "Segoe UI", system-ui, sans-serif; }
+  .stars { position: fixed; inset: 0; background-image: radial-gradient(1px 1px at 20% 30%, #fff8, transparent), radial-gradient(1px 1px at 70% 80%, #fff6, transparent), radial-gradient(1.5px 1.5px at 40% 70%, #fff9, transparent), radial-gradient(1px 1px at 85% 20%, #fff7, transparent), radial-gradient(1px 1px at 10% 85%, #fff5, transparent); background-size: 300px 300px; animation: drift 60s linear infinite; }
+  @keyframes drift { to { background-position: -600px 300px; } }
+  .box { position: relative; width: min(560px, 100%); text-align: center; }
+  .big { position: relative; font: 900 clamp(5rem, 24vw, 10rem)/1 ui-monospace, Consolas, monospace; color: #52E6A3; letter-spacing: .04em; }
+  .big::before, .big::after { content: '404'; position: absolute; inset: 0; }
+  .big::before { color: #ff2b6a; animation: g1 2.4s infinite steps(1); clip-path: inset(0 0 55% 0); }
+  .big::after { color: #3aa0ff; animation: g2 2.4s infinite steps(1); clip-path: inset(55% 0 0 0); }
+  @keyframes g1 { 0%, 88%, 100% { transform: none; opacity: 0; } 90% { transform: translate(-6px, -2px); opacity: .9; } 94% { transform: translate(5px, 1px); opacity: .9; } }
+  @keyframes g2 { 0%, 88%, 100% { transform: none; opacity: 0; } 91% { transform: translate(6px, 2px); opacity: .9; } 95% { transform: translate(-4px, -1px); opacity: .9; } }
+  .astro { position: fixed; font-size: 54px; animation: float 14s ease-in-out infinite; pointer-events: none; }
+  @keyframes float { 0% { left: -10%; top: 70%; transform: rotate(0); } 50% { left: 55%; top: 12%; transform: rotate(200deg); } 100% { left: 110%; top: 60%; transform: rotate(400deg); } }
+  h1 { margin: 10px 0 4px; font-size: 1.4rem; }
+  p { margin: 6px 0; color: #b9c0cc; }
+  .term { margin: 18px 0; padding: 14px 16px; border-radius: 12px; background: #0a0d12; border: 1px solid #2a3140; text-align: left; font: 13px/1.6 ui-monospace, Consolas, monospace; color: #cfd6e2; white-space: pre-wrap; word-break: break-all; }
+  .g { color: #52E6A3; } .r { color: #ff6b82; } .y { color: #F5B25C; }
+  a.btn { display: inline-block; margin-top: 4px; padding: 9px 20px; border-radius: 999px; background: #52E6A3; color: #04130b; font-weight: 700; text-decoration: none; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } .astro { display: none; } }
+</style>
+</head>
+<body>
+<div class="stars" aria-hidden="true"></div>
+<div class="astro" aria-hidden="true">🧑‍🚀</div>
+<div class="box">
+  <div class="big">404</div>
+  <h1>Lost in cyberspace</h1>
+  <p id="quip">This page doesn’t exist. But guessing addresses is a real recon technique, so: good instincts.</p>
+  <div class="term" id="t"></div>
+  <a class="btn" id="home" href="/">← Back to Mr B’s CTF</a>
+</div>
+<script>
+  (function () {
+    try { var k = 'mbctf-eggs-v1', s = JSON.parse(localStorage.getItem(k) || '{}') || {}; if (!s.lost) { s.lost = { t: Date.now(), n: 1 }; localStorage.setItem(k, JSON.stringify(s)); } } catch (e) { }
+    var seg = location.pathname.split('/').filter(Boolean)[0];
+    if (seg && /mrbutlersctf/i.test(seg)) document.getElementById('home').href = '/' + seg + '/';
+    var path = location.pathname + location.search, low = path.toLowerCase();
+    function esc(t) { return String(t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    var Q = [
+      [/flag/, 'Looking for a flags file? Nice try — the flags live on Mr Butler’s server, not on this website.'],
+      [/answer|solution|cheat/, 'The answers aren’t on this site at all. They’re checked by a server you can’t see. 😉'],
+      [/\.git|\.env|config|backup|\.bak|\.zip/, 'Hunting for leaked config files or backups? Real hackers check those first. Nothing leaked here though!'],
+      [/passwd|shadow|etc/, 'Path traversal vibes. No /etc/passwd on a static website, sorry.'],
+      [/wp-|wordpress|phpmyadmin|login\.php/, 'This isn’t WordPress. But scanners try those addresses on every site on the internet, all day long.'],
+      [/secret|hidden|private/, 'So close! Have you read robots.txt?']
+    ];
+    for (var i = 0; i < Q.length; i++) if (Q[i][0].test(low)) { document.getElementById('quip').textContent = Q[i][1]; break; }
+    var lines = ['<span class="g">$</span> curl -i "' + esc(path) + '"', '<span class="r">HTTP/1.1 404 Not Found</span>', 'Server: mr-butlers-ctf/13.37', 'X-Hint: try robots.txt', '', '<span class="y">🥚 You found an easter egg just by getting lost.</span>'];
+    var t = document.getElementById('t'), n = 0;
+    (function step() { if (n < lines.length) { t.innerHTML += lines[n++] + '\n'; setTimeout(step, 260); } })();
+  })();
+</script>
+</body>
+</html>

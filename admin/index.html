@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Admin panel (not really)</title>
+<style>
+  @font-face { font-family: 'Lemon Milk'; src: url('../assets/fonts/lemonmilk-bold.woff') format('woff'); font-weight: 700; }
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; background: #0E1117; background-image: radial-gradient(rgba(160,175,205,.09) 1px, transparent 1px); background-size: 22px 22px; color: #E5E8EE; font: 16px/1.5 "Segoe UI", system-ui, sans-serif; }
+  .card { width: min(380px, 100%); padding: 26px 24px 22px; border-radius: 18px; background: #181C24; border: 1px solid rgba(255,255,255,.07); box-shadow: 0 30px 70px -20px #000; transition: border-color .3s; }
+  .card.no { animation: shake .45s; border-color: #ff6b82; }
+  .card.yes { border-color: #F5B25C; }
+  @keyframes shake { 20%, 60% { transform: translateX(-9px); } 40%, 80% { transform: translateX(9px); } }
+  .logo { font: 700 1.1rem 'Lemon Milk', sans-serif; letter-spacing: .08em; color: #52E6A3; }
+  .logo small { display: block; margin-top: 2px; font: 600 .72rem ui-monospace, Consolas, monospace; letter-spacing: .1em; color: #8A93A3; }
+  label { display: block; margin: 16px 0 6px; font-size: .85rem; color: #8A93A3; }
+  input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #3b4454; background: #0E1117; color: #fff; font: inherit; }
+  input:focus { outline: 2px solid #8AB6FF; outline-offset: 1px; }
+  button { width: 100%; margin-top: 18px; padding: 11px; border: 0; border-radius: 999px; background: #52E6A3; color: #04130b; font: 700 1rem inherit; cursor: pointer; }
+  .msg { min-height: 1.5em; margin-top: 14px; font-size: .9rem; color: #b9c0cc; }
+  .msg b { color: #ff6b82; }
+  .msg.warm b { color: #F5B25C; }
+  .denied { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; font: 800 clamp(2rem, 9vw, 5rem) ui-monospace, Consolas, monospace; color: #ff3355; text-shadow: 0 0 30px #ff0033; letter-spacing: .06em; opacity: 0; }
+  .denied.go { animation: denied 1s steps(1) forwards; }
+  @keyframes denied { 0%, 20%, 40% { opacity: 1; transform: translate(3px,-2px); } 10%, 30% { opacity: .2; transform: translate(-3px,2px); } 60% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+  .note { margin-top: 18px; padding-top: 14px; border-top: 1px solid #2F3644; font-size: .78rem; color: #6d7686; }
+  a { color: #5CD3EE; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+</style>
+</head>
+<body>
+<!-- Admin password hint: there isn't one. This page doesn't send anything anywhere. Real logins are checked on a server. -->
+<form class="card" id="f" autocomplete="off">
+  <div class="logo">⚑ MR B’S CTF<small>ADMINISTRATOR LOGIN</small></div>
+  <label for="u">Username</label>
+  <input id="u" value="admin" spellcheck="false">
+  <label for="p">Password</label>
+  <input id="p" type="password">
+  <button type="submit">Log in</button>
+  <div class="msg" id="m" aria-live="polite">You found the admin page. Can you get in?</div>
+  <div class="note">This is a joke page — nothing you type leaves your computer. <a id="home" href="../">← Back to the challenges</a></div>
+</form>
+<div class="denied" id="d" aria-hidden="true">ACCESS DENIED</div>
+<script src="../assets/js/egg-page.js"></script>
+<script>
+  mbEgg('admin');
+  var tries = 0, f = document.getElementById('f'), m = document.getElementById('m'), d = document.getElementById('d');
+  var WEAK = ['password', 'password1', 'password123', '123456', '12345678', '123456789', 'qwerty', 'admin', 'letmein', 'hunter2', 'iloveyou', '111111', 'abc123', 'welcome', 'monkey', 'football', 'dragon'];
+  function esc(t) { return String(t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function say(html, warm) { m.className = 'msg' + (warm ? ' warm' : ''); m.innerHTML = html; }
+  f.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var u = document.getElementById('u').value, pw = document.getElementById('p').value, both = u + ' ' + pw;
+    document.getElementById('p').value = '';
+    f.classList.remove('no', 'yes'); void f.offsetWidth;
+    tries++;
+    if (/('|")\s*(or|and)\s|--|\bunion\b|\bor\s+1\s*=\s*1/i.test(both)) {
+      mbEgg('sqli'); f.classList.add('yes');
+      return say('<b>🧑‍🍳 SQL injection!</b> A classic. It would work on a badly-built site that glues your text straight into a database query. This page has no database at all — and real sites use parameterised queries so it can’t work.', true);
+    }
+    if (/<\s*script|on\w+\s*=|javascript:|<\s*img/i.test(both)) {
+      mbEgg('xss'); f.classList.add('yes');
+      return say('<b>🛡 XSS attempt spotted.</b> This page shows your text as text, so the script never runs.', true);
+    }
+    if (WEAK.indexOf(pw.toLowerCase()) >= 0) {
+      mbEgg('weakpw'); f.classList.add('yes');
+      return say('<b>🤦 “' + esc(pw) + '”? Really?</b> That’s one of the most common passwords on Earth — attackers try lists of these first. It still didn’t work, because this login is fake. Long, unique passphrases win.', true);
+    }
+    f.classList.add('no'); d.classList.remove('go'); void d.offsetWidth; d.classList.add('go');
+    if (tries >= 5) return say('<b>🔒 Account locked.</b> …just kidding. There is no admin password: this page doesn’t check anything. Real sites lock you out after too many wrong guesses — like your PIN on Mr B’s CTF.');
+    say('<b>Access denied.</b> ' + ['Nope.', 'Still no.', 'Did you try the most common password in the world?', 'Hackers would try a SQL injection about now…'][Math.min(tries - 1, 3)]);
+  });
+</script>
+</body>
+</html>

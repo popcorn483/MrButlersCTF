@@ -1,0 +1,12 @@
+# robots.txt for Mr B's CTF
+# Dear search engines: please don't look in these folders. Thanks!
+
+User-agent: *
+Disallow: /MrButlersCTF/secret/
+Disallow: /MrButlersCTF/admin/
+
+# Note to self (Mr B): robots.txt is PUBLIC. Anyone can read it.
+# ...including pupils. Oops.
+#
+# Hello, human. If you're reading this, go back to the site
+# (not in a text box) and type: beepboop

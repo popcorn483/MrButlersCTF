@@ -1,0 +1,12 @@
+/* TEAM */
+  Teacher, flag-hider, coffee-drinker: Mr Butler
+  Location: Enniskillen, Northern Ireland
+
+/* THANKS */
+  The pupils of ERGS, for testing everything (and breaking most of it)
+  GCHQ, for CyberChef
+
+/* SITE */
+  Standards: HTML5, CSS3, a lot of JavaScript
+  Hosting: GitHub Pages
+  Easter eggs: yes. Lots. Keep looking.

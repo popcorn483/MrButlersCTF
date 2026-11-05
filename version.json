@@ -1,10 +1,10 @@
 {
-  "version": "mbctf-v43",
+  "version": "mbctf-v44",
   "date": "2026-11-05",
   "notes": [
+    "\ud83e\udd5a The site is now full of easter eggs. No hints. OK, one hint: be curious.",
     "Approved pupils now appear in the Teacher tab's pupil list straight away",
     "Cleaner Teacher dashboard: one row of icon buttons, with everything else in a \u22ef menu",
-    "Tidier Teacher tab: sign-up requests now have Waiting and Declined tabs, and declined requests can be deleted",
-    "47 new challenges: Web, Forensics, Reverse engineering, OSINT and Online safety now have challenges at every level, from Beginner to Unreal"
+    "Tidier Teacher tab: sign-up requests now have Waiting and Declined tabs, and declined requests can be deleted"
   ]
 }

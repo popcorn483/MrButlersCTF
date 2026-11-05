@@ -1,0 +1,10 @@
+# security.txt for Mr B's CTF
+# Found a real bug in this site? Brilliant. That's what ethical hackers do.
+
+Contact: Tell Mr Butler in person, privately, before telling anyone else.
+Policy: Don't break things on purpose, don't look at other pupils' data, and report what you find.
+Acknowledgments: Your name, said proudly in class.
+Preferred-Languages: en
+Expires: 2027-08-31T23:00:00.000Z
+
+# Bonus: go back to the site (not in a text box) and type: responsible
