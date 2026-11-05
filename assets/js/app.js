@@ -702,7 +702,7 @@
   var SYNC_URL = (window.CTF_CONFIG && window.CTF_CONFIG.syncUrl) || '';
   var syncTimer = null, syncState = { at: 0, ok: null };
   function isTeacherDevice() { try { return !!localStorage.getItem('mbctf-teacher-livekey-v1') || localStorage.getItem('mbctf-teacher-pc-v1') === '1'; } catch (e) { return false; } }
-  function hasActivity() { return !isTeacherDevice() && !!S.name && !!S.cls; }
+  function hasActivity() { return !isTeacherDevice() && !!S.name && !!S.cls && (!S.access || S.access === 'approved'); }
   function syncBody() {
     var obj = JSON.parse(makeExport());
     try { var t = window.TestArea && TestArea.liveSnapshot && TestArea.liveSnapshot(); if (t) obj.test = t; } catch (e) { }
@@ -847,13 +847,13 @@
       if (other) { S = blankState(); save(); }
       go.disabled = true; m.textContent = 'Checking…';
       function finish(found, offline) {
-        if (found) { adoptPid(found.id); S.name = found.name || name; S.cls = found.cls || cls; S.pinOk = 1; }
-        else { S.name = name; S.cls = cls; S.pinOk = 0; try { sessionStorage.setItem(WHO_LATER, '1'); } catch (x) { } }
+        if (found) { adoptPid(found.id); S.name = found.name || name; S.cls = found.cls || cls; S.pinOk = 1; S.access = found.status || 'approved'; }
+        else { S.name = name; S.cls = cls; S.pinOk = 0; S.access = S.access || 'approved'; try { sessionStorage.setItem(WHO_LATER, '1'); } catch (x) { } }   // offline or an older script: let them practise; the sheet checks again later
         var added = 0;
         if (found && found.json) { try { var r = parseImport(found.json); if (r.ok && r.data.pid === S.pid) added = applyImport(r.data); } catch (x) { } }
         save(); refreshHeader(); renderBoard(); renderProgress();
         try { document.dispatchEvent(new CustomEvent('ctf:refresh')); } catch (x) { }
-        close(); pushSync(); setTimeout(fetchAwards, 1500);
+        close(); if (S.access !== 'approved') { showWaiting(); return; } pushSync(); setTimeout(fetchAwards, 1500);
         toast(found && !found.fresh ? '👋 Welcome back, ' + S.name.split(' ')[0] + '!' + (added ? ' ' + added + ' solve' + (added === 1 ? '' : 's') + ' loaded from your other computer.' : '') : '👋 Hi ' + S.name.split(' ')[0] + ' — you’re signed in.', 4000);
         void offline;
       }
@@ -876,7 +876,46 @@
     setTimeout(function () { (S.name ? (S.cls ? pinI : c) : n).focus(); }, 60);
   }
   window.CTFWho = askWho;
-  setTimeout(function () { if (!isTeacherDevice() && !whoDone()) askWho(false); }, 400);
+  setTimeout(function () { if (!isTeacherDevice() && !whoDone()) askWho(false); else if (!isTeacherDevice() && S.name) checkAccess(); }, 400);
+
+  // ---------- access approval: new pupils wait until a teacher lets them in ----------
+  var waitTimer = null;
+  function checkAccess(cb) {
+    if (!SYNC_URL || isTeacherDevice()) return;
+    fetch(SYNC_URL + (SYNC_URL.indexOf('?') < 0 ? '?' : '&') + 'action=access&id=' + encodeURIComponent(S.pid) + '&t=' + Date.now(), { cache: 'no-store', credentials: 'omit' })
+      .then(function (r) { return r.json(); }).then(function (j) {
+        // only pending / declined block; anything else (approved, an older script, offline) lets them in, so nobody is locked out by a fault
+        var st = j && j.ok && /^(pending|declined)$/.test(j.status || '') ? j.status : 'approved';
+        var was = S.access; S.access = st; if (was !== st) save();
+        if (st === 'approved') { var w = document.getElementById('waitModal'); if (w) { w.remove(); document.documentElement.style.overflow = ''; clearInterval(waitTimer); toast('🎉 You’re in! Your teacher has approved you.', 4500); pushSync(); fetchAwards(); } }
+        else showWaiting();
+        if (cb) cb(st);
+      }).catch(function () { });
+  }
+  function showWaiting() {
+    var d = document.getElementById('waitModal'), declined = S.access === 'declined';
+    if (!d) {
+      d = document.createElement('div'); d.id = 'waitModal'; d.className = 'who-modal'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
+      document.body.appendChild(d); document.documentElement.style.overflow = 'hidden';
+      d.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); } }, true);
+    }
+    clearInterval(waitTimer); if (!declined) waitTimer = setInterval(function () { if (!document.getElementById('waitModal')) return clearInterval(waitTimer); if (!document.hidden) checkAccess(); }, 20000);
+    d.innerHTML = '<div class="who-card wait-card"><div class="who-flag">' + (declined ? '⛔' : '⏳') + '</div>' +
+      '<h2>' + (declined ? 'Access not approved' : 'Waiting for approval') + '</h2>' +
+      '<p>' + (declined ? 'Mr Butler hasn’t approved access for ' + esc(S.name || 'this name') + (S.cls ? ' (' + esc(S.cls) + ')' : '') + '. If you think this is a mistake, speak to him.'
+        : 'Thanks, ' + esc((S.name || '').split(' ')[0] || 'you') + '! Mr Butler needs to approve you before you can use Mr Butler’s CTF. This page opens by itself as soon as he does.') + '</p>' +
+      '<div class="who-btns"><button type="button" class="btn" id="waitOther">Sign out</button>' + (declined ? '' : '<button type="button" class="btn primary" id="waitCheck">Check again</button>') + '</div>' +
+      '<p class="who-msg" aria-live="polite"></p>' +
+      '<button type="button" class="linkish who-teacher" id="waitTeacher">👩‍🏫 Teacher? Sign in here</button></div>';
+    var wc = d.querySelector('#waitCheck');
+    if (wc) wc.addEventListener('click', function () { var b = this, m = d.querySelector('.who-msg'); b.disabled = true; m.textContent = 'Checking…';
+      checkAccess(function (st) { b.disabled = false; if (document.getElementById('waitModal')) m.textContent = st === 'pending' ? 'Not approved yet — this page will open by itself when it is.' : ''; }); });
+    d.querySelector('#waitOther').addEventListener('click', function () {
+      clearInterval(waitTimer); d.remove(); document.documentElement.style.overflow = '';
+      S = blankState(); save(); refreshHeader(); renderBoard(); renderProgress(); askWho(false);
+    });
+    d.querySelector('#waitTeacher').addEventListener('click', function () { openTeacherSignIn(); });
+  }
 
   // ---------- pupils' leaderboard (scores checked by the teacher's Google script) ----------
   var LB = { rows: null, at: 0, cls: null, timer: null, busy: false };
@@ -1419,7 +1458,7 @@
       Object.keys(AL).forEach(function (old) { var k = AL[old], n = 0; while (AL[k] && n++ < 20) k = AL[k]; (T.aliasOf[k] = T.aliasOf[k] || []).push(old); });
       Object.keys(byPid).forEach(function (k) { injectAwards(byPid[k].data); });
       T.rows = Object.keys(byPid).map(function (k) { return byPid[k]; });
-      renderTeacher(); renderLiveTests(tests);
+      renderTeacher(); renderLiveTests(tests); renderPending(res.pending || [], res.approval);
       var n = (res.rows || []).length, active = (res.rows || []).filter(function (x) { return Date.now() - x.seen < 5 * 60000; }).length;
       liveInfo('good-text', '🔴 Live · ' + n + ' pupil' + (n === 1 ? '' : 's') + ' (' + active + ' active now) · refreshed ' + new Date().toLocaleTimeString() + (bad ? ' · ' + bad + ' unreadable row(s)' : ''));
     }).catch(function () { liveInfo('bad-text', 'Couldn\'t reach the Google Sheet — trying again in a moment…'); });
@@ -1452,6 +1491,37 @@
         return '<tr><td class="num">' + (i + 1) + '</td><td>' + esc(d.name) + '</td><td class="num">' + d.score + '</td><td class="num">' + d.solvedCount + '/' + d.paperSize + '</td><td>' + st +
           '</td><td class="num">' + mmss(d.timeUsedMs) + '</td><td class="num">' + d.wrong + '</td><td>' + (d.unv ? '<span class="badge bad">' + d.unv + ' unverified</span>' : '') + '</td></tr>';
       }).join('') + '</tbody></table>';
+  }
+  // ---------- teacher: approve new pupils ----------
+  var PEND = { list: [], seen: null };
+  function renderPending(list, on) {
+    PEND.list = list; var box = $('#pendBox'); if (!box) return;
+    var waiting = list.filter(function (x) { return x.status === 'pending'; }), declined = list.filter(function (x) { return x.status === 'declined'; });
+    var tab = $('#navTeacher'); if (tab) tab.innerHTML = '👩‍🏫 Teacher' + (waiting.length ? ' <span class="pend-count">' + waiting.length + '</span>' : '');
+    var ids = waiting.map(function (x) { return x.pid; }).join(',');
+    if (PEND.seen !== null && waiting.length > PEND.seen) toast('🙋 ' + (waiting.length - PEND.seen) + ' new pupil' + (waiting.length - PEND.seen === 1 ? '' : 's') + ' waiting for approval', 5000);
+    PEND.seen = waiting.length;
+    if (!on && !list.length) { box.innerHTML = ''; return; }
+    function row(x) {
+      return '<div class="pend-row"><span><b>' + esc(x.name) + '</b> <span class="muted small">' + esc(x.cls) + (x.at ? ' · asked ' + fmtDate(x.at) : '') + '</span></span><span class="pend-btns">' +
+        (x.status === 'declined' ? '<span class="muted small">Declined · </span>' : '') + '<button class="btn primary small" data-appr="' + esc(x.pid) + '">Approve</button>' + (x.status === 'pending' ? '<button class="btn small" data-decl="' + esc(x.pid) + '">Decline</button>' : '') + '</span></div>';
+    }
+    box.innerHTML = '<div class="pend-box' + (waiting.length ? ' has' : '') + '"><div class="pend-head"><b>🙋 ' + (waiting.length ? waiting.length + ' waiting for approval' : 'Awaiting approval') + '</b>' +
+      (waiting.length > 1 ? '<button class="btn primary small" id="pendAll">Approve all ' + waiting.length + '</button>' : '') + '</div>' +
+      (waiting.length ? waiting.map(row).join('') : '<p class="muted small">Nobody is waiting. New pupils appear here as soon as they sign in for the first time.</p>') +
+      (declined.length ? '<details class="pend-declined"><summary>Declined (' + declined.length + ')</summary>' + declined.map(row).join('') + '</details>' : '') + '</div>';
+    $$('[data-appr]', box).forEach(function (b) { b.addEventListener('click', function () { setAccessFor(b.dataset.appr, true); }); });
+    $$('[data-decl]', box).forEach(function (b) { b.addEventListener('click', function () { var x = list.filter(function (y) { return y.pid === b.dataset.decl; })[0]; if (confirm('Decline ' + (x ? x.name : 'this pupil') + '? They won’t be able to use Mr Butler’s CTF under this name. You can approve them later from the Declined list.')) setAccessFor(b.dataset.decl, false); }); });
+    var all = $('#pendAll'); if (all) all.addEventListener('click', function () { setAccessFor(ids, true); });
+  }
+  function setAccessFor(pids, ok) {
+    if (!LIVE.key && !askLiveKey()) return;
+    fetch(liveUrl('&action=' + (ok ? 'approve' : 'decline') + '&pids=' + encodeURIComponent(pids)), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (res) {
+      if (!res.ok || res.access === undefined) { toast(res.error === 'key' ? 'Teacher key not accepted' : 'Your Google script needs updating for approvals — see teacher-sync/SETUP.md', 6000); return; }
+      var set = {}; pids.split(',').forEach(function (p) { set[p] = 1; });
+      renderPending(PEND.list.filter(function (x) { return !set[x.pid] || !ok; }).map(function (x) { return set[x.pid] && !ok ? Object.assign({}, x, { status: 'declined' }) : x; }), true);
+      toast(ok ? '✓ Approved — they’ll be let in within 20 seconds' : 'Declined', 3500);
+    }).catch(function () { toast('Couldn’t reach the sheet'); });
   }
   function startLive() {
     if (!LIVE.key && !askLiveKey()) return;
@@ -1499,7 +1569,7 @@
       try { localStorage.setItem(TEACHER_PC, '1'); sessionStorage.setItem(STAFF_SS, pw); } catch (err) { }
       var lk = data.info && data.info.liveKey;
       if (lk && !LIVE.key) { LIVE.key = lk; try { localStorage.setItem(LIVE_KEY_STORE, lk); } catch (err) { } }
-      closeModal($('#teacherModal')); var wm = document.getElementById('whoModal'); if (wm) wm.remove(); document.documentElement.style.overflow = ''; liveSignedIn(); show('teacher');
+      closeModal($('#teacherModal')); var wm = document.getElementById('whoModal'); if (wm) wm.remove(); var wt = document.getElementById('waitModal'); if (wt) { wt.remove(); clearInterval(waitTimer); } document.documentElement.style.overflow = ''; liveSignedIn(); show('teacher');
       if (SYNC_URL && LIVE.key && !LIVE.on) startLive();
       toast('👩‍🏫 Signed in — this PC is now a teacher screen');
     }).catch(function (err) {

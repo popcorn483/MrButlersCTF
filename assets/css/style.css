@@ -1046,3 +1046,13 @@ table.lbp th { cursor: default; }
 .home-cta { display: inline-block; margin-top: 14px; padding: 9px 18px; border-radius: 999px; font-weight: 800; font-size: 15px; color: #06140d; background: var(--wc); }
 .home-c-main:hover .home-cta { filter: brightness(1.08); }
 @media (max-width: 640px) { .home-c-main { flex-direction: column; align-items: flex-start; } }
+
+/* access approval */
+.wait-card p { margin: 6px 0; }
+.pend-box { margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--line2); border-radius: 12px; background: var(--panel); }
+.pend-box.has { border-color: var(--amber); background: color-mix(in srgb, var(--amber) 8%, var(--panel)); }
+.pend-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; }
+.pend-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 0; border-top: 1px solid var(--line); }
+.pend-btns { display: flex; gap: 6px; }
+.pend-declined { margin-top: 8px; } .pend-declined summary { cursor: pointer; color: var(--muted); font-size: .88rem; }
+.pend-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--amber); color: #1a1205; font-size: .75rem; font-weight: 800; margin-left: 4px; }
