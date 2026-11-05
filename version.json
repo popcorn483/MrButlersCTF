@@ -2,9 +2,9 @@
   "version": "mbctf-v43",
   "date": "2026-11-05",
   "notes": [
+    "Approved pupils now appear in the Teacher tab's pupil list straight away",
     "Cleaner Teacher dashboard: one row of icon buttons, with everything else in a \u22ef menu",
     "Tidier Teacher tab: sign-up requests now have Waiting and Declined tabs, and declined requests can be deleted",
-    "47 new challenges: Web, Forensics, Reverse engineering, OSINT and Online safety now have challenges at every level, from Beginner to Unreal",
-    "Challenges now open only after Mr Butler approves you"
+    "47 new challenges: Web, Forensics, Reverse engineering, OSINT and Online safety now have challenges at every level, from Beginner to Unreal"
   ]
 }

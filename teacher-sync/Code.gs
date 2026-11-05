@@ -118,6 +118,20 @@ function pending_() {
     return { pid: String(r[0]), status: String(r[1]), name: String(r[2]).replace(/^'/, ''), cls: String(r[3]), at: r[4] instanceof Date ? r[4].getTime() : 0 };
   });
 }
+/* Approved pupils who haven't sent any progress yet, so they show on the Teacher tab straight away (as "not started"). */
+function joined_(progressIds) {
+  var ps = pupilsSheet_(), n = ps.getLastRow() - 1; if (n < 1) return [];
+  var acc = {}; accRows_().forEach(function (r) { acc[String(r[0])] = String(r[1]); });
+  var rm = {}, rs = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REMOVED_SHEET);
+  if (rs && rs.getLastRow() > 1) rs.getRange(2, 1, rs.getLastRow() - 1, 1).getValues().forEach(function (r) { rm[String(r[0])] = 1; });
+  var A = aliases_(), out = [];
+  ps.getRange(2, 1, n, 5).getValues().forEach(function (r) {
+    var id = String(r[0]); if (!/^[0-9a-f]{16}$/.test(id) || rm[id] || A[id] || progressIds[id]) return;
+    if (REQUIRE_APPROVAL && acc[id] && acc[id] !== 'approved') return;   // still waiting, or declined
+    out.push({ pid: id, name: String(r[1]).replace(/^'/, ''), cls: String(r[2]), at: r[4] instanceof Date ? r[4].getTime() : 0 });
+  });
+  return out;
+}
 function decide_(pids, status) {
   var lock = LockService.getScriptLock(); lock.waitLock(15000); var done = 0;
   try { String(pids || '').split(',').forEach(function (x) { if (/^[0-9a-f]{16}$/.test(x)) { setAccess_(x, status); done++; } }); } finally { lock.releaseLock(); }
@@ -585,13 +599,14 @@ function doGet(e) {
     return out_({ ok: true, cleared: true });
   }
 
-  var rows = [];
+  var rows = [], ids = {};
   var n = sh.getLastRow() - 1;
   if (n > 0) {
     sh.getRange(2, 1, n, HEADER.length).getValues().forEach(function (r) {
+      if (r[0]) ids[String(r[0])] = 1;
       if (!r[5]) return;
       rows.push({ seen: r[4] instanceof Date ? r[4].getTime() : 0, json: r[5] });
     });
   }
-  return out_({ ok: true, now: Date.now(), rows: rows, awards: awards_(), aliases: aliases_(), pending: pending_(), approval: REQUIRE_APPROVAL, mail: { on: EMAIL_SIGNINS, error: PropertiesService.getScriptProperties().getProperty('mailError') || '' }, installed: installed_() });
+  return out_({ ok: true, now: Date.now(), rows: rows, awards: awards_(), aliases: aliases_(), pending: pending_(), joined: joined_(ids), approval: REQUIRE_APPROVAL, mail: { on: EMAIL_SIGNINS, error: PropertiesService.getScriptProperties().getProperty('mailError') || '' }, installed: installed_() });
 }

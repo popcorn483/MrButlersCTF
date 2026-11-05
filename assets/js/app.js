@@ -1288,7 +1288,7 @@
     });
     var hints = Object.keys(d.hints || {}).reduce(function (s, k) { return s + d.hints[k]; }, 0), rev = Object.keys(d.revealed || {}).length;
     var tutIds = Object.keys(d.tut || {}).filter(function (id) { return BY_ID[id]; });
-    return { name: d.name || '(no name)', pts: pts, n: n, unv: unv, rev: rev, tiers: tiers, hints: hints, tut: tutIds.length, tutIds: tutIds, last: last, ok: r.ok, file: r.file, seen: r.seen || 0, pid: d.pid, cls: d.cls || '' };
+    return { name: d.name || '(no name)', pts: pts, n: n, unv: unv, rev: rev, tiers: tiers, hints: hints, tut: tutIds.length, tutIds: tutIds, last: last, ok: r.ok, file: r.file, seen: r.seen || 0, fresh: !!r.fresh, pid: d.pid, cls: d.cls || '' };
   }
   // ---------- teacher: one pupil's challenge-by-challenge detail ----------
   function renderPupilDetail() {
@@ -1519,8 +1519,8 @@
   }
   function deletePupil(r, name) {
     var pid = r.data.pid;
-    function dropLocal() { T.rows = T.rows.filter(function (x) { return x.data.pid !== pid; }); T.sel = null; renderTeacher(); }
-    if (!r.seen || !SYNC_URL) {   // a hand-loaded file: just take it off this screen
+    function dropLocal() { delete PEND.joined[pid]; T.rows = T.rows.filter(function (x) { return x.data.pid !== pid; }); T.sel = null; renderTeacher(); }
+    if ((!r.seen && !r.fresh) || !SYNC_URL) {   // a hand-loaded file: just take it off this screen
       if (confirm('Remove "' + name + '" from this leaderboard?')) { dropLocal(); toast('Removed'); }
       return;
     }
@@ -1569,7 +1569,7 @@
           TIER_NUMS.map(function (t) { return '<td class="num">' + r.tiers[t] + '</td>'; }).join('') +
           '<td class="num">' + r.hints + '</td><td class="num' + (r.tut ? ' tut-cell' : '') + '">' + r.tut + '</td><td class="num">' + r.rev + '</td><td class="num">' + (r.last ? fmtDate(r.last) : '-') + '</td><td>' +
           (r.seen ? '<span class="badge live" title="Sent automatically">live · ' + new Date(r.seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '</span> ' : '') +
-          (r.ok ? '<span class="badge good">ok</span>' : '<span class="badge bad">edited</span>') +
+          (r.fresh ? '<span class="badge new" title="Approved — appears with scores once they start">approved · not started</span>' : r.ok ? '<span class="badge good">ok</span>' : '<span class="badge bad">edited</span>') +
           (r.unv ? ' <span class="badge bad">' + r.unv + ' unverified</span>' : '') + '</td></tr>';
       }).join('') + '</tbody></table>' + struggleSummary();
     $$('th[data-k]', box).forEach(function (th) { th.addEventListener('click', function () { T.sort = th.dataset.k === 'pts' ? 'pts' : th.dataset.k; renderTeacher(); }); });
@@ -1618,14 +1618,16 @@
           if (!cur || (cur.data.exported || 0) <= (r.data.exported || 0)) byPid[r.data.pid] = r;
         } catch (e) { bad++; }
       });
-      if (byPid[S.pid] && !Object.keys(S.solved).length && !S.name) delete byPid[S.pid];   // this teacher PC's own visit before signing in
+      if (byPid[S.pid] && !Object.keys(S.solved).length && !S.name) delete byPid[S.pid];
+      (res.joined || []).forEach(function (j) { delete PEND.joined[j.pid]; if (!byPid[j.pid]) byPid[j.pid] = joinedRow(j); });
+      Object.keys(PEND.joined).forEach(function (k) { if (byPid[k]) delete PEND.joined[k]; else byPid[k] = joinedRow(PEND.joined[k]); });   // just approved: show them until the sheet catches up   // this teacher PC's own visit before signing in
       T.awards = res.awards || {};
       T.aliasOf = {}; var AL = res.aliases || {};
       Object.keys(AL).forEach(function (old) { var k = AL[old], n = 0; while (AL[k] && n++ < 20) k = AL[k]; (T.aliasOf[k] = T.aliasOf[k] || []).push(old); });
       Object.keys(byPid).forEach(function (k) { injectAwards(byPid[k].data); });
       T.rows = Object.keys(byPid).map(function (k) { return byPid[k]; });
       renderTeacher(); renderLiveTests(tests); renderPending(res.pending || [], res.approval, res.mail); renderInstall(res.installed);
-      var n = (res.rows || []).length, active = (res.rows || []).filter(function (x) { return Date.now() - x.seen < 5 * 60000; }).length;
+      var n = T.rows.filter(function (r) { return r.seen || r.fresh; }).length, active = (res.rows || []).filter(function (x) { return Date.now() - x.seen < 5 * 60000; }).length;
       liveInfo('muted', '<span class="live-dot"></span>Live · ' + n + ' pupil' + (n === 1 ? '' : 's') + ' · ' + active + ' active · updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + (bad ? ' · ' + bad + ' unreadable' : ''));
     }).catch(function () { liveInfo('bad-text', 'Couldn\'t reach the Google Sheet — trying again in a moment…'); });
   }
@@ -1659,7 +1661,9 @@
       }).join('') + '</tbody></table>';
   }
   // ---------- teacher: sign-up requests (approve / decline / delete declined) ----------
-  var PEND = { list: [], seen: null, tab: 'waiting', busy: {} };
+  var PEND = { list: [], seen: null, tab: 'waiting', busy: {}, joined: {} };
+  // an approved pupil who hasn't sent any progress yet: an empty row so they're on the list straight away
+  function joinedRow(j) { return { data: { app: 'MrButlersCTF', pid: j.pid, name: j.name, cls: j.cls, solved: {}, hints: {}, revealed: {}, tut: {}, tries: {} }, ok: true, file: 'live', seen: 0, fresh: true, joinedAt: j.at || 0 }; }
   function ago(t) {
     if (!t) return '';
     var s = Math.max(0, (Date.now() - t) / 1000);
@@ -1745,6 +1749,11 @@
     fetch(liveUrl('&action=' + (ok ? 'approve' : 'decline') + '&pids=' + encodeURIComponent(pids)), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (res) {
       if (!res.ok || res.access === undefined) { renderPending(PEND.list); toast(res.error === 'key' ? 'Teacher key not accepted' : 'Your Google script needs updating for approvals — see teacher-sync/SETUP.md', 6000); return; }
       var set = {}; pids.split(',').forEach(function (p) { set[p] = 1; });
+      if (ok) {
+        var have = {}; T.rows.forEach(function (r) { have[r.data.pid] = 1; });
+        PEND.list.forEach(function (x) { if (set[x.pid] && !have[x.pid]) { PEND.joined[x.pid] = x; T.rows.push(joinedRow(x)); } });
+        renderTeacher();
+      }
       renderPending(PEND.list.filter(function (x) { return !set[x.pid] || !ok; }).map(function (x) { return set[x.pid] && !ok ? Object.assign({}, x, { status: 'declined' }) : x; }));
       toast(ok ? '✓ Approved — they’ll be let in within 20 seconds' : 'Declined', 3500);
     }).catch(function () { renderPending(PEND.list); toast('Couldn’t reach the sheet'); });

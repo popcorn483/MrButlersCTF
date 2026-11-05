@@ -271,6 +271,7 @@ table.lb td.num { font-family: var(--mono); }
 .badge { font-size: .72rem; padding: 1px 7px; border-radius: 999px; border: 1px solid; font-family: var(--mono); }
 .badge.good { color: var(--green); border-color: var(--green); }
 .badge.bad { color: var(--red); border-color: var(--red); }
+.badge.new { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
 
 /* ---------- toolkit ---------- */
 .tool-head p { color: var(--muted); max-width: 90ch; }
