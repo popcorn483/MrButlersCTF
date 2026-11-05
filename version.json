@@ -1,10 +1,10 @@
 {
-  "version": "mbctf-v40",
+  "version": "mbctf-v41",
   "date": "2026-11-05",
   "notes": [
+    "47 new challenges: Web, Forensics, Reverse engineering, OSINT and Online safety now have challenges at every level, from Beginner to Unreal",
     "Challenges now open only after Mr Butler approves you",
     "Flags are checked by Mr Butler\u2019s server, so answers are never stored on your computer",
-    "New pupils now need Mr Butler to approve them before they can start (just like the Revision Guide)",
-    "\ud83c\udfc6 New Leaderboard tab: see how you rank against everyone, or just your class"
+    "New pupils now need Mr Butler to approve them before they can start (just like the Revision Guide)"
   ]
 }
