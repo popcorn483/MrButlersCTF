@@ -1049,12 +1049,42 @@ table.lbp th { cursor: default; }
 
 /* access approval */
 .wait-card p { margin: 6px 0; }
-.pend-box { margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--line2); border-radius: 12px; background: var(--panel); }
-.pend-box.has { border-color: var(--amber); background: color-mix(in srgb, var(--amber) 8%, var(--panel)); }
-.pend-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; }
-.pend-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 0; border-top: 1px solid var(--line); }
-.pend-btns { display: flex; gap: 6px; }
-.pend-declined { margin-top: 8px; } .pend-declined summary { cursor: pointer; color: var(--muted); font-size: .88rem; }
+/* teacher: sign-up requests */
+.req-card { margin: 0 0 16px; border: 1px solid var(--card-line); border-radius: var(--radius); background: var(--panel); box-shadow: var(--card-shadow); overflow: hidden; }
+.req-card.has { border-color: color-mix(in srgb, var(--amber) 45%, transparent); }
+.req-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 16px 12px; }
+.req-head h3 { margin: 0; font-size: 1rem; letter-spacing: .01em; }
+.req-tabs { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--bg2); border: 1px solid var(--line); }
+.req-tab { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: .84rem; cursor: pointer; }
+.req-tab:hover { color: var(--text); }
+.req-tab.on { background: var(--panel2); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.35); }
+.req-n { min-width: 18px; padding: 0 6px; border-radius: 999px; background: var(--line); color: var(--text); font-size: .72rem; font-weight: 700; line-height: 18px; text-align: center; }
+.req-n.hot { background: var(--amber); color: #1a1205; }
+.req-act { margin-left: auto; }
+.req-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.req-row { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+.req-row:last-child { border-bottom: 0; }
+.req-row:hover { background: color-mix(in srgb, var(--panel2) 60%, transparent); }
+.req-av { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 18%, var(--panel2)); color: var(--accent); font-size: .8rem; font-weight: 700; letter-spacing: .02em; }
+.req-who { display: flex; flex-direction: column; min-width: 0; }
+.req-who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.req-meta { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .8rem; }
+.req-cls { padding: 0 7px; border: 1px solid var(--line2); border-radius: 6px; font-family: var(--mono); font-size: .72rem; color: var(--text); }
+.req-btns { display: flex; gap: 6px; }
+.req-ghost { background: none; }
+.req-empty { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-top: 1px solid var(--line); }
+.req-empty div { display: flex; flex-direction: column; }
+.req-empty span:not(.req-empty-ic) { color: var(--muted); font-size: .84rem; }
+.req-empty-ic { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); font-weight: 700; }
+.req-card .req-hint { margin: 0; padding: 10px 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: .8rem; }
+.req-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 9px 16px; border-top: 1px solid var(--line); background: var(--bg2); color: var(--muted); font-size: .8rem; }
+.req-foot .linkish { font-size: .8rem; }
+@media (max-width: 560px) {
+  .req-row { grid-template-columns: 32px 1fr; }
+  .req-av { width: 32px; height: 32px; }
+  .req-btns { grid-column: 1 / -1; justify-content: flex-end; }
+  .req-act { margin-left: 0; width: 100%; }
+}
 .pend-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--amber); color: #1a1205; font-size: .75rem; font-weight: 800; margin-left: 4px; }
 
 /* lockdown: while waiting for approval (or not signed in) only the sign-in / waiting / teacher boxes are shown */

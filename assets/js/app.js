@@ -1657,30 +1657,69 @@
           '</td><td class="num">' + mmss(d.timeUsedMs) + '</td><td class="num">' + d.wrong + '</td><td>' + (d.unv ? '<span class="badge bad">' + d.unv + ' unverified</span>' : '') + '</td></tr>';
       }).join('') + '</tbody></table>';
   }
-  // ---------- teacher: approve new pupils ----------
-  var PEND = { list: [], seen: null };
+  // ---------- teacher: sign-up requests (approve / decline / delete declined) ----------
+  var PEND = { list: [], seen: null, tab: 'waiting', busy: {} };
+  function ago(t) {
+    if (!t) return '';
+    var s = Math.max(0, (Date.now() - t) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return Math.round(s / 60) + ' min ago';
+    if (s < 86400) return Math.round(s / 3600) + ' h ago';
+    if (s < 7 * 86400) return Math.round(s / 86400) + ' d ago';
+    return new Date(t).toLocaleDateString([], { day: 'numeric', month: 'short' });
+  }
+  function initials(n) { var p = String(n || '?').trim().split(/\s+/); return ((p[0] || '?')[0] + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase(); }
   function renderPending(list, on, mail) {
     if (mail !== undefined) PEND.mail = mail;
-    PEND.list = list; var box = $('#pendBox'); if (!box) return;
+    if (on !== undefined) PEND.on = on;
+    PEND.list = list.filter(function (x) { return !PEND.busy[x.pid]; }); list = PEND.list;
+    var box = $('#pendBox'); if (!box) return;
     var waiting = list.filter(function (x) { return x.status === 'pending'; }), declined = list.filter(function (x) { return x.status === 'declined'; });
     var tab = $('#navTeacher'); if (tab) tab.innerHTML = '👩‍🏫 Teacher' + (waiting.length ? ' <span class="pend-count">' + waiting.length + '</span>' : '');
-    var ids = waiting.map(function (x) { return x.pid; }).join(',');
-    if (PEND.seen !== null && waiting.length > PEND.seen) toast('🙋 ' + (waiting.length - PEND.seen) + ' new pupil' + (waiting.length - PEND.seen === 1 ? '' : 's') + ' waiting for approval', 5000);
+    if (PEND.seen !== null && waiting.length > PEND.seen) { toast('🙋 ' + (waiting.length - PEND.seen) + ' new pupil' + (waiting.length - PEND.seen === 1 ? '' : 's') + ' waiting for approval', 5000); PEND.tab = 'waiting'; }
     PEND.seen = waiting.length;
-    var oldScript = on === undefined;   // the live feed has no approval info: the script predates approvals and sign-up emails
-    if (on === false && !list.length) { box.innerHTML = ''; return; }
+    var oldScript = on === undefined && PEND.on === undefined;   // the live feed has no approval info: the script predates approvals and sign-up emails
+    if (PEND.on === false && !list.length) { box.innerHTML = ''; return; }
+    if (PEND.tab === 'declined' && !declined.length) PEND.tab = 'waiting';
+    var showing = PEND.tab === 'declined' ? declined : waiting;
+
     function row(x) {
-      return '<div class="pend-row"><span><b>' + esc(x.name) + '</b> <span class="muted small">' + esc(x.cls) + (x.at ? ' · asked ' + fmtDate(x.at) : '') + '</span></span><span class="pend-btns">' +
-        (x.status === 'declined' ? '<span class="muted small">Declined · </span>' : '') + '<button class="btn primary small" data-appr="' + esc(x.pid) + '">Approve</button>' + (x.status === 'pending' ? '<button class="btn small" data-decl="' + esc(x.pid) + '">Decline</button>' : '') + '</span></div>';
+      var dec = x.status === 'declined', p = esc(x.pid);
+      return '<li class="req-row">' +
+        '<span class="req-av" aria-hidden="true">' + esc(initials(x.name)) + '</span>' +
+        '<span class="req-who"><b>' + esc(x.name) + '</b><span class="req-meta">' + (x.cls ? '<span class="req-cls">' + esc(x.cls) + '</span>' : '') + (x.at ? '<span>' + (dec ? 'Asked ' : '') + ago(x.at) + '</span>' : '') + '</span></span>' +
+        '<span class="req-btns">' + (dec
+          ? '<button class="btn small" data-appr="' + p + '">Approve</button><button class="btn small danger req-del" data-del="' + p + '" title="Delete this request" aria-label="Delete request from ' + esc(x.name) + '">🗑 Delete</button>'
+          : '<button class="btn small req-ghost" data-decl="' + p + '">Decline</button><button class="btn primary small" data-appr="' + p + '">Approve</button>') +
+        '</span></li>';
     }
-    box.innerHTML = '<div class="pend-box' + (waiting.length ? ' has' : '') + '"><div class="pend-head"><b>🙋 ' + (waiting.length ? waiting.length + ' waiting for approval' : 'Awaiting approval') + '</b>' +
-      (waiting.length > 1 ? '<button class="btn primary small" id="pendAll">Approve all ' + waiting.length + '</button>' : '') + '</div>' +
-      (waiting.length ? waiting.map(row).join('') : '<p class="muted small">Nobody is waiting. New pupils appear here as soon as they sign in for the first time.</p>') +
-      (declined.length ? '<details class="pend-declined"><summary>Declined (' + declined.length + ')</summary>' + declined.map(row).join('') + '</details>' : '') +
-      '<div class="pend-mail small">' + (oldScript ? '<span class="bad-text">⚠ Your Google script is an older version, so approvals and sign-up emails are off. Paste in the latest Code.gs, run “authorise” once, then deploy a New version.</span> ' : PEND.mail && PEND.mail.error ? '<span class="bad-text">⚠ The last sign-up email failed: ' + esc(PEND.mail.error) + '</span> ' : PEND.mail && PEND.mail.on === false ? '<span class="muted">Sign-up emails are off (EMAIL_SIGNINS = false).</span> ' : '<span class="muted">You get an email for each new sign-up.</span> ') +
-      '<button class="btn small" id="pendMail">✉ Send test email</button> <span id="pendMailMsg"></span></div></div>';
-    $$('[data-appr]', box).forEach(function (b) { b.addEventListener('click', function () { setAccessFor(b.dataset.appr, true); }); });
-    $$('[data-decl]', box).forEach(function (b) { b.addEventListener('click', function () { var x = list.filter(function (y) { return y.pid === b.dataset.decl; })[0]; if (confirm('Decline ' + (x ? x.name : 'this pupil') + '? They won’t be able to use Mr Butler’s CTF under this name. You can approve them later from the Declined list.')) setAccessFor(b.dataset.decl, false); }); });
+    var mailLine = oldScript ? '<span class="bad-text">⚠ Your Google script is an older version, so approvals and sign-up emails are off. Paste in the latest Code.gs, run “authorise” once, then deploy a New version.</span>'
+      : PEND.mail && PEND.mail.error ? '<span class="bad-text">⚠ Last sign-up email failed: ' + esc(PEND.mail.error) + '</span>'
+      : PEND.mail && PEND.mail.on === false ? '<span>Sign-up emails are off</span>'
+      : '<span>✉ You’re emailed for each new sign-up</span>';
+    var action = PEND.tab === 'waiting'
+      ? (waiting.length > 1 ? '<button class="btn primary small" id="pendAll">Approve all ' + waiting.length + '</button>' : '')
+      : (declined.length > 1 ? '<button class="btn danger small" id="pendDelAll">🗑 Delete all ' + declined.length + '</button>' : '');
+    var empty = PEND.tab === 'waiting'
+      ? '<div class="req-empty"><span class="req-empty-ic">✓</span><div><b>All caught up</b><span>New pupils appear here the first time they sign in.</span></div></div>'
+      : '';
+    box.innerHTML = '<section class="req-card' + (waiting.length ? ' has' : '') + '">' +
+      '<header class="req-head"><h3>Sign-up requests</h3>' +
+        '<div class="req-tabs" role="tablist">' +
+          '<button role="tab" class="req-tab' + (PEND.tab === 'waiting' ? ' on' : '') + '" data-ptab="waiting" aria-selected="' + (PEND.tab === 'waiting') + '">Waiting <span class="req-n' + (waiting.length ? ' hot' : '') + '">' + waiting.length + '</span></button>' +
+          (declined.length ? '<button role="tab" class="req-tab' + (PEND.tab === 'declined' ? ' on' : '') + '" data-ptab="declined" aria-selected="' + (PEND.tab === 'declined') + '">Declined <span class="req-n">' + declined.length + '</span></button>' : '') +
+        '</div><span class="req-act">' + action + '</span></header>' +
+      (showing.length ? '<ul class="req-list">' + showing.map(row).join('') + '</ul>' : empty) +
+      (PEND.tab === 'declined' ? '<p class="req-hint">Deleting a request removes it from your sheet. If that pupil signs in again, they’ll appear under Waiting as a new request.</p>' : '') +
+      '<footer class="req-foot">' + mailLine + '<button class="linkish" id="pendMail">Send test email</button><span id="pendMailMsg"></span></footer>' +
+      '</section>';
+
+    $$('[data-ptab]', box).forEach(function (b) { b.addEventListener('click', function () { PEND.tab = b.dataset.ptab; renderPending(PEND.list); }); });
+    $$('[data-appr]', box).forEach(function (b) { b.addEventListener('click', function () { b.disabled = true; setAccessFor(b.dataset.appr, true); }); });
+    $$('[data-decl]', box).forEach(function (b) { b.addEventListener('click', function () { var x = byPid(b.dataset.decl); if (confirm('Decline ' + (x ? x.name : 'this pupil') + '?\n\nThey won’t be able to use Mr Butler’s CTF under this name. You can still approve or delete them from the Declined tab.')) { b.disabled = true; setAccessFor(b.dataset.decl, false); } }); });
+    $$('[data-del]', box).forEach(function (b) { b.addEventListener('click', function () { var x = byPid(b.dataset.del); if (confirm('Delete the request from ' + (x ? x.name : 'this pupil') + '?\n\nIt’s removed from your sheet. If they sign in again, they’ll show up as a new request.')) deleteRequests([b.dataset.del]); }); });
+    var all = $('#pendAll'); if (all) all.addEventListener('click', function () { all.disabled = true; setAccessFor(waiting.map(function (x) { return x.pid; }).join(','), true); });
+    var dall = $('#pendDelAll'); if (dall) dall.addEventListener('click', function () { if (confirm('Delete all ' + declined.length + ' declined requests?\n\nThey’re removed from your sheet. Anyone who signs in again will show up as a new request.')) deleteRequests(declined.map(function (x) { return x.pid; })); });
     $('#pendMail').addEventListener('click', function () {
       var b = this, m = $('#pendMailMsg'); if (!LIVE.key && !askLiveKey()) return;
       b.disabled = true; m.className = 'muted'; m.textContent = 'Sending…';
@@ -1693,16 +1732,35 @@
         m.textContent = j.error === 'key' ? 'Teacher key not accepted.' : j.error && j.error !== 'key' && j.ok === false && !/permission|authori/i.test(j.error) ? '✕ ' + j.error : /permission|authori/i.test(j.error || '') ? '✕ The script isn’t allowed to send email yet: in Apps Script run “authorise” once and accept, then deploy a New version.' : '✕ Your script is an older version without emails — paste in the latest Code.gs and deploy a New version.';
       }).catch(function () { b.disabled = false; m.className = 'bad-text'; m.textContent = 'Couldn’t reach the script.'; });
     });
-    var all = $('#pendAll'); if (all) all.addEventListener('click', function () { setAccessFor(ids, true); });
   }
+  function byPid(pid) { return PEND.list.filter(function (y) { return y.pid === pid; })[0]; }
   function setAccessFor(pids, ok) {
-    if (!LIVE.key && !askLiveKey()) return;
+    if (!LIVE.key && !askLiveKey()) { renderPending(PEND.list); return; }
     fetch(liveUrl('&action=' + (ok ? 'approve' : 'decline') + '&pids=' + encodeURIComponent(pids)), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (res) {
-      if (!res.ok || res.access === undefined) { toast(res.error === 'key' ? 'Teacher key not accepted' : 'Your Google script needs updating for approvals — see teacher-sync/SETUP.md', 6000); return; }
+      if (!res.ok || res.access === undefined) { renderPending(PEND.list); toast(res.error === 'key' ? 'Teacher key not accepted' : 'Your Google script needs updating for approvals — see teacher-sync/SETUP.md', 6000); return; }
       var set = {}; pids.split(',').forEach(function (p) { set[p] = 1; });
-      renderPending(PEND.list.filter(function (x) { return !set[x.pid] || !ok; }).map(function (x) { return set[x.pid] && !ok ? Object.assign({}, x, { status: 'declined' }) : x; }), true);
+      renderPending(PEND.list.filter(function (x) { return !set[x.pid] || !ok; }).map(function (x) { return set[x.pid] && !ok ? Object.assign({}, x, { status: 'declined' }) : x; }));
       toast(ok ? '✓ Approved — they’ll be let in within 20 seconds' : 'Declined', 3500);
-    }).catch(function () { toast('Couldn’t reach the sheet'); });
+    }).catch(function () { renderPending(PEND.list); toast('Couldn’t reach the sheet'); });
+  }
+  // Deleting a declined request uses the script's existing "delete" action (Pupils, Access and progress rows), so no redeploy is needed.
+  function deleteRequests(pids) {
+    if (!LIVE.key && !askLiveKey()) return;
+    pids.forEach(function (p) { PEND.busy[p] = 1; });
+    renderPending(PEND.list);
+    var done = 0, failed = [];
+    (function next(i) {
+      if (i >= pids.length) {
+        failed.forEach(function (p) { delete PEND.busy[p]; });
+        if (done) toast('🗑 Deleted ' + done + ' request' + (done === 1 ? '' : 's'), 3500);
+        if (failed.length) { toast('Couldn’t delete ' + failed.length + ' — they’ll reappear on the next refresh', 5000); liveFetch(); }
+        setTimeout(function () { pids.forEach(function (p) { delete PEND.busy[p]; }); }, 30000);   // forget once the sheet has caught up
+        return;
+      }
+      fetch(liveUrl('&action=delete&pid=' + encodeURIComponent(pids[i])), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (res) {
+        if (res.ok && res.deleted) done++; else { failed.push(pids[i]); if (res.error === 'key') toast('Teacher key not accepted'); }
+      }).catch(function () { failed.push(pids[i]); }).then(function () { next(i + 1); });
+    })(0);
   }
   function startLive() {
     if (!LIVE.key && !askLiveKey()) return;

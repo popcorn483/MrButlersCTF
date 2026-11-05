@@ -1,10 +1,10 @@
 {
-  "version": "mbctf-v41",
+  "version": "mbctf-v42",
   "date": "2026-11-05",
   "notes": [
+    "Tidier Teacher tab: sign-up requests now have Waiting and Declined tabs, and declined requests can be deleted",
     "47 new challenges: Web, Forensics, Reverse engineering, OSINT and Online safety now have challenges at every level, from Beginner to Unreal",
     "Challenges now open only after Mr Butler approves you",
-    "Flags are checked by Mr Butler\u2019s server, so answers are never stored on your computer",
-    "New pupils now need Mr Butler to approve them before they can start (just like the Revision Guide)"
+    "Flags are checked by Mr Butler\u2019s server, so answers are never stored on your computer"
   ]
 }
