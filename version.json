@@ -1,10 +1,10 @@
 {
-  "version": "mbctf-v45",
+  "version": "mbctf-v46",
   "date": "2026-11-05",
   "notes": [
+    "\ud83c\udfc1 1,000 challenges!",
+    "\ud83d\udcdd Three new practice tests in the Test area: Foundations, Challenger and Final Boss",
     "\ud83d\ude80 500 new challenges! 960 in total, across every category and level \u2014 from Beginner to Unreal",
-    "\ud83e\udd5a The site is now full of easter eggs. No hints. OK, one hint: be curious.",
-    "Approved pupils now appear in the Teacher tab's pupil list straight away",
-    "Cleaner Teacher dashboard: one row of icon buttons, with everything else in a \u22ef menu"
+    "\ud83e\udd5a The site is now full of easter eggs. No hints. OK, one hint: be curious."
   ]
 }

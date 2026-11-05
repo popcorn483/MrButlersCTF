@@ -1642,7 +1642,7 @@
     var used = t.status === 'running' ? Date.now() - t.start : t.timeUsedMs;
     var left = t.status === 'running' ? Math.max(0, t.minutes * 60000 - (Date.now() - t.start)) : 0;
     if (t.status === 'running' && !left) t.status = 'timeup';
-    return { app: 'MrButlersCTF-Test', pid: t.pid, name: t.name || '(no name)', exported: t.exported, score: pts, solvedCount: n, paperSize: t.paperSize,
+    return { app: 'MrButlersCTF-Test', pid: t.pid, name: t.name || '(no name)', exported: t.exported, score: pts, solvedCount: n, paperSize: t.paperSize, paper: t.paper || 'p0', paperTitle: t.paperTitle || 'Mock CTF',
       timeUsedMs: Math.min(used, t.minutes * 60000), left: left, status: t.status, wrong: t.wrong || 0, unv: unv, seen: seen, live: true };
   }
   function mmss(ms) { var s = Math.round(ms / 1000); return Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2); }
@@ -1650,13 +1650,14 @@
     var box = $('#liveTestTable'); if (!box) return;
     if (window.CTFEventLive) try { window.CTFEventLive(list); } catch (e) { }
     if (!list.length) { box.innerHTML = ''; return; }
-    list.sort(function (a, b) { return (b.score - a.score) || (a.timeUsedMs - b.timeUsedMs); });
-    var running = list.filter(function (d) { return d.status === 'running'; }).length;
-    box.innerHTML = '<h2>🔒 Test area — live results</h2><p class="muted small">' + list.length + ' started · ' + running + ' still running. Ranked by points, then fastest. Also feeds the projector event scoreboard automatically.</p>' +
-      '<table class="lb"><thead><tr><th>#</th><th>Name / team</th><th>Points</th><th>Flags</th><th>Status</th><th>Time used</th><th>Wrong guesses</th><th></th></tr></thead><tbody>' +
+    list.sort(function (a, b) { return a.paper.localeCompare(b.paper) || (b.score - a.score) || (a.timeUsedMs - b.timeUsedMs); });
+    var running = list.filter(function (d) { return d.status === 'running'; }).length, rank = 0, lastPaper = null;
+    box.innerHTML = '<h2>🔒 Test area — live results</h2><p class="muted small">' + list.length + ' started · ' + running + ' still running. Grouped by paper, then ranked by points, then fastest. Also feeds the projector event scoreboard automatically.</p>' +
+      '<table class="lb"><thead><tr><th>#</th><th>Name / team</th><th>Paper</th><th>Points</th><th>Flags</th><th>Status</th><th>Time used</th><th>Wrong guesses</th><th></th></tr></thead><tbody>' +
       list.map(function (d, i) {
         var st = d.status === 'running' ? '<span class="badge live">running · ' + mmss(d.left) + ' left</span>' : d.status === 'finished' ? '<span class="badge good">finished</span>' : '<span class="badge">time up</span>';
-        return '<tr><td class="num">' + (i + 1) + '</td><td>' + esc(d.name) + '</td><td class="num">' + d.score + '</td><td class="num">' + d.solvedCount + '/' + d.paperSize + '</td><td>' + st +
+        rank = d.paper === lastPaper ? rank + 1 : 1; lastPaper = d.paper;
+        return '<tr><td class="num">' + rank + '</td><td>' + esc(d.name) + '</td><td>' + esc(d.paperTitle) + '</td><td class="num">' + d.score + '</td><td class="num">' + d.solvedCount + '/' + d.paperSize + '</td><td>' + st +
           '</td><td class="num">' + mmss(d.timeUsedMs) + '</td><td class="num">' + d.wrong + '</td><td>' + (d.unv ? '<span class="badge bad">' + d.unv + ' unverified</span>' : '') + '</td></tr>';
       }).join('') + '</tbody></table>';
   }

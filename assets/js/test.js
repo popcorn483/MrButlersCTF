@@ -1,5 +1,5 @@
 /* Test area: an exam-style mock that mimics the real event.
-   Password-gated to start, a countdown timer, a fixed paper, NO hints and NO walkthroughs,
+   Three papers (Foundations, Challenger, Final Boss). Password-gated to start, a countdown timer, a fixed paper, NO hints and NO walkthroughs,
    and a results screen the teacher can collect. Assistance is switched off everywhere while a test runs. */
 (function () {
   'use strict';
@@ -8,48 +8,99 @@
   // Change the password pupils must type to start, and how long the test runs.
   var CONFIG = {
     // the start password is NOT kept here (this site is public): it is checked by the teacher's Google script,
-    // which got it from the answer book (Teacher tab › 🔐 Install answers).
-    minutes: 45,           // length of the test
-    title: 'Mock CTF',
-    // The paper: a balanced spread across categories, easy to hard.
-    paper: ['warm-02', 'warm-05', 'cry-01', 'osint-01', 'net-01', 'safe-01',
-            'warm-07', 'cry-02', 'web-01', 'for-01', 'steg-02', 'prog-06',
-            'cry-08', 'web-03', 'for-03', 'rev-01', 'net-02', 'cry-07',
-            'steg-03', 'cry-11', 'web-08', 'for-06', 'rev-06', 'cry-20']
+    // which got it from the answer book (Teacher tab › 🔐 Install answers). The same password opens every paper.
+    papers: [
+      { id: 'p1', icon: '🌱', title: 'Paper 1 · Foundations', level: 'Beginner & Intermediate', minutes: 45,
+        blurb: 'A first taste of the real event. Mostly one-step challenges across every category, with a few two-step ones to finish.',
+        paper: ['warm-q05', 'web-q03', 'cry-q01', 'for-q05', 'steg-q08', 'osint-q02',
+              'net-q05', 'safe-q01', 'warm-q26', 'web-q16', 'cry-q16', 'for-q14',
+              'steg-q11', 'osint-q12', 'rev-q13', 'net-q14', 'safe-q16', 'prog-q13',
+              'log-q16', 'cry-q20', 'web-q19', 'for-q21', 'log-q20', 'net-q21'] },
+      { id: 'p2', icon: '⚡', title: 'Paper 2 · Challenger', level: 'Intermediate & Hard', minutes: 60,
+        blurb: 'Multi-step puzzles, files to dig through and a little scripting. Pick your battles and keep moving.',
+        paper: ['cry-q21', 'web-q17', 'for-q19', 'steg-q23', 'osint-q21', 'rev-q20',
+              'safe-q22', 'prog-q22', 'web-q28', 'cry-q29', 'for-q25', 'steg-q28',
+              'osint-q30', 'rev-q32', 'net-q28', 'safe-q29', 'prog-q25', 'log-q29',
+              'cry-q27', 'for-q32', 'cry-q35', 'web-q38', 'rev-q33', 'net-q38'] },
+      { id: 'p3', icon: '🌌', title: 'Paper 3 · Final Boss', level: 'Expert & Unreal', minutes: 90,
+        blurb: 'Expert, Competition Grade and Unreal challenges. As hard as it gets: nobody is expected to finish.',
+        paper: ['web-q35', 'cry-q36', 'for-q36', 'steg-q38', 'osint-q36', 'rev-q36',
+              'net-q36', 'safe-q35', 'prog-q35', 'log-q34', 'elite-q26', 'elite-q18',
+              'elite-q19', 'elite-q23', 'elite-q24', 'elite-q20', 'elite-q33', 'elite-q45',
+              'unreal-q12', 'unreal-q25', 'unreal-q11', 'unreal-q14'] }
+    ]
   };
   // ============================================================
 
   var U = window.CTFUtil, $ = U.$, esc = U.esc, toast = U.toast, download = U.download;
   var BY_ID = window.CTF.BY_ID, CATS = window.CTF.DATA.cats;
-  var TIER = [null, 'Beginner', 'Easy', 'Medium', 'Hard', 'Expert'];
+  var TIER = [null, 'Beginner', 'Easy', 'Medium', 'Hard', 'Expert', 'Elite', 'Unreal'];
   var TCLS = [null, 't1', 't2', 't3', 't4', 't5', 't6', 't7'];
   var SALT = 'mbctf-test-v1';
-  var KEY = 'mbctf-test-v1';
+  var KEY = 'mbctf-test-v2';
 
-  var PAPER = CONFIG.paper.filter(function (id) { return BY_ID[id]; });
-  var TOTAL_PTS = PAPER.reduce(function (s, id) { return s + BY_ID[id].pts; }, 0);
+  // each paper keeps its own clock and result; only one can run at a time
+  var PAPERS = CONFIG.papers.map(function (p) { var ids = p.paper.filter(function (id) { return BY_ID[id]; }); return Object.assign({}, p, { ids: ids, total: ids.reduce(function (s, id) { return s + BY_ID[id].pts; }, 0) }); });
+  function paperById(id) { return PAPERS.filter(function (p) { return p.id === id; })[0]; }
+  var P = PAPERS[0], PAPER = P.ids, TOTAL_PTS = P.total;
 
-  function blank() { return { v: 1, pid: rid(), name: '', started: false, start: 0, end: 0, finished: false, solved: {}, wrong: 0 }; }
+  function blank() { return { v: 2, paper: P.id, pid: rid(), name: '', started: false, start: 0, end: 0, finished: false, solved: {}, wrong: 0 }; }
   function rid() { var a = new Uint8Array(6); (crypto.getRandomValues ? crypto.getRandomValues(a) : a.forEach(function (_, i) { a[i] = Math.random() * 256; })); return Array.prototype.map.call(a, function (b) { return ('0' + b.toString(16)).slice(-2); }).join(''); }
-  var TS = blank();
-  try { var raw = localStorage.getItem(KEY); if (raw) TS = Object.assign(blank(), JSON.parse(raw)); } catch (e) { }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(TS)); } catch (e) { } if (window.CTFSyncSoon) window.CTFSyncSoon(); }
+  var ALL = { active: null, papers: {} };
+  try { var raw = localStorage.getItem(KEY); if (raw) ALL = Object.assign(ALL, JSON.parse(raw)); } catch (e) { }
+  function stateFor(p) { var o = ALL.papers[p.id]; return o ? Object.assign(blank(), o, { paper: p.id }) : null; }
+  function use(p) { P = p; PAPER = p.ids; TOTAL_PTS = p.total; TS = stateFor(p) || blank(); }
+  var TS = null;
+  use(paperById(ALL.active) || PAPERS[0]);
+  function save() { ALL.papers[P.id] = TS; ALL.active = P.id; try { localStorage.setItem(KEY, JSON.stringify(ALL)); } catch (e) { } if (window.CTFSyncSoon) window.CTFSyncSoon(); }
+  function liveOf(p) { var t = stateFor(p); return !!(t && t.started && !t.finished && Date.now() - t.start < p.minutes * 60000); }
+  function runningPaper() { return PAPERS.filter(liveOf)[0] || null; }
 
   var timer = null;
-  function durationMs() { return CONFIG.minutes * 60 * 1000; }
+  function durationMs() { return P.minutes * 60 * 1000; }
   function remaining() { return Math.max(0, durationMs() - (Date.now() - TS.start)); }
-  function isLive() { return TS.started && !TS.finished && remaining() > 0; }
+  function isLive() { return !!runningPaper(); }
   function tScore() { var p = 0; Object.keys(TS.solved).forEach(function (id) { if (BY_ID[id]) p += BY_ID[id].pts; }); return p; }
   function tCount() { return Object.keys(TS.solved).filter(function (id) { return BY_ID[id]; }).length; }
 
   var area = function () { return $('#testArea'); };
 
-  function enter() {
-    if (!PAPER.length) { stopTimer(); area().innerHTML = '<div class="test-gate"><div class="test-badge">🔒 Test area</div><h1>' + esc(CONFIG.title) + '</h1><p>The test opens once Mr Butler has approved you and the challenges have loaded.</p></div>'; return; }
-    if (TS.finished) return renderResults();
-    if (TS.started && remaining() > 0) { renderBoard(); startTimer(); return; }
-    if (TS.started && remaining() <= 0) { return finish('time'); }
-    renderStart();
+  function enter(pid) {
+    if (!PAPERS.some(function (p) { return p.ids.length; })) { stopTimer(); area().innerHTML = '<div class="test-gate"><div class="test-badge">🔒 Test area</div><h1>Practice tests</h1><p>The tests open once Mr Butler has approved you and the challenges have loaded.</p></div>'; return; }
+    var run = runningPaper();
+    if (run) { use(run); renderBoard(); startTimer(); return; }
+    // a paper whose clock ran out while the pupil was away: close it off
+    PAPERS.forEach(function (p) { var t = stateFor(p); if (t && t.started && !t.finished) { use(p); TS.finished = true; TS.end = TS.start + p.minutes * 60000; TS.endReason = 'time'; save(); } });
+    if (pid && paperById(pid)) { use(paperById(pid)); if (TS.finished) return renderResults(); return renderStart(); }
+    renderPicker();
+  }
+
+  // ---------- choose a paper ----------
+  function renderPicker() {
+    stopTimer();
+    var cards = PAPERS.map(function (p) {
+      var t = stateFor(p), done = t && t.finished, tiers = {};
+      p.ids.forEach(function (id) { tiers[BY_ID[id].tier] = 1; });
+      var score = done ? Object.keys(t.solved || {}).reduce(function (s, id) { return s + (BY_ID[id] ? BY_ID[id].pts : 0); }, 0) : 0;
+      return '<button class="paper-card ' + p.id + (done ? ' done' : '') + '" data-paper="' + p.id + '"' + (p.ids.length ? '' : ' disabled') + '>' +
+        '<span class="paper-icon">' + p.icon + '</span>' +
+        '<span class="paper-level">' + esc(p.level) + '</span>' +
+        '<b class="paper-title">' + esc(p.title) + '</b>' +
+        '<span class="paper-blurb">' + esc(p.blurb) + '</span>' +
+        '<span class="paper-facts"><span>⏱️ ' + p.minutes + ' min</span><span>🏁 ' + p.ids.length + ' challenges</span><span>⭐ ' + p.total + ' pts</span></span>' +
+        '<span class="paper-tiers">' + Object.keys(tiers).map(function (k) { return '<span class="tag tier ' + TCLS[k] + '">' + TIER[k] + '</span>'; }).join('') + '</span>' +
+        '<span class="paper-go">' + (done ? '✓ Done · ' + score + ' / ' + p.total + ' pts · see result' : 'Choose this paper →') + '</span>' +
+        '</button>';
+    }).join('');
+    area().innerHTML =
+      '<div class="test-picker">' +
+      '<div class="test-badge">🔒 Test area</div>' +
+      '<h1>Practice tests</h1>' +
+      '<p class="muted">Three timed mock papers that work like the real event: a countdown, no hints and no walkthroughs. Start with the one that matches where you are — you can sit each paper once (your teacher can clear it to try again).</p>' +
+      '<div class="paper-grid">' + cards + '</div>' +
+      '<p class="muted small">Not ready? Keep practising on the <a href="#" data-goto="board">Challenge board</a> instead.</p>' +
+      '</div>';
+    U.$$('[data-paper]', area()).forEach(function (b) { b.addEventListener('click', function () { enter(b.dataset.paper); }); });
   }
 
   // ---------- start screen ----------
@@ -58,10 +109,11 @@
     area().innerHTML =
       '<div class="test-gate">' +
       '<div class="test-badge">🔒 Test area</div>' +
-      '<h1>' + esc(CONFIG.title) + '</h1>' +
+      '<h1>' + P.icon + ' ' + esc(P.title) + '</h1>' +
+      '<p class="paper-level-line">' + esc(P.level) + '</p>' +
       '<p>This is a <b>timed mock competition</b> that works like the real event. Before you start, know that:</p>' +
       '<ul class="test-rules">' +
-      '<li>⏱️ You have <b>' + CONFIG.minutes + ' minutes</b> once you begin. The clock does not stop.</li>' +
+      '<li>⏱️ You have <b>' + P.minutes + ' minutes</b> once you begin. The clock does not stop.</li>' +
       '<li>🚫 There are <b>no hints and no walkthroughs</b> — here or anywhere on the site — while the test runs.</li>' +
       '<li>🧰 You <b>can</b> use the Toolkit (Decoder, Hex viewer and so on), just like on the day.</li>' +
       '<li>🏁 There are ' + PAPER.length + ' challenges worth ' + TOTAL_PTS + ' points. Do the easy ones first.</li>' +
@@ -73,8 +125,9 @@
       '<div id="testStartMsg" class="flag-msg bad"></div>' +
       '<button class="btn primary big" type="submit">Start the test ▶</button>' +
       '</form>' +
-      '<p class="muted small">Not ready? You can keep practising on the <a href="#" data-goto="board">Challenge board</a> instead.</p>' +
+      '<p class="muted small"><a href="#" id="testBack">← Choose a different paper</a></p>' +
       '</div>';
+    $('#testBack').addEventListener('click', function (e) { e.preventDefault(); renderPicker(); });
     $('#testStartForm').addEventListener('submit', function (e) {
       e.preventDefault();
       var pass = $('#testPass').value.trim(), m = $('#testStartMsg'), btn = this.querySelector('button[type=submit]'), nm = $('#testName').value.trim().slice(0, 40);
@@ -90,6 +143,7 @@
     });
   }
   function begin(nm) {
+    if (runningPaper()) { toast('Finish the paper you have already started first.'); return enter(); }
     TS = blank(); TS.name = nm; TS.started = true; TS.start = Date.now(); save();
     renderBoard(); startTimer();
     toast('Good luck! The clock has started.');
@@ -103,7 +157,7 @@
     var cats = CATS.filter(function (cat) { return byCat[cat.id]; });
     area().innerHTML =
       '<div class="test-bar">' +
-      '<div class="test-bar-left"><span class="test-badge small">🔒 Test in progress</span>' + (TS.name ? ' <b>' + esc(TS.name) + '</b>' : '') + '</div>' +
+      '<div class="test-bar-left"><span class="test-badge small">🔒 ' + esc(P.title) + '</span>' + (TS.name ? ' <b>' + esc(TS.name) + '</b>' : '') + '</div>' +
       '<div class="test-timer" id="testTimer">--:--</div>' +
       '<div class="test-bar-right"><span class="test-score"><b id="testScore">0</b> pts · <span id="testSolved">0</span>/' + PAPER.length + '</span>' +
       '<button class="btn danger small" id="testFinish">Finish &amp; see results</button></div>' +
@@ -255,7 +309,7 @@
       perCat[cat.id] = { name: cat.name, solved: ids.filter(function (id) { return TS.solved[id]; }).length, total: ids.length };
     });
     var timeUsed = Math.min(durationMs(), (TS.end || Date.now()) - TS.start);
-    var d = { app: 'MrButlersCTF-Test', v: 1, pid: TS.pid, name: TS.name, exported: Date.now(),
+    var d = { app: 'MrButlersCTF-Test', v: 2, pid: TS.pid, name: TS.name, exported: Date.now(), paper: P.id, paperTitle: P.title,
       score: tScore(), totalPts: TOTAL_PTS, solvedCount: tCount(), paperSize: PAPER.length,
       wrong: TS.wrong, timeUsedMs: timeUsed, endReason: TS.endReason || 'manual',
       solvedIds: Object.keys(TS.solved), perCat: perCat };
@@ -280,7 +334,7 @@
     }).join('');
     area().innerHTML =
       '<div class="test-results">' +
-      '<div class="test-badge">🏁 Test complete</div>' +
+      '<div class="test-badge">🏁 ' + esc(P.title) + ' — complete</div>' +
       '<h1>' + (TS.name ? esc(TS.name) + '\'s result' : 'Your result') + '</h1>' +
       (d.endReason === 'time' ? '<p class="muted">Time ran out — here is how you did.</p>' : '') +
       '<div class="result-stats">' +
@@ -294,6 +348,7 @@
       '<h2>Challenge by challenge</h2><p class="muted small">The ones you missed are great to practise next — no answers are shown here.</p><div class="result-list">' + solvedList + '</div>' +
       '<div class="progress-actions">' +
       '<button class="btn primary" id="testDownload">⬇ Download my result for my teacher</button>' +
+      '<button class="btn" id="testPapers">← All practice tests</button>' +
       '<button class="btn" data-goto="board">Back to practice</button>' +
       '<button class="btn danger" id="testReset">Clear this result</button>' +
       '</div>' +
@@ -306,17 +361,19 @@
       download('MrButlersCTF-TEST-' + nm + '.json', out);
       toast('Result downloaded — send it to your teacher');
     });
+    $('#testPapers').addEventListener('click', function () { renderPicker(); });
     $('#testReset').addEventListener('click', function () {
-      if (confirm('Clear this test result and return to the start screen?')) { TS = blank(); save(); renderStart(); }
+      if (confirm('Clear this test result so the paper can be sat again?')) { TS = blank(); save(); renderPicker(); }
     });
   }
 
   // what the teacher's live view sees: the result payload plus each solve's proof code
   function liveSnapshot() {
-    if (!TS.started) return null;
+    var run = runningPaper(); if (run && run.id !== P.id) use(run);
+    if (!TS || !TS.started) return null;
     var d = resultPayload(), proofs = {};
     Object.keys(TS.solved).forEach(function (id) { proofs[id] = TS.solved[id].p; });
-    d.proofs = proofs; d.start = TS.start; d.minutes = CONFIG.minutes;
+    d.proofs = proofs; d.start = TS.start; d.minutes = P.minutes;
     d.status = TS.finished ? 'finished' : (remaining() > 0 ? 'running' : 'timeup');
     return d;
   }

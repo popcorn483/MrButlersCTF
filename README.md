@@ -8,7 +8,8 @@ These are original practice challenges, not the real competition tasks.
 - Challenge board by category, with seven difficulty tiers (Beginner → Unreal)
 - **🏆 Competition Grade** — 100 Elite challenges (500–600 pts) modelled on real competition tasks; no hints or walkthroughs; unlocks after 5 Hard/Expert solves
 - **🌌 Unreal** — 52 multi-stage challenges (1,000 pts) with decoys and no help at all; unlocks after 3 Competition Grade solves
-- 960 challenges in total across 13 categories and 7 levels, every generated one solved again automatically from its own published puzzle
+- 1,000 challenges in total across 13 categories and 7 levels, every generated one solved again automatically from its own published puzzle
+- **Practice tests** — three timed mock papers in the Test area: Paper 1 Foundations (Beginner & Intermediate, 45 min), Paper 2 Challenger (Intermediate & Hard, 60 min) and Paper 3 Final Boss (Expert, Competition Grade & Unreal, 90 min). No hints; flags checked by the script; live results on the Teacher tab, grouped by paper
 - **View HTML** button on every challenge (Inspect Element is blocked on C2k)
 - Practice-only hints, plus a **Show answer & solution** button (revealed challenges score 0 points)
 - Toolkit: the full **CyberChef** v11.5 (GCHQ, Apache-2.0, served from `assets/cyberchef` with analytics removed), plus a guided CyberChef-style decoder, frequency analysis, hashes, hex viewer, image inspector, JS scratchpad, ASCII table

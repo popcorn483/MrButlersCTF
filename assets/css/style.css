@@ -1123,3 +1123,22 @@ html.mb-locked #waitModal, html.mb-locked #whoModal { display: grid !important; 
 .req-x { margin-left: auto; background: none; border: 0; color: var(--muted); font-size: 1rem; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
 .req-x:hover { color: var(--text); background: var(--panel2); }
 @media (max-width: 560px) { .tdash-tools { width: 100%; } .tmenu { margin-left: auto; } }
+
+/* Test area: choose one of three practice papers */
+.test-picker { max-width: 1040px; margin: 10px auto; }
+.test-picker h1 { margin: 12px 0 6px; }
+.paper-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 18px 0; }
+.paper-card { --pc: var(--green); position: relative; display: flex; flex-direction: column; gap: 8px; padding: 20px 20px 16px; border-radius: var(--radius); border: 1px solid var(--card-line); background: linear-gradient(170deg, color-mix(in srgb, var(--pc) 12%, var(--panel)), var(--panel) 55%); color: var(--text); font: inherit; text-align: left; cursor: pointer; box-shadow: var(--card-shadow); transition: transform .15s, border-color .15s; overflow: hidden; }
+.paper-card::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: var(--pc); }
+.paper-card:hover:not([disabled]) { transform: translateY(-3px); border-color: color-mix(in srgb, var(--pc) 60%, transparent); }
+.paper-card[disabled] { opacity: .5; cursor: not-allowed; }
+.paper-card.p1 { --pc: var(--t1); } .paper-card.p2 { --pc: var(--t4); } .paper-card.p3 { --pc: var(--t7); }
+.paper-icon { font-size: 2rem; line-height: 1; }
+.paper-level { color: var(--pc); font: 700 .74rem var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+.paper-title { font-family: var(--brand); font-size: 1.15rem; letter-spacing: .02em; }
+.paper-blurb { color: var(--muted); font-size: .88rem; line-height: 1.45; flex: 1; }
+.paper-facts { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .82rem; }
+.paper-tiers { display: flex; flex-wrap: wrap; gap: 4px; }
+.paper-go { margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--pc); font-weight: 700; font-size: .88rem; }
+.paper-card.done .paper-go { color: var(--green); }
+.paper-level-line { margin: 0 0 8px; color: var(--muted); font: 700 .8rem var(--mono); letter-spacing: .05em; text-transform: uppercase; }
