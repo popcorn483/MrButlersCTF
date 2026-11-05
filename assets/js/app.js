@@ -1590,6 +1590,7 @@
   var LIVE = { on: false, timer: null, key: '' }, LIVE_KEY_STORE = 'mbctf-teacher-livekey-v1';
   try { LIVE.key = localStorage.getItem(LIVE_KEY_STORE) || ''; } catch (e) { }
   function liveSignedIn() { var b = $('#liveSignOut'); if (b) b.hidden = !teacherSignedIn(); updateTeacherUI(); }
+  function liveBtnIcon() { var b = $('#liveBtn'); if (!b) return; b.textContent = LIVE.on ? '⏸' : '▶'; b.title = LIVE.on ? 'Pause live view' : 'Start live view'; b.setAttribute('aria-label', b.title); b.classList.toggle('on', !!LIVE.on); }
   function liveInfo(cls, html) { var el = $('#liveInfo'); if (!el) return; el.className = 'small ' + (cls || 'muted'); el.innerHTML = html; }
   function askLiveKey() {
     var k = prompt('Teacher key (the TEACHER_KEY you set in the Google Apps Script):', LIVE.key || '');
@@ -1625,7 +1626,7 @@
       T.rows = Object.keys(byPid).map(function (k) { return byPid[k]; });
       renderTeacher(); renderLiveTests(tests); renderPending(res.pending || [], res.approval, res.mail); renderInstall(res.installed);
       var n = (res.rows || []).length, active = (res.rows || []).filter(function (x) { return Date.now() - x.seen < 5 * 60000; }).length;
-      liveInfo('good-text', '🔴 Live · ' + n + ' pupil' + (n === 1 ? '' : 's') + ' (' + active + ' active now) · refreshed ' + new Date().toLocaleTimeString() + (bad ? ' · ' + bad + ' unreadable row(s)' : ''));
+      liveInfo('muted', '<span class="live-dot"></span>Live · ' + n + ' pupil' + (n === 1 ? '' : 's') + ' · ' + active + ' active · updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + (bad ? ' · ' + bad + ' unreadable' : ''));
     }).catch(function () { liveInfo('bad-text', 'Couldn\'t reach the Google Sheet — trying again in a moment…'); });
   }
   // ---------- teacher: live Test area (mock competition) results ----------
@@ -1682,6 +1683,10 @@
     if (PEND.on === false && !list.length) { box.innerHTML = ''; return; }
     if (PEND.tab === 'declined' && !declined.length) PEND.tab = 'waiting';
     var showing = PEND.tab === 'declined' ? declined : waiting;
+    var rq = $('#tdReqN'); if (rq) { rq.hidden = !waiting.length; rq.textContent = waiting.length; }
+    var rb = $('#tdReq'); if (rb) rb.classList.toggle('on', !!PEND.open);
+    var warn = oldScript || (PEND.mail && PEND.mail.error);
+    if (!waiting.length && !PEND.open && !warn) { box.innerHTML = ''; return; }
 
     function row(x) {
       var dec = x.status === 'declined', p = esc(x.pid);
@@ -1704,7 +1709,7 @@
       ? '<div class="req-empty"><span class="req-empty-ic">✓</span><div><b>All caught up</b><span>New pupils appear here the first time they sign in.</span></div></div>'
       : '';
     box.innerHTML = '<section class="req-card' + (waiting.length ? ' has' : '') + '">' +
-      '<header class="req-head"><h3>Sign-up requests</h3>' +
+      '<header class="req-head"><h3>Sign-up requests</h3>' + (waiting.length ? '' : '<button class="req-x" id="pendClose" title="Close" aria-label="Close">✕</button>') + '' +
         '<div class="req-tabs" role="tablist">' +
           '<button role="tab" class="req-tab' + (PEND.tab === 'waiting' ? ' on' : '') + '" data-ptab="waiting" aria-selected="' + (PEND.tab === 'waiting') + '">Waiting <span class="req-n' + (waiting.length ? ' hot' : '') + '">' + waiting.length + '</span></button>' +
           (declined.length ? '<button role="tab" class="req-tab' + (PEND.tab === 'declined' ? ' on' : '') + '" data-ptab="declined" aria-selected="' + (PEND.tab === 'declined') + '">Declined <span class="req-n">' + declined.length + '</span></button>' : '') +
@@ -1714,6 +1719,7 @@
       '<footer class="req-foot">' + mailLine + '<button class="linkish" id="pendMail">Send test email</button><span id="pendMailMsg"></span></footer>' +
       '</section>';
 
+    var pc = $('#pendClose'); if (pc) pc.addEventListener('click', function () { PEND.open = false; renderPending(PEND.list); });
     $$('[data-ptab]', box).forEach(function (b) { b.addEventListener('click', function () { PEND.tab = b.dataset.ptab; renderPending(PEND.list); }); });
     $$('[data-appr]', box).forEach(function (b) { b.addEventListener('click', function () { b.disabled = true; setAccessFor(b.dataset.appr, true); }); });
     $$('[data-decl]', box).forEach(function (b) { b.addEventListener('click', function () { var x = byPid(b.dataset.decl); if (confirm('Decline ' + (x ? x.name : 'this pupil') + '?\n\nThey won’t be able to use Mr Butler’s CTF under this name. You can still approve or delete them from the Declined tab.')) { b.disabled = true; setAccessFor(b.dataset.decl, false); } }); });
@@ -1764,14 +1770,14 @@
   }
   function startLive() {
     if (!LIVE.key && !askLiveKey()) return;
-    LIVE.on = true; $('#liveBtn').textContent = '⏸ Pause live view';
-    liveInfo('muted', 'Connecting to the sheet…');
+    LIVE.on = true; liveBtnIcon();
+    liveInfo('muted', 'Connecting…');
     liveFetch(); clearInterval(LIVE.timer); LIVE.timer = setInterval(liveFetch, 20000);
   }
   function stopLive() {
     LIVE.on = false; clearInterval(LIVE.timer); LIVE.timer = null;
-    var b = $('#liveBtn'); if (b) b.textContent = '▶ Start live view';
-    liveInfo('muted', 'Live view paused.');
+    liveBtnIcon();
+    liveInfo('muted', '⏸ Paused');
   }
   // ---------- teacher access: one password (the Teacher Area password) signs a PC in ----------
   var TEACHER_PC = 'mbctf-teacher-pc-v1', STAFF_SS = 'mbctf-staff-v1';
@@ -1824,21 +1830,21 @@
     if (!SYNC_URL || !LIVE.key || T.installing) return;
     var d = T.vault, info = d.info || {};
     if (!d.answers || !info.contentKey) { if (msg) msg.textContent = 'The answer book is out of date — reload the page.'; return; }
-    T.installing = true; if (msg) { msg.className = 'small'; msg.textContent = 'Installing answers on your Google script…'; }
+    T.installing = true; if (msg) { msg.className = 'small'; msg.textContent = 'Installing answers on your Google script…'; } if (manual) toast('🔐 Installing answers…');
     fetch(SYNC_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ kind: 'install', key: LIVE.key, k: info.contentKey, ver: info.contentVer, answers: d.answers, testpw: info.testPassword || '' }) })
       .then(function (r) { return r.json(); }).then(function (j) {
         T.installing = false;
         if (j && j.ok && j.installed) { T.installed = j.ver; renderInstall(j.ver); if (manual || j.cleaned) toast('🔐 Answers installed for ' + j.installed + ' challenges' + (j.cleaned ? ' · ' + j.cleaned + ' pupil record(s) had unprovable solves removed' : ''), 5000); }
-        else if (msg) { msg.className = 'small bad-text'; msg.textContent = j && j.error === 'key' ? 'The script rejected the teacher key.' : 'Your Google script needs updating first (see teacher-sync/SETUP.md).'; }
-      }).catch(function () { T.installing = false; if (msg) { msg.className = 'small bad-text'; msg.textContent = 'Couldn’t reach the script (it may need updating — see teacher-sync/SETUP.md).'; } });
+        else if (msg) { $('#installBox').hidden = false; msg.className = 'small bad-text'; msg.textContent = j && j.error === 'key' ? 'The script rejected the teacher key.' : 'Your Google script needs updating first (see teacher-sync/SETUP.md).'; }
+      }).catch(function () { T.installing = false; if (msg) { $('#installBox').hidden = false; msg.className = 'small bad-text'; msg.textContent = 'Couldn’t reach the script (it may need updating — see teacher-sync/SETUP.md).'; } });
   }
   function renderInstall(ver) {
     var box = $('#installBox'); if (!box) return;
     if (ver === undefined) { box.hidden = true; return; }   // older script: nothing to show
     T.feedVer = ver;
-    var ok = ver && ver === META.ver; box.hidden = false;
+    var ok = ver && ver === META.ver; box.hidden = !!ok;
     box.className = 'callout ' + (ok ? 'install-ok' : 'warn');
-    box.innerHTML = ok ? '<span class="small">🔐 Answers are installed on your Google script — pupils’ flags are checked there.</span> <button type="button" class="linkish small" id="installBtn">Reinstall</button> <span id="installMsg" class="small"></span>'
+    box.innerHTML = ok ? '<span id="installMsg" class="small"></span> <button type="button" class="linkish small" id="installBtn">Retry</button>'
       : '<b>🔐 Answers need installing</b><p class="small">' + (ver ? 'The challenges have changed since the answers were installed.' : 'Your Google script doesn’t have the answers yet, so pupils can’t open or score any challenges.') + '</p><button type="button" class="btn primary small" id="installBtn">Install answers now</button> <span id="installMsg" class="small"></span>';
     $('#installBtn').addEventListener('click', function () { installAnswers(true); });
     if (!ok && T.vault && !T.installing && T.autoTried !== META.ver) { T.autoTried = META.ver; installAnswers(false); }
@@ -1879,12 +1885,22 @@
 
   (function initLive() {
     var box = $('#liveBox'); if (!box) return;
+    var menu = $('#tdMenu'), more = $('#tdMore');
+    function closeMenu() { menu.hidden = true; more.setAttribute('aria-expanded', 'false'); }
+    more.addEventListener('click', function (e) { e.stopPropagation(); menu.hidden = !menu.hidden; more.setAttribute('aria-expanded', String(!menu.hidden)); });
+    menu.addEventListener('click', function (e) { if (e.target.closest('button, label')) setTimeout(closeMenu, 0); });
+    document.addEventListener('click', function (e) { if (!menu.hidden && !e.target.closest('.tmenu')) closeMenu(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !menu.hidden) closeMenu(); });
     if (!SYNC_URL) {
-      $('#liveBtns').hidden = true;
+      ['#liveBtn', '#tdReq', '#tdInstall', '#tdMail', '#liveKeyBtn', '#liveClear'].forEach(function (k) { var e = $(k); if (e) e.hidden = true; });
       liveInfo('muted', 'Not set up yet. Connect a Google Sheet once and every pupil\'s progress arrives here automatically — no files to collect. Follow <a href="https://github.com/popcorn483/MrButlersCTF/blob/main/teacher-sync/SETUP.md" target="_blank" rel="noopener">the 5-minute setup guide</a>.');
       return;
     }
     $('#liveBtn').addEventListener('click', function () { LIVE.on ? stopLive() : startLive(); });
+    liveBtnIcon();
+    $('#tdReq').addEventListener('click', function () { PEND.open = !PEND.open; renderPending(PEND.list || []); var pb = $('#pendBox'); if (PEND.open && pb.firstChild) pb.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); });
+    $('#tdInstall').addEventListener('click', function () { installAnswers(true); });
+    $('#tdMail').addEventListener('click', function () { PEND.open = true; renderPending(PEND.list || []); var m = $('#pendMail'); if (m) m.click(); });
     $('#liveKeyBtn').addEventListener('click', function () { if (askLiveKey() && LIVE.on) liveFetch(); });
     $('#liveSignOut').addEventListener('click', function () {
       if (!confirm('Sign this PC out of the teacher view?\n\nThe teacher key is forgotten here, and anyone using this PC afterwards is tracked as a pupil again.')) return;
@@ -1902,7 +1918,7 @@
       }).catch(function () { toast('Couldn\'t reach the sheet'); });
     });
     document.addEventListener('visibilitychange', function () { if (!document.hidden && LIVE.on) liveFetch(); });
-    if (LIVE.key) startLive(); else liveInfo('muted', 'Press <b>Start live view</b> and enter your teacher key.');
+    if (LIVE.key) startLive(); else liveInfo('muted', 'Press ▶ and enter your teacher key to see the class live.');
   })();
 
   // ---------- getting started page ----------

@@ -279,38 +279,37 @@
   <!-- ============ TEACHER ============ -->
   <section class="view" id="view-teacher">
     <div class="prose wide">
-      <div class="event-launch callout">
-        <div>
-          <b>🖥 Run a class mock event</b>
-          <p class="muted small">A big-screen countdown and live-style scoreboard for a whole-class dress rehearsal. Put it on the projector, start the clock, and have teams work through the <a href="#" data-goto="test">Test area</a> on their own devices.</p>
-        </div>
-        <button class="btn primary" id="openEvent">Open projector event screen →</button>
-      </div>
-      <h1>Teacher leaderboard</h1>
-      <div id="installBox" hidden></div>
-      <div id="pendBox"></div>
-      <div class="live-box callout" id="liveBox">
-        <div>
-          <b>📡 Live class progress</b>
+      <header class="tdash-head live-box" id="liveBox">
+        <div class="tdash-title">
+          <h1>Teacher dashboard</h1>
           <p id="liveInfo" class="small muted"></p>
         </div>
-        <div class="live-btns" id="liveBtns">
-          <button class="btn primary" id="liveBtn">▶ Start live view</button>
-          <button class="btn small" id="liveKeyBtn">Teacher key</button>
-          <button class="btn small" id="liveSignOut" hidden>Sign out of this PC</button>
-          <button class="btn danger small" id="liveClear">Clear live data</button>
+        <div class="tdash-tools" id="liveBtns">
+          <button class="ibtn" id="liveBtn" title="Pause live view" aria-label="Pause live view">⏸</button>
+          <button class="ibtn" id="tdReq" title="Sign-up requests" aria-label="Sign-up requests">🙋<span class="ibadge" id="tdReqN" hidden></span></button>
+          <a class="ibtn" href="teacher.html" title="Answer book (solutions and PDF)" aria-label="Answer book">📖</a>
+          <button class="ibtn" id="openEvent" title="Projector event screen (class mock event)" aria-label="Projector event screen">🖥</button>
+          <div class="tmenu">
+            <button class="ibtn" id="tdMore" title="More" aria-label="More options" aria-haspopup="true" aria-expanded="false">⋯</button>
+            <div class="tmenu-pop" id="tdMenu" role="menu" hidden>
+              <label for="teacherFiles" role="menuitem">📂 Load pupil progress files</label>
+              <button type="button" role="menuitem" id="teacherCsv">⬇ Leaderboard (CSV)</button>
+              <button type="button" role="menuitem" id="challengeListCsv">⬇ Challenge list (no answers)</button>
+              <button type="button" role="menuitem" id="teacherClear">✕ Clear loaded files</button>
+              <hr>
+              <button type="button" role="menuitem" id="tdInstall">🔐 Reinstall answers</button>
+              <button type="button" role="menuitem" id="tdMail">✉ Send test email</button>
+              <button type="button" role="menuitem" id="liveKeyBtn">🔑 Teacher key</button>
+              <button type="button" role="menuitem" id="liveSignOut" hidden>⎋ Sign out of this PC</button>
+              <hr>
+              <button type="button" role="menuitem" class="danger-text" id="liveClear">🗑 Clear live data</button>
+            </div>
+          </div>
+          <input type="file" id="teacherFiles" accept=".json,application/json" multiple hidden>
         </div>
-      </div>
-      <p>Live view lists every pupil who opens the site and refreshes itself every 20 seconds while this tab is open; a green dot means they're on the site right now. Test area attempts appear in their own table below. You can still load progress files below for pupils who worked offline or at home.</p>
-      <p class="callout">🔒 <b>Staff answer book</b> — the full solutions and a downloadable PDF live on the password-protected <a href="teacher.html">Teacher Area</a> page.</p>
-      <div class="progress-actions">
-        <label class="btn primary" for="teacherFiles">Load pupil progress files</label>
-        <input type="file" id="teacherFiles" accept=".json,application/json" multiple hidden>
-        <button class="btn" id="teacherClear">Clear</button>
-        <button class="btn" id="teacherCsv">⬇ Leaderboard CSV</button>
-        <button class="btn" id="challengeListCsv">⬇ Challenge list (no answers)</button>
-      </div>
-      <p class="muted small">Each solve carries a proof code that only a real flag submission produces, so hand-edited files show up as <span class="badge bad">unverified</span>. Challenges solved after the pupil clicked <b>Show answer</b> count as flags but score 0 points.</p>
+      </header>
+      <div id="installBox" hidden></div>
+      <div id="pendBox"></div>
       <div id="teacherMsg" class="notice" hidden></div>
       <div class="teacher-filter"><select class="io" id="teacherClass" hidden aria-label="Filter by class"></select></div>
       <div id="teacherTable"></div>

@@ -1098,3 +1098,27 @@ html.mb-locked #waitModal, html.mb-locked #whoModal { display: grid !important; 
 .content-note h3 { margin: .2rem 0 .4rem; }
 #installBox { margin-bottom: 1rem; }
 #installBox.install-ok { padding: .5rem .9rem; }
+
+/* ---------- teacher dashboard: compact header with icon tools ---------- */
+.tdash-head { display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; margin: 0 0 16px; padding: 0 0 14px; border-bottom: 1px solid var(--line); }
+.tdash-title h1 { margin: 0; }
+.tdash-title p { margin: 4px 0 0; }
+.live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--red); margin-right: 7px; vertical-align: 1px; animation: livePulse 2s infinite; }
+@keyframes livePulse { 0% { box-shadow: 0 0 0 0 rgba(255,80,80,.55); } 70% { box-shadow: 0 0 0 7px rgba(255,80,80,0); } 100% { box-shadow: 0 0 0 0 rgba(255,80,80,0); } }
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+.tdash-tools { display: flex; align-items: center; gap: 6px; }
+.ibtn { position: relative; display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line2); background: var(--panel); color: var(--text); font-size: 1.05rem; line-height: 1; cursor: pointer; text-decoration: none; transition: background .15s, border-color .15s; }
+.ibtn:hover, .ibtn:focus-visible { background: var(--panel2); border-color: var(--accent); outline: none; }
+.ibtn.on { border-color: var(--green); color: var(--green); }
+.ibadge { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--amber); color: #1a1205; font-size: .7rem; font-weight: 800; display: grid; place-items: center; }
+.ibadge[hidden] { display: none; }
+.tmenu { position: relative; }
+.tmenu-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 240px; padding: 6px; border-radius: 12px; border: 1px solid var(--line2); background: var(--panel); box-shadow: 0 14px 40px rgba(0,0,0,.45); }
+.tmenu-pop[hidden], .tmenu-pop [hidden] { display: none; }
+.tmenu-pop button, .tmenu-pop label { display: block; width: 100%; text-align: left; padding: 9px 11px; border: 0; border-radius: 8px; background: none; color: var(--text); font: inherit; font-size: .9rem; cursor: pointer; }
+.tmenu-pop button:hover, .tmenu-pop label:hover, .tmenu-pop button:focus-visible { background: var(--panel2); outline: none; }
+.tmenu-pop hr { border: 0; border-top: 1px solid var(--line); margin: 5px 4px; }
+.tmenu-pop .danger-text { color: var(--red); }
+.req-x { margin-left: auto; background: none; border: 0; color: var(--muted); font-size: 1rem; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
+.req-x:hover { color: var(--text); background: var(--panel2); }
+@media (max-width: 560px) { .tdash-tools { width: 100%; } .tmenu { margin-left: auto; } }
