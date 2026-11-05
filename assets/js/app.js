@@ -2,13 +2,21 @@
 (function () {
   'use strict';
 
-  // ---------- decode challenge bundle (lightly scrambled so answers aren't sitting in plain text) ----------
-  function decodeBundle(b64, key) {
-    var bin = atob(b64), out = new Uint8Array(bin.length);
-    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i) ^ key.charCodeAt(i % key.length);
-    return JSON.parse(new TextDecoder().decode(out));
+  // ---------- challenges: encrypted on the public site (no flags or answers in them at all). The key comes from the
+  // teacher's Google script, and only once a pupil is approved (or on a teacher PC). Flags are checked by the script.
+  var CONTENT_STORE = 'mbctf-content-v1', CKEY_STORE = 'mbctf-ck-v1', ANS_STORE = 'mbctf-ans-v1', META = window.CTF_CONTENT || {};
+  function wipeContent() { try { localStorage.removeItem(CONTENT_STORE); localStorage.removeItem(CKEY_STORE); localStorage.removeItem(ANS_STORE); } catch (e) { } }
+  function readContent() {
+    try {
+      var ps = JSON.parse(localStorage.getItem('mbctf-progress-v1') || '{}');
+      var tpc = !!localStorage.getItem('mbctf-teacher-livekey-v1') || localStorage.getItem('mbctf-teacher-pc-v1') === '1';
+      if (!tpc && (/^(pending|declined|unknown)$/.test(ps.access || '') || !ps.name)) { wipeContent(); return null; }
+      var c = JSON.parse(localStorage.getItem(CONTENT_STORE) || 'null');
+      return c && c.ver === META.ver && c.data && c.data.challenges ? c.data : null;
+    } catch (e) { return null; }
   }
-  var DATA = decodeBundle(window.CTF_BUNDLE, window.CTF_KEY);
+  var DATA = readContent(), CONTENT_READY = !!DATA, CONTENT_STATE = CONTENT_READY ? 'ready' : 'loading';
+  if (!DATA) DATA = { cats: [], challenges: [] };
   var CH = DATA.challenges, CATS = DATA.cats;
   var BY_ID = {}; CH.forEach(function (c) { BY_ID[c.id] = c; });
   window.CTF = { DATA: DATA, BY_ID: BY_ID };
@@ -186,8 +194,20 @@
   $('#hideSolved').addEventListener('change', function () { setHideSolved(this.checked); });
 
   // ---------- board ----------
+  var CONTENT_MSG = {
+    loading: ['⏳', 'Loading the challenges…', 'This only takes a moment the first time.'],
+    setup: ['🛠️', 'The challenges aren’t ready yet', 'Mr Butler is still setting them up. This page will open them by itself as soon as he has.'],
+    access: ['🔒', 'Not approved yet', 'The challenges open once Mr Butler has approved you.'],
+    offline: ['📡', 'Can’t load the challenges', 'Mr Butler’s CTF needs an internet connection to unlock the challenges the first time. Trying again…'],
+    storage: ['💾', 'This browser can’t store the challenges', 'Private / incognito windows block it. Open the site in a normal window.']
+  };
+  function contentNote() {
+    var m = CONTENT_MSG[CONTENT_STATE] || CONTENT_MSG.loading;
+    return '<div class="callout content-note"><div class="cn-ic">' + m[0] + '</div><h3>' + m[1] + '</h3><p class="muted">' + m[2] + '</p></div>';
+  }
   function renderBoard() {
     var board = $('#board'); board.innerHTML = '';
+    if (!CONTENT_READY) { board.innerHTML = contentNote(); return; }
     CATS.forEach(function (cat) {
       var unlock = catUnlock(cat.id);
       var matchAll = CH.filter(function (c) {
@@ -407,7 +427,7 @@
         var b = e.target.closest('button'); if (!b) return;
         var act = b.dataset.f;
         if (act === 'view') { showText(f.name, f.text); }
-        if (act === 'dl') { if (f.url) { var a = document.createElement('a'); a.href = f.url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); } else download(f.name, f.text, 'text/plain'); }
+        if (act === 'dl') { if (f.url || f.enc) fileBlob(f).then(function (bl) { var a = document.createElement('a'); a.href = URL.createObjectURL(bl); a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 60000); }, function () { toast('Couldn’t open that file — check the internet connection.'); }); else download(f.name, f.text, 'text/plain'); }
         if (act === 'hex') { CTFReturn.set('board', c.id, c.title); closeModal($('#chalModal')); show('toolkit'); Toolkit.open('hex', { file: f }); }
         if (act === 'img') { CTFReturn.set('board', c.id, c.title); closeModal($('#chalModal')); show('toolkit'); Toolkit.open('image', { file: f }); }
       });
@@ -438,7 +458,7 @@
     }
   }
   function tutorialSteps(c) {
-    var base = (c.walk && c.walk.length) ? c.walk.slice() : (c.hints || []).slice();
+    var base = (c.tut && c.tut.length) ? c.tut.slice() : (c.hints || []).slice();
     var steps = ['Look at the challenge and work out what kind of puzzle it is — the <a href="#" data-goto="reference">Reference cheat sheet</a> helps if you are unsure.'];
     steps = steps.concat(base);
     steps.push('Follow those steps, then submit your flag. No need to peek at the answer — you can do this!');
@@ -503,6 +523,20 @@
   }
 
   var lastTry = {};
+  // revealed answers this pupil has fetched (kept apart from progress files, so they're never passed around)
+  function ansCache() { try { return JSON.parse(localStorage.getItem(ANS_STORE) || '{}'); } catch (e) { return {}; } }
+  function getAnswer(c) {   // the walkthrough and flag come from the teacher's script (the reveal is recorded there)
+    var have = ansCache()[c.id]; if (have) return Promise.resolve(have);
+    if (!SYNC_URL) return Promise.reject(new Error('offline'));
+    var lk = ''; try { lk = localStorage.getItem('mbctf-teacher-livekey-v1') || ''; } catch (e) { }
+    var q = isTeacherDevice() && lk ? 'action=answer&key=' + encodeURIComponent(lk) : 'action=reveal&id=' + encodeURIComponent(S.pid);
+    return api(q + '&cid=' + encodeURIComponent(c.id)).then(function (j) {
+      if (!j || !j.ok) throw new Error((j && j.error) || 'offline');
+      var a = { f: j.f, sol: j.sol || '', walk: j.walk || [] }, all = ansCache(); all[c.id] = a;
+      try { localStorage.setItem(ANS_STORE, JSON.stringify(all)); } catch (e) { }
+      return a;
+    });
+  }
   function reveal(c) {
     if (!S.solved[c.id] && !S.revealed[c.id] && !confirm('Show the full walkthrough? You will get 0 points for this challenge if you reveal it before solving it.')) return false;
     S.revealed[c.id] = S.revealed[c.id] || Date.now(); save(); renderAnswer(c);
@@ -534,15 +568,23 @@
     if (assistOff()) return;
     var tries = (S.tries && S.tries[c.id]) || 0;
     if (S.revealed[c.id]) {
+      var A = ansCache()[c.id];
+      if (!A) {
+        box.innerHTML = '<div class="hint-box answer-box"><div class="hint-warn">📖 Full walkthrough</div><p class="muted">Loading the walkthrough…</p></div>';
+        getAnswer(c).then(function () { if (current && current.id === c.id) renderAnswer(c); }, function (err) {
+          if (current && current.id === c.id) box.innerHTML = '<div class="hint-box answer-box"><div class="hint-warn">📖 Full walkthrough</div><p>' + (err.message === 'setup' ? 'Mr Butler is still setting up the answers — try again in a minute.' : 'Couldn’t load the walkthrough — check the internet connection and open the challenge again.') + '</p></div>';
+        });
+        return;
+      }
       var mine = lastTry[c.id];
-      var useWalk = c.walk && c.walk.length;
-      var steps = (useWalk ? c.walk : (c.hints || [])).map(function (h) { return '<li>' + h + '</li>'; }).join('');
+      var useWalk = A.walk && A.walk.length;
+      var steps = (useWalk ? A.walk : (c.hints || [])).map(function (h) { return '<li>' + h + '</li>'; }).join('');
       box.innerHTML = '<div class="hint-box answer-box"><div class="hint-warn">📖 Full walkthrough</div>' +
         clueBlock(c) +
         (steps ? '<p><b>' + (useWalk ? 'Thinking it through:' : 'Step by step:') + '</b></p><ol class="walk">' + steps + '</ol>' : '') +
-        (c.sol ? '<p><b>Why it works:</b> ' + c.sol + '</p>' : '') +
-        '<p class="flag-reveal">The flag is <code>' + esc(c.f) + '</code></p>' +
-        (mine ? '<p>Your last answer was <code>' + esc(mine) + '</code> ' + (mine.toLowerCase() === c.f.toLowerCase() ? '<span class="ok-tick">✓ that matches</span>' : '✗ which does not match') + '</p>' : '') +
+        (A.sol ? '<p><b>Why it works:</b> ' + A.sol + '</p>' : '') +
+        '<p class="flag-reveal">The flag is <code>' + esc(A.f) + '</code></p>' +
+        (mine ? '<p>Your last answer was <code>' + esc(mine) + '</code> ' + (mine.toLowerCase() === String(A.f).toLowerCase() ? '<span class="ok-tick">✓ that matches</span>' : '✗ which does not match') + '</p>' : '') +
         (S.solved[c.id] && !S.solved[c.id].r ? '' : '<p class="muted small">Revealed challenges score 0 points, but you can still submit the flag to tick it off.</p>') + '</div>';
       return;
     }
@@ -566,13 +608,27 @@
     var c = current; if (!c) return;
     var raw = $('#flagInput').value.trim(), msg = $('#flagMsg');
     if (!raw) return;
-    var norm = raw.toLowerCase();
     lastTry[c.id] = raw;
-    if (sha256(norm) === c.h) {
+    var sbtn = this.querySelector('button[type=submit]'); if (sbtn && sbtn.disabled) return;
+    if (!SYNC_URL) { msg.className = 'flag-msg bad'; msg.textContent = 'Flags are checked by Mr Butler’s Google script, which isn’t connected.'; return; }
+    if (sbtn) sbtn.disabled = true; msg.className = 'flag-msg'; msg.textContent = 'Checking…';
+    api('action=submit&id=' + encodeURIComponent(S.pid) + '&cid=' + encodeURIComponent(c.id) + '&flag=' + encodeURIComponent(raw) + '&h=' + (S.hints[c.id] || 0)).then(function (j) {
+      if (sbtn) sbtn.disabled = false;
+      if (!j || !j.ok) {
+        msg.className = 'flag-msg bad';
+        msg.textContent = !j ? 'Couldn’t check that flag — try again.' : j.error === 'slow' ? 'That’s a lot of guesses! Wait a minute, then try again.' : (j.error === 'setup' || j.error === 'key') ? 'Mr Butler is still setting up the answers — try again in a minute.' : j.error === 'access' ? 'You need to be approved before your flags count.' : 'Couldn’t check that flag — try again.';
+        if (j && j.error === 'access') checkAccess();
+        return;
+      }
+      if (j.correct) flagRight(c, j.p, msg); else flagWrong(c, raw, !!j.close, msg);
+    }, function () { if (sbtn) sbtn.disabled = false; msg.className = 'flag-msg bad'; msg.textContent = 'Couldn’t reach Mr Butler’s script to check that flag. Check the internet connection and try again.'; });
+  });
+  function flagRight(c, proof, msg) {
+    {
       if (!S.solved[c.id]) {
         var rv = S.revealed[c.id] ? 1 : 0;
         var firstTry = !(S.tries && S.tries[c.id]);
-        S.solved[c.id] = { t: Date.now(), p: sha256(S.pid + '|' + norm).slice(0, 16), h: S.hints[c.id] || 0, r: rv };
+        S.solved[c.id] = { t: Date.now(), p: proof, h: S.hints[c.id] || 0, r: rv };
         save();
         try { document.dispatchEvent(new CustomEvent('ctf:solve', { detail: { id: c.id, revealed: rv, firstTry: firstTry } })); } catch (e) { }
         var praise = ['Brilliant work', 'Nicely done', 'You got it', 'Spot on', 'Great solve', 'Well played'];
@@ -583,12 +639,13 @@
         if (!S.name) setTimeout(function () { if (confirm('Nice! Add your name so your teacher knows whose progress file this is?')) askName(); }, 600);
       } else { msg.className = 'flag-msg ok'; msg.textContent = '✓ Still correct — nice to see it stuck!'; }
       refreshHeader(); renderBoard(); openChalMeta(c); renderAnswer(c);
-      return;
     }
+  }
+  function flagWrong(c, raw, close, msg) {
     S.wrong++; if (!S.tries) S.tries = {}; S.tries[c.id] = (S.tries[c.id] || 0) + 1; save();
     var tries = S.tries[c.id];
     msg.className = 'flag-msg bad';
-    if (!/^flag\{.*\}$/i.test(raw) && !/^\w+\{/.test(raw) && sha256('flag{' + norm + '}') === c.h) {
+    if (close) {
       msg.className = 'flag-msg info'; msg.textContent = 'So close — that is exactly right! Just wrap it as flag{...} and submit again.';
     } else if (!/^flag\{.*\}$/i.test(raw)) {
       msg.textContent = 'Not quite yet — flags here look like flag{something}. Keep going, you are on the right track.';
@@ -601,7 +658,7 @@
     }
     renderAnswer(c);
     var f = $('#flagForm'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake');
-  });
+  }
   function milestone(c) {
     var n = solvedCount();
     setTimeout(function () {
@@ -661,6 +718,7 @@
 
   function makeExport() {
     var payload = { app: 'MrButlersCTF', v: 1, pid: S.pid, name: S.name, cls: S.cls || '', exported: Date.now(), score: score(), solved: S.solved, hints: S.hints, revealed: S.revealed, tries: S.tries, tut: S.tut, wrong: S.wrong, created: S.created };
+    if (S.prevPids && S.prevPids.length) payload.prevPids = S.prevPids;
     var body = JSON.stringify(payload);
     return JSON.stringify({ data: payload, check: sha256(body + SALT) }, null, 1);
   }
@@ -779,10 +837,7 @@
   }
   function adoptPid(newId) {   // this device joins an existing pupil: re-key this device's own solves to their ID
     var old = S.pid; if (!newId || newId === old) return;
-    Object.keys(S.solved).forEach(function (id) {
-      var c = BY_ID[id], s = S.solved[id]; if (!c || !s.p) return;
-      if (sha256(old + '|' + c.f.toLowerCase()).slice(0, 16) === s.p) s.p = sha256(newId + '|' + c.f.toLowerCase()).slice(0, 16);
-    });
+    if (Object.keys(S.solved).length) S.prevPids = (S.prevPids || []).filter(function (x) { return x !== old; }).concat(old).slice(-10);
     S.pid = newId;
   }
   function askWho(editing) {
@@ -854,7 +909,7 @@
         if (found && found.json) { try { var r = parseImport(found.json); if (r.ok && r.data.pid === S.pid) added = applyImport(r.data); } catch (x) { } }
         save(); refreshHeader(); renderBoard(); renderProgress();
         try { document.dispatchEvent(new CustomEvent('ctf:refresh')); } catch (x) { }
-        close(); if (S.access !== 'approved') { showWaiting(); return; } pushSync(); setTimeout(fetchAwards, 1500);
+        close(); if (S.access !== 'approved') { wipeContent(); if (CONTENT_READY) { location.reload(); return; } showWaiting(); return; } pushSync(); setTimeout(fetchAwards, 1500); if (found) ensureContent();
         toast(found && !found.fresh ? '👋 Welcome back, ' + S.name.split(' ')[0] + '!' + (added ? ' ' + added + ' solve' + (added === 1 ? '' : 's') + ' loaded from your other computer.' : '') : '👋 Hi ' + S.name.split(' ')[0] + ' — you’re signed in.', 4000);
         void offline;
       }
@@ -880,6 +935,64 @@
   if (accessBlocked()) { lockdown(true); setTimeout(showWaiting, 0); }
   setTimeout(function () { if (!isTeacherDevice() && !whoDone()) askWho(false); else if (!isTeacherDevice() && S.name) checkAccess(); }, 400);
 
+  // ---------- unlocking the challenges ----------
+  function api(qs) {
+    return fetch(SYNC_URL + (SYNC_URL.indexOf('?') < 0 ? '?' : '&') + qs + '&t=' + Date.now(), { cache: 'no-store', credentials: 'omit' })
+      .then(function (r) { return r.json(); });
+  }
+  window.CTFApi = function (qs) { return SYNC_URL ? api(qs) : Promise.reject(new Error('nosync')); };
+  function keyBytes(k) { return Uint8Array.from(atob(k), function (ch) { return ch.charCodeAt(0); }); }
+  function ckDecrypt(buf, k) {
+    var b = new Uint8Array(buf);
+    return crypto.subtle.importKey('raw', keyBytes(k), 'AES-GCM', false, ['decrypt']).then(function (key) {
+      return crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.slice(0, 12) }, key, b.slice(12));
+    });
+  }
+  function fileBlob(f) {   // challenge files are encrypted too; decrypt on demand
+    if (!f.enc) return f.url ? fetch(f.url).then(function (r) { return r.blob(); }) : Promise.resolve(new Blob([f.text || ''], { type: 'text/plain' }));
+    var k = ''; try { k = localStorage.getItem(CKEY_STORE) || ''; } catch (e) { }
+    return fetch(f.enc).then(function (r) { if (!r.ok) throw new Error('fetch'); return r.arrayBuffer(); }).then(function (b) { return ckDecrypt(b, k); })
+      .then(function (pt) { return new Blob([pt], { type: f.mime || 'application/octet-stream' }); });
+  }
+  window.CTF.fileBlob = fileBlob;
+  var contentBusy = false, contentRetry = null;
+  function setContentState(st) { CONTENT_STATE = st; if (!CONTENT_READY) { var b = $('#board'); if (b) b.innerHTML = contentNote(); } }
+  function ensureContent(givenKey) {
+    if (CONTENT_READY || contentBusy || !META.url) return;
+    if (!givenKey && !isTeacherDevice() && (accessBlocked() || needsSignIn() || !S.name)) return;
+    if (!(window.crypto && crypto.subtle)) { setContentState('storage'); return; }
+    contentBusy = true; setContentState('loading');
+    var stored = ''; try { stored = localStorage.getItem(CKEY_STORE) || ''; } catch (e) { }
+    var lk = ''; try { lk = localStorage.getItem('mbctf-teacher-livekey-v1') || ''; } catch (e) { }
+    var getKey = givenKey ? Promise.resolve(givenKey) : stored ? Promise.resolve(stored) : !SYNC_URL ? Promise.reject(new Error('offline')) :
+      api('action=ckey&' + (isTeacherDevice() && lk ? 'key=' + encodeURIComponent(lk) : 'id=' + encodeURIComponent(S.pid))).then(function (j) {
+        if (j && j.ok && j.k) return j.k; throw new Error((j && j.error) || 'offline');
+      });
+    getKey.then(function (k) {
+      return fetch(META.url).then(function (r) { if (!r.ok) throw new Error('offline'); return r.arrayBuffer(); })
+        .then(function (b) { return ckDecrypt(b, k); })
+        .then(function (pt) {
+          var data = JSON.parse(new TextDecoder().decode(pt));
+          try { localStorage.setItem(CKEY_STORE, k); localStorage.setItem(CONTENT_STORE, JSON.stringify({ ver: META.ver, data: data })); } catch (e) { }
+          var back = null; try { back = JSON.parse(localStorage.getItem(CONTENT_STORE) || 'null'); } catch (e) { }
+          if (!back || back.ver !== META.ver) throw new Error('storage');
+          location.reload();
+        }, function (err) {
+          if (err && /^(offline|storage)$/.test(err.message)) throw err;
+          try { localStorage.removeItem(CKEY_STORE); } catch (e) { }   // wrong / old key: ask the script next time
+          throw new Error(k === stored ? 'retry' : 'setup');
+        });
+    }).catch(function (err) {
+      contentBusy = false;
+      var m = (err && err.message) || 'offline'; if (m === 'key') m = 'setup';   // an older script without the answers
+      if (m === 'retry') return ensureContent();
+      setContentState(/^(setup|access|storage)$/.test(m) ? m : 'offline');
+      if (m === 'access') checkAccess();
+      clearTimeout(contentRetry); if (m !== 'storage') contentRetry = setTimeout(function () { if (!document.hidden) ensureContent(); else contentRetry = setTimeout(ensureContent, 30000); }, m === 'setup' ? 30000 : 20000);
+    });
+  }
+  setTimeout(function () { if (!CONTENT_READY && (isTeacherDevice() || (!accessBlocked() && !needsSignIn() && S.name))) ensureContent(); }, 600);
+
   // ---------- access approval: new pupils wait until a teacher lets them in ----------
   var waitTimer = null;
   function checkAccess(cb) {
@@ -887,8 +1000,15 @@
     fetch(SYNC_URL + (SYNC_URL.indexOf('?') < 0 ? '?' : '&') + 'action=access&id=' + encodeURIComponent(S.pid) + '&t=' + Date.now(), { cache: 'no-store', credentials: 'omit' })
       .then(function (r) { return r.json(); }).then(function (j) {
         // only pending / declined block; anything else (approved, an older script, offline) lets them in, so nobody is locked out by a fault
-        var st = j && j.ok && /^(pending|declined)$/.test(j.status || '') ? j.status : 'approved';
+        var st = j && j.ok && /^(pending|declined|unknown)$/.test(j.status || '') ? j.status : 'approved';
+        if (st === 'unknown') {   // not registered (e.g. deleted by the teacher): sign in again
+          S.pinOk = false; S.access = ''; save(); wipeContent();
+          if (CONTENT_READY) { location.reload(); return; }
+          askWho(false); if (cb) cb(st); return;
+        }
         var was = S.access; S.access = st; if (was !== st) save();
+        if (st !== 'approved') { wipeContent(); if (CONTENT_READY) { location.reload(); return; } }
+        else ensureContent();
         if (st === 'approved') { lockdown(false); var w = document.getElementById('waitModal'); if (w) { w.remove(); document.documentElement.style.overflow = ''; clearInterval(waitTimer); toast('🎉 You’re in! Your teacher has approved you.', 4500); pushSync(); fetchAwards(); } }
         else showWaiting();
         if (cb) cb(st);
@@ -945,7 +1065,7 @@
     if (wc) wc.addEventListener('click', function () { var b = this, m = d.querySelector('.who-msg'); b.disabled = true; m.textContent = 'Checking…';
       checkAccess(function (st) { b.disabled = false; if (document.getElementById('waitModal')) m.textContent = st === 'pending' ? 'Not approved yet — this page will open by itself when it is.' : ''; }); });
     d.querySelector('#waitOther').addEventListener('click', function () {
-      clearInterval(waitTimer); S = blankState(); save(); d.remove(); document.documentElement.style.overflow = '';
+      clearInterval(waitTimer); S = blankState(); save(); wipeContent(); d.remove(); document.documentElement.style.overflow = '';
       S = blankState(); save(); refreshHeader(); renderBoard(); renderProgress(); askWho(false);
     });
     d.querySelector('#waitTeacher').addEventListener('click', function () { openTeacherSignIn(); });
@@ -1130,8 +1250,7 @@
   });
 
   // ---------- teacher ----------
-  var T = { rows: [], key: {}, sort: 'pts' };
-  CH.forEach(function (c) { T.key[c.id] = c.f; });
+  var T = { rows: [], key: {}, sort: 'pts', ans: {} };   // key / ans are filled from the answer book on teacher PCs
   $('#teacherFiles').addEventListener('change', function () {
     var files = Array.prototype.slice.call(this.files), input = this;
     Promise.all(files.map(function (f) { return f.text().then(function (t) { try { var r = parseImport(t); r.file = f.name; return r; } catch (e) { return { err: f.name }; } }); }))
@@ -1320,7 +1439,11 @@
     if (rev && !s) bits.push('revealed the answer');
     var n = document.createElement('div'); n.id = 'chalTeacherNote'; n.className = 'teacher-note';
     n.innerHTML = '<div><b>👩‍🏫 ' + esc(name) + ':</b> ' + bits.join(' · ') + '</div>' +
-      '<details><summary>Show answer (teacher)</summary><p class="small">' + (c.sol || '') + '</p><p>Flag: <code>' + esc(c.f) + '</code></p></details>';
+      '<details><summary>Show answer (teacher)</summary><p class="small tn-ans">Loading…</p></details>';
+    n.querySelector('details').addEventListener('toggle', function () {
+      var el = n.querySelector('.tn-ans'); if (!this.open || el.dataset.done) return;
+      var t = T.ans[id]; (t ? Promise.resolve(t) : getAnswer(c)).then(function (a) { el.dataset.done = 1; el.innerHTML = (a.sol || '') + '<br>Flag: <code>' + esc(a.f) + '</code>'; }, function () { el.textContent = 'Couldn’t load the answer — check the teacher key / internet.'; });
+    });
     var meta = document.getElementById('chalMeta'); meta.after(n);
     var ok = s && !s.r && (isAwarded(d.pid, id) || proofOk(d.pid, id, s.p));
     if (SYNC_URL && LIVE.key) {
@@ -1336,9 +1459,9 @@
   }
   // a solve is genuine if its proof matches this pupil's ID, or the ID of a login merged into them
   function proofOk(pid, cid, p) {
-    var c = BY_ID[cid]; if (!c || !p) return false;
+    var f = T.key[cid]; if (!p) return false; if (!f) return true;   // without the answer book, the script has already checked it
     var ids = [pid].concat((T.aliasOf && T.aliasOf[pid]) || []);
-    for (var i = 0; i < ids.length; i++) if (sha256(ids[i] + '|' + c.f.toLowerCase()).slice(0, 16) === p) return true;
+    for (var i = 0; i < ids.length; i++) if (sha256(ids[i] + '|' + f.toLowerCase()).slice(0, 16) === p) return true;
     return false;
   }
   function isAwarded(pid, cid) { return !!(T.awards && T.awards[pid] && T.awards[pid][cid]); }
@@ -1492,7 +1615,7 @@
       Object.keys(AL).forEach(function (old) { var k = AL[old], n = 0; while (AL[k] && n++ < 20) k = AL[k]; (T.aliasOf[k] = T.aliasOf[k] || []).push(old); });
       Object.keys(byPid).forEach(function (k) { injectAwards(byPid[k].data); });
       T.rows = Object.keys(byPid).map(function (k) { return byPid[k]; });
-      renderTeacher(); renderLiveTests(tests); renderPending(res.pending || [], res.approval, res.mail);
+      renderTeacher(); renderLiveTests(tests); renderPending(res.pending || [], res.approval, res.mail); renderInstall(res.installed);
       var n = (res.rows || []).length, active = (res.rows || []).filter(function (x) { return Date.now() - x.seen < 5 * 60000; }).length;
       liveInfo('good-text', '🔴 Live · ' + n + ' pupil' + (n === 1 ? '' : 's') + ' (' + active + ' active now) · refreshed ' + new Date().toLocaleTimeString() + (bad ? ' · ' + bad + ' unreadable row(s)' : ''));
     }).catch(function () { liveInfo('bad-text', 'Couldn\'t reach the Google Sheet — trying again in a moment…'); });
@@ -1611,6 +1734,52 @@
         .then(function (pt) { return JSON.parse(new TextDecoder().decode(pt)); }, function () { throw new Error('wrong'); });
     });
   }
+  // The answer book holds the flags, solutions, the challenge key and the Test password. A teacher PC hands them to
+  // the Google script (Install answers), so pupils' flags can be checked there; the public site never has them.
+  function useVault(data, pw) {
+    var info = data.info || {};
+    if (data.answers) Object.keys(data.answers).forEach(function (cid) {
+      var a = data.answers[cid], x = {}; try { x = JSON.parse(a[2] || '{}'); } catch (e) { }
+      T.key[cid] = a[0]; T.ans[cid] = { f: a[0], sol: x.s || '', walk: x.w || [] };
+    });
+    if (info.contentKey && !CONTENT_READY) ensureContent(info.contentKey);
+    T.vault = data; T.pw = pw;
+    if (T.installWanted || (T.feedVer !== undefined && T.feedVer !== META.ver && T.autoTried !== META.ver)) { T.autoTried = META.ver; installAnswers(false); }
+  }
+  function installAnswers(manual) {
+    var msg = $('#installMsg');
+    if (!T.vault) {
+      T.installWanted = true;
+      var pw = prompt('Enter the Teacher Area password to install the answers on your Google script:'); if (!pw) { T.installWanted = false; return; }
+      openVault(pw).then(function (d) { try { sessionStorage.setItem(STAFF_SS, pw); } catch (e) { } useVault(d, pw); }, function () { T.installWanted = false; alert('That password isn’t right.'); });
+      return;
+    }
+    T.installWanted = false;
+    if (!SYNC_URL || !LIVE.key || T.installing) return;
+    var d = T.vault, info = d.info || {};
+    if (!d.answers || !info.contentKey) { if (msg) msg.textContent = 'The answer book is out of date — reload the page.'; return; }
+    T.installing = true; if (msg) { msg.className = 'small'; msg.textContent = 'Installing answers on your Google script…'; }
+    fetch(SYNC_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ kind: 'install', key: LIVE.key, k: info.contentKey, ver: info.contentVer, answers: d.answers, testpw: info.testPassword || '' }) })
+      .then(function (r) { return r.json(); }).then(function (j) {
+        T.installing = false;
+        if (j && j.ok && j.installed) { T.installed = j.ver; renderInstall(j.ver); if (manual || j.cleaned) toast('🔐 Answers installed for ' + j.installed + ' challenges' + (j.cleaned ? ' · ' + j.cleaned + ' pupil record(s) had unprovable solves removed' : ''), 5000); }
+        else if (msg) { msg.className = 'small bad-text'; msg.textContent = j && j.error === 'key' ? 'The script rejected the teacher key.' : 'Your Google script needs updating first (see teacher-sync/SETUP.md).'; }
+      }).catch(function () { T.installing = false; if (msg) { msg.className = 'small bad-text'; msg.textContent = 'Couldn’t reach the script (it may need updating — see teacher-sync/SETUP.md).'; } });
+  }
+  function renderInstall(ver) {
+    var box = $('#installBox'); if (!box) return;
+    if (ver === undefined) { box.hidden = true; return; }   // older script: nothing to show
+    T.feedVer = ver;
+    var ok = ver && ver === META.ver; box.hidden = false;
+    box.className = 'callout ' + (ok ? 'install-ok' : 'warn');
+    box.innerHTML = ok ? '<span class="small">🔐 Answers are installed on your Google script — pupils’ flags are checked there.</span> <button type="button" class="linkish small" id="installBtn">Reinstall</button> <span id="installMsg" class="small"></span>'
+      : '<b>🔐 Answers need installing</b><p class="small">' + (ver ? 'The challenges have changed since the answers were installed.' : 'Your Google script doesn’t have the answers yet, so pupils can’t open or score any challenges.') + '</p><button type="button" class="btn primary small" id="installBtn">Install answers now</button> <span id="installMsg" class="small"></span>';
+    $('#installBtn').addEventListener('click', function () { installAnswers(true); });
+    if (!ok && T.vault && !T.installing && T.autoTried !== META.ver) { T.autoTried = META.ver; installAnswers(false); }
+  }
+  // a teacher PC that signed in this session opens the answer book quietly
+  setTimeout(function () { var pw = ''; try { pw = sessionStorage.getItem(STAFF_SS) || ''; } catch (e) { } if (pw && isTeacherDevice()) openVault(pw).then(function (d) { useVault(d, pw); }, function () { }); }, 300);
+
   $('#tmForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var pw = $('#tmPw').value, msg = $('#tmMsg'); if (!pw) return;
@@ -1619,6 +1788,7 @@
       try { localStorage.setItem(TEACHER_PC, '1'); sessionStorage.setItem(STAFF_SS, pw); } catch (err) { }
       var lk = data.info && data.info.liveKey;
       if (lk && !LIVE.key) { LIVE.key = lk; try { localStorage.setItem(LIVE_KEY_STORE, lk); } catch (err) { } }
+      useVault(data, pw);
       closeModal($('#teacherModal')); var wm = document.getElementById('whoModal'); if (wm) wm.remove(); var wt = document.getElementById('waitModal'); if (wt) { wt.remove(); clearInterval(waitTimer); } lockdown(false); document.documentElement.style.overflow = ''; liveSignedIn(); show('teacher');
       if (SYNC_URL && LIVE.key && !LIVE.on) startLive();
       toast('👩‍🏫 Signed in — this PC is now a teacher screen');
@@ -1652,7 +1822,7 @@
     $('#liveKeyBtn').addEventListener('click', function () { if (askLiveKey() && LIVE.on) liveFetch(); });
     $('#liveSignOut').addEventListener('click', function () {
       if (!confirm('Sign this PC out of the teacher view?\n\nThe teacher key is forgotten here, and anyone using this PC afterwards is tracked as a pupil again.')) return;
-      stopLive(); LIVE.key = ''; try { localStorage.removeItem(LIVE_KEY_STORE); localStorage.removeItem(TEACHER_PC); sessionStorage.removeItem(STAFF_SS); } catch (e) { }
+      stopLive(); LIVE.key = ''; try { localStorage.removeItem(LIVE_KEY_STORE); localStorage.removeItem(TEACHER_PC); sessionStorage.removeItem(STAFF_SS); } catch (e) { } wipeContent(); setTimeout(function () { location.reload(); }, 1200);
       T.rows = T.rows.filter(function (r) { return !r.seen; }); T.sel = null; renderTeacher(); renderLiveTests([]);
       liveSignedIn(); show('home'); toast('Signed out of teacher access on this PC');
     });

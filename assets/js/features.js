@@ -125,7 +125,7 @@
   function dailyChallenge() { var pool = CH.filter(function (c) { return c.tier < 6; }); return pool[hashStr('mbctf|' + todayKey()) % pool.length]; }
   function renderDaily() {
     var box = $('#dailyCard'); if (!box) return;
-    var S = CTF.getState(), c = dailyChallenge(), cat = CATS.filter(function (x) { return x.id === c.cat; })[0];
+    var S = CTF.getState(), c = dailyChallenge(); if (!c) { box.innerHTML = ''; return; } var cat = CATS.filter(function (x) { return x.id === c.cat; })[0];
     var done = !!(S.solved && S.solved[c.id]);
     var s = stats();
     var streakTxt = s.curStreak > 0

@@ -143,7 +143,7 @@
     if (payload && payload.file) {
       var f = payload.file;
       if (f.text !== undefined) showBytes(f.name, new TextEncoder().encode(f.text));
-      else fetch(f.url).then(function (r) { return r.arrayBuffer(); }).then(function (b) { showBytes(f.name, new Uint8Array(b)); })
+      else window.CTF.fileBlob(f).then(function (bl) { return bl.arrayBuffer(); }).then(function (b) { showBytes(f.name, new Uint8Array(b)); })
         .catch(function () { $('#hexDump').textContent = 'Could not load the file here. Click Download on the challenge, then open it with the button above.'; });
     }
   }
@@ -190,7 +190,7 @@
       }
       ctx.putImageData(out, 0, 0);
     }
-    if (payload && payload.file && payload.file.url) img.src = payload.file.url;
+    if (payload && payload.file && (payload.file.url || payload.file.enc)) window.CTF.fileBlob(payload.file).then(function (bl) { img.src = URL.createObjectURL(bl); }, function () { });
   }
 
   // ---------- JS scratchpad ----------

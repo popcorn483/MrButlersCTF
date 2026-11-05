@@ -7,7 +7,8 @@
   // ===================== TEACHER SETTINGS =====================
   // Change the password pupils must type to start, and how long the test runs.
   var CONFIG = {
-    password: '',   // tell pupils this on the day (change it here to set your own)
+    // the start password is NOT kept here (this site is public): it is checked by the teacher's Google script,
+    // which got it from the answer book (Teacher tab › 🔐 Install answers).
     minutes: 45,           // length of the test
     title: 'Mock CTF',
     // The paper: a balanced spread across categories, easy to hard.
@@ -44,6 +45,7 @@
   var area = function () { return $('#testArea'); };
 
   function enter() {
+    if (!PAPER.length) { stopTimer(); area().innerHTML = '<div class="test-gate"><div class="test-badge">🔒 Test area</div><h1>' + esc(CONFIG.title) + '</h1><p>The test opens once Mr Butler has approved you and the challenges have loaded.</p></div>'; return; }
     if (TS.finished) return renderResults();
     if (TS.started && remaining() > 0) { renderBoard(); startTimer(); return; }
     if (TS.started && remaining() <= 0) { return finish('time'); }
@@ -75,12 +77,22 @@
       '</div>';
     $('#testStartForm').addEventListener('submit', function (e) {
       e.preventDefault();
-      var pass = $('#testPass').value.trim();
-      if (pass !== CONFIG.password) { $('#testStartMsg').textContent = '✗ That password is not right. Ask your teacher for today\'s password.'; return; }
-      TS = blank(); TS.name = $('#testName').value.trim().slice(0, 40); TS.started = true; TS.start = Date.now(); save();
-      renderBoard(); startTimer();
-      toast('Good luck! The clock has started.');
+      var pass = $('#testPass').value.trim(), m = $('#testStartMsg'), btn = this.querySelector('button[type=submit]'), nm = $('#testName').value.trim().slice(0, 40);
+      if (!pass) return;
+      if (!window.CTFApi) { m.textContent = '✗ The test needs the internet connection to Mr Butler\'s script.'; return; }
+      btn.disabled = true; m.className = 'flag-msg'; m.textContent = 'Checking…';
+      window.CTFApi('action=testpass&pw=' + encodeURIComponent(pass)).then(function (j) {
+        btn.disabled = false; m.className = 'flag-msg bad';
+        if (!j || !j.ok) { m.textContent = j && j.error === 'setup' ? '✗ The test isn\'t set up yet — ask your teacher.' : '✗ Couldn\'t check the password. Try again.'; return; }
+        if (!j.pass) { m.textContent = '✗ That password is not right. Ask your teacher for today\'s password.'; return; }
+        begin(nm);
+      }, function () { btn.disabled = false; m.className = 'flag-msg bad'; m.textContent = '✗ Couldn\'t reach Mr Butler\'s script. Check the internet and try again.'; });
     });
+  }
+  function begin(nm) {
+    TS = blank(); TS.name = nm; TS.started = true; TS.start = Date.now(); save();
+    renderBoard(); startTimer();
+    toast('Good luck! The clock has started.');
   }
 
   // ---------- test board ----------
@@ -199,17 +211,22 @@
     if (!isLive()) { window.CTFModal.close('#testModal'); enter(); return; }
     var raw = $('#tFlagInput').value.trim(), msg = $('#tFlagMsg');
     if (!raw) return;
-    var norm = raw.toLowerCase();
-    if (sha256(norm) === c.h) {
-      if (!TS.solved[c.id]) { TS.solved[c.id] = { t: Date.now(), p: sha256(TS.pid + '|' + norm).slice(0, 16) }; save(); updateHud(); markSolved(c.id); toast('✓ Flag captured (+' + c.pts + ')'); }
-      msg.className = 'flag-msg ok'; msg.textContent = '✓ Correct.';
-      $('#tChalMeta').innerHTML += TS.solved[c.id] ? '' : '';
-      return;
-    }
-    TS.wrong++; save();
-    msg.className = 'flag-msg bad';
-    msg.textContent = /^flag\{.*\}$/i.test(raw) ? '✗ Incorrect.' : '✗ Incorrect. Flags look like flag{...}.';
-    var f = $('#tFlagForm'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake');
+    // flags are checked by the teacher's Google script — the answers are not on this site
+    var btn = this.querySelector('button[type=submit]'); if (btn && btn.disabled) return;
+    if (btn) btn.disabled = true; msg.className = 'flag-msg'; msg.textContent = 'Checking…';
+    window.CTFApi('action=submit&mode=test&id=' + encodeURIComponent(window.CTF.getState().pid) + '&tid=' + TS.pid + '&cid=' + encodeURIComponent(c.id) + '&flag=' + encodeURIComponent(raw)).then(function (j) {
+      if (btn) btn.disabled = false;
+      if (!j || !j.ok) { msg.className = 'flag-msg bad'; msg.textContent = j && j.error === 'slow' ? 'Too many guesses — wait a minute and try again.' : '✗ Couldn\'t check that flag just now. Try again.'; return; }
+      if (j.correct) {
+        if (!TS.solved[c.id]) { TS.solved[c.id] = { t: Date.now(), p: j.p }; save(); updateHud(); markSolved(c.id); toast('✓ Flag captured (+' + c.pts + ')'); }
+        msg.className = 'flag-msg ok'; msg.textContent = '✓ Correct.';
+        return;
+      }
+      TS.wrong++; save();
+      msg.className = 'flag-msg bad';
+      msg.textContent = /^flag\{.*\}$/i.test(raw) ? '✗ Incorrect.' : '✗ Incorrect. Flags look like flag{...}.';
+      var f = $('#tFlagForm'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake');
+    }, function () { if (btn) btn.disabled = false; msg.className = 'flag-msg bad'; msg.textContent = '✗ Couldn\'t reach Mr Butler\'s script — check the internet and try again.'; });
   });
   function markSolved(id) {
     // lightweight refresh of solved styling on the board tiles

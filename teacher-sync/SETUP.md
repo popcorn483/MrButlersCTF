@@ -31,7 +31,14 @@ Commit, wait a minute for GitHub Pages, and you're live.
 2. Save, then **Deploy → Manage deployments → ✏ Edit → Version: New version → Deploy**. The URL stays the same, so nothing on the site needs changing.
 
 ## 5. Give the script its permissions (once, after each update that adds a feature)
-In Apps Script, pick **authorise** from the function drop-down at the top, press **Run**, and allow everything Google asks for (your Sheet, sending you email, connecting to an external service — that is your own CTF site). The log should say “All set: the script can read … challenges”. Then deploy a **New version** as in step 4.
+In Apps Script, pick **authorise** from the function drop-down at the top, press **Run**, and allow everything Google asks for (your Sheet, sending you email). Then deploy a **New version** as in step 4.
+
+## 6. Install the answers (once, and again whenever the challenges change)
+The public site has **no flags, answers or walkthroughs** in it, and the challenges themselves are encrypted. Your script holds the answers and checks every flag, and only hands the key that unlocks the challenges to pupils you have approved.
+1. On the site, press **Teacher login** and enter the Teacher Area password.
+2. That's it: the teacher PC reads the answers from the password-protected answer book and installs them on your script (Teacher tab shows **🔐 Answers are installed**). If it says **Answers need installing**, press **Install answers now**.
+
+Until this is done pupils see “The challenges aren’t ready yet”. The answers go on an **Answers** tab of your Sheet; the challenge key and the Test area password go in the script's properties. Installing also re-checks every pupil's stored progress, and drops any solve that can't be proved.
 
 ## Using it
 - On the homepage press **👩‍🏫 Teacher access** and enter the Teacher Area password. That PC becomes a teacher screen: the Teacher tab appears (pupils never see it), live view starts by itself and the answer book opens without asking again. The live-view key is stored inside the encrypted answer book, so staff only need one password. (You can still type the key by hand with the **Teacher key** button.)
@@ -48,7 +55,8 @@ In Apps Script, pick **authorise** from the function drop-down at the top, press
 - Progress from a pupil's different computers is now combined on the sheet, so a solve on one PC is never wiped out by another.
 - **Mark a flag completed** (e.g. a pupil showed you their answer on paper): click the pupil → click the challenge → **✅ Mark completed**. They get the full points, it counts as verified, and their own computer picks it up within a few minutes with a message. **Undo** takes it back. Marks are kept on the *Marked complete* tab of the Sheet.
 - **Mark several at once:** in a pupil’s breakdown press **☑ Select challenges to mark completed**, tick the squares (or **Tick all attempted**), optionally open **Also mark for other pupils** (e.g. **Tick everyone in 11B**), then **✅ Mark completed**. **Undo marks** reverses the same selection.
-- **Pupils’ leaderboard** (🏆 Leaderboard tab): names show as first name + surname initial, with class. The script checks every solve’s proof itself (it reads the challenge list from `SITE_URL`), so hand-edited progress never counts. Set `BOARD_PUBLIC = false` in the script to hide it. The first time after updating, Google asks permission to “connect to an external service” — that’s the script reading the challenge list from your own site.
+- **Pupils’ leaderboard** (🏆 Leaderboard tab): names show as first name + surname initial, with class. Only solves the script itself has checked count. Set `BOARD_PUBLIC = false` in the script to hide it.
+- **Security:** flags are checked by the script, never on pupils' computers (at most 30 guesses a minute each). Unapproved, declined, deleted or made-up logins get no challenges, can't submit flags and nothing they send is saved. Pupils who reveal an answer get it from the script, which records the reveal. The Test area password is checked by the script too.
 - **Clear live data** empties the Sheet — use it before a new group. Pupils' own progress is untouched and re-sends when they next solve.
 - The Sheet itself is readable too (name, score, flags, last update), but the Teacher tab is better: it checks each solve's proof code, so anything tampered with shows as *edited* / *unverified*.
 

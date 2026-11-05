@@ -1,10 +1,10 @@
 {
-  "version": "mbctf-v38",
-  "date": "2026-11-03",
+  "version": "mbctf-v39",
+  "date": "2026-11-05",
   "notes": [
+    "Challenges now open only after Mr Butler approves you",
+    "Flags are checked by Mr Butler\u2019s server, so answers are never stored on your computer",
     "New pupils now need Mr Butler to approve them before they can start (just like the Revision Guide)",
-    "\ud83c\udfc6 New Leaderboard tab: see how you rank against everyone, or just your class",
-    "Teachers: tick several challenges and mark them completed at once, for one pupil or a whole group",
-    "140 new challenges \u2014 413 in total"
+    "\ud83c\udfc6 New Leaderboard tab: see how you rank against everyone, or just your class"
   ]
 }

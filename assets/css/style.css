@@ -1061,3 +1061,10 @@ table.lbp th { cursor: default; }
 html.mb-locked body > *:not(#waitModal):not(#whoModal):not(#teacherModal):not(#toast):not(script):not(style) { display: none !important; }
 html.mb-locked body { overflow: hidden !important; }
 html.mb-locked #waitModal, html.mb-locked #whoModal { display: grid !important; visibility: visible !important; opacity: 1 !important; }
+
+/* challenges locked until approved */
+.content-note { text-align: center; padding: 2.2rem 1.2rem; max-width: 560px; margin: 1.5rem auto; }
+.content-note .cn-ic { font-size: 2.4rem; margin-bottom: .4rem; }
+.content-note h3 { margin: .2rem 0 .4rem; }
+#installBox { margin-bottom: 1rem; }
+#installBox.install-ok { padding: .5rem .9rem; }

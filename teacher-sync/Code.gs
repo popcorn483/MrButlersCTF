@@ -25,7 +25,7 @@ var MAX_JSON = 45000; // a Sheets cell holds 50,000 characters
 var RECOVERY_EMAIL = '';
 // Pupil leaderboard: set to false to hide it from pupils. Names show as first name + surname initial.
 var BOARD_PUBLIC = true;
-var SITE_URL = 'https://popcorn483.github.io/MrButlersCTF/';   // the script reads the challenge list from here to check scores
+var SITE_URL = 'https://popcorn483.github.io/MrButlersCTF/';   // your site's address (used in emails)
 var REQUIRE_APPROVAL = true;   // new pupils wait until you approve them on the Teacher tab › Awaiting approval (false: anyone can sign up)
 var EMAIL_SIGNINS = true;      // email you when a new pupil signs up (at most 90 a day); set to false to stop them
 var REMOVED_SHEET = 'Removed'; // pupil IDs the teacher deleted — their devices are ignored from then on
@@ -247,33 +247,21 @@ function merge_(from, to) {
 }
 
 /* Run this ONCE from the Apps Script editor (choose 'authorise' in the function menu, press Run) after pasting in a new version.
-   Google then asks for every permission the script needs: the Sheet, sending you the password email, and reading your site. */
+   Google then asks for every permission the script needs: the Sheet, and sending you emails. */
 function authorise() {
   sheet_();
   MailApp.getRemainingDailyQuota();
-  var t = flagTable_();
-  Logger.log('All set: the script can read ' + Object.keys(t).length + ' challenges from ' + SITE_URL);
+  Logger.log('All set. Answers installed for ' + Object.keys(answers_()).length + ' challenges' + (installed_() ? '' : ' — none yet: on the site press Teacher tab › 🔐 Install answers'));
 }
 
 // ---------- pupil leaderboard: scores the script has checked itself ----------
-/* Read the challenge list from the live site (cached for 6 hours) so every solve can be checked against its proof code. */
-function flagTable_() {
-  var cache = CacheService.getScriptCache(), hit = cache.get('flags');
-  if (hit) return JSON.parse(hit);
-  var js = UrlFetchApp.fetch(SITE_URL + 'assets/js/challenges.js?t=' + Date.now(), { muteHttpExceptions: true }).getContentText();
-  var key = /CTF_KEY="([^"]+)"/.exec(js)[1], b = Utilities.base64Decode(/CTF_BUNDLE="([^"]+)"/.exec(js)[1]);
-  for (var i = 0; i < b.length; i++) b[i] = b[i] ^ key.charCodeAt(i % key.length);
-  var data = JSON.parse(Utilities.newBlob(b).getDataAsString('UTF-8')), t = {};
-  data.challenges.forEach(function (c) { t[c.id] = [String(c.f).toLowerCase(), c.pts]; });
-  try { cache.put('flags', JSON.stringify(t), 21600); } catch (x) { }
-  return t;
-}
 function short_(id) { return hex_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, 'board|' + id, Utilities.Charset.UTF_8)).slice(0, 10); }
 function board_() {
   if (!BOARD_PUBLIC) return { ok: false, error: 'off' };
   var cache = CacheService.getScriptCache(), hit = cache.get('board');
   if (hit) return JSON.parse(hit);
-  var F = flagTable_(), A = aliases_(), olds = {}, AW = awards_(), sh = sheet_(), n = sh.getLastRow() - 1, out = [];
+  if (!installed_()) return { ok: false, error: 'setup' };
+  var F = answers_(), A = aliases_(), olds = {}, AW = awards_(), sh = sheet_(), n = sh.getLastRow() - 1, out = [];
   Object.keys(A).forEach(function (o) { var k = resolve_(o, A); (olds[k] = olds[k] || []).push(o); });
   if (n > 0) sh.getRange(2, 1, n, 7).getValues().forEach(function (r) {
     var id = String(r[0]); if (!id || !r[5]) return;
@@ -294,6 +282,136 @@ function board_() {
   var res = { ok: true, at: Date.now(), rows: out };
   try { cache.put('board', JSON.stringify(res), 60); } catch (x) { }
   return res;
+}
+
+// ---------- secure content: flags, solutions and the content key live ONLY here (never on the public site) ----------
+/* The Answers tab and the key are installed from the Teacher tab (› 🔐 Install answers), which reads them from the
+   password-protected answer book. Pupils' computers never receive a flag unless they choose to reveal one. */
+function ansSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet(), sh = ss.getSheetByName('Answers');
+  if (!sh) { sh = ss.insertSheet('Answers'); sh.appendRow(['Challenge', 'Flag', 'Points', 'Solution']); sh.setFrozenRows(1); }
+  return sh;
+}
+function answers_() {   // { cid: [flag (lower case), points] } — cached for 6 hours
+  var cache = CacheService.getScriptCache(), hit = cache.get('ans2');
+  if (hit) return JSON.parse(hit);
+  var sh = ansSheet_(), n = sh.getLastRow() - 1, out = {};
+  if (n > 0) sh.getRange(2, 1, n, 3).getValues().forEach(function (r) { if (r[0]) out[String(r[0])] = [String(r[1]).toLowerCase(), +r[2] || 0]; });
+  try { cache.put('ans2', JSON.stringify(out), 21600); } catch (e) { }
+  return out;
+}
+function solution_(cid) {
+  var sh = ansSheet_(), c = sh.getRange('A:A').createTextFinder(cid).matchEntireCell(true).findNext();
+  if (!c) return null;
+  var v = sh.getRange(c.getRow(), 1, 1, 4).getValues()[0], sol = String(v[3]), walk = [];
+  try { var j = JSON.parse(sol); sol = String(j.s || ''); walk = j.w || []; } catch (e) { }
+  return { f: String(v[1]), sol: sol, walk: walk };
+}
+function installed_() { return PropertiesService.getScriptProperties().getProperty('contentVer') || ''; }
+function proof_(id, flag) { return hex_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, id + '|' + flag, Utilities.Charset.UTF_8)).slice(0, 16); }
+function oldIds_(id, A) { var out = []; Object.keys(A).forEach(function (o) { if (resolve_(o, A) === id) out.push(o); }); return out; }
+/* keep only solves this script can prove: right proof for this pupil (or a login merged into them, or a computer they
+   used before), or marked by the teacher. Stored proofs are rewritten for the pupil's own ID. */
+function cleanSolves_(id, d, ANS, A, AW) {
+  if (!d || !d.solved) return d;
+  var ids = [id].concat(oldIds_(id, A)).concat((d.prevPids || []).filter(function (x) { return /^[0-9a-f]{16}$/.test(x); }).slice(0, 10)), aw = (AW || {})[id] || {};
+  Object.keys(d.solved).forEach(function (cid) {
+    var s = d.solved[cid], f = ANS[cid];
+    if (!f) { delete d.solved[cid]; return; }
+    if (aw[cid] && s.a) return;
+    var ok = false;
+    for (var i = 0; i < ids.length && !ok; i++) ok = !!s.p && proof_(ids[i], f[0]) === s.p;
+    if (!ok) { delete d.solved[cid]; return; }
+    s.p = proof_(id, f[0]);
+  });
+  if (d.test && d.test.proofs) Object.keys(d.test.proofs).forEach(function (cid) {
+    var f = ANS[cid]; if (!f || proof_(String(d.test.pid), f[0]) !== d.test.proofs[cid]) { delete d.test.proofs[cid]; d.test.solvedIds = (d.test.solvedIds || []).filter(function (x) { return x !== cid; }); }
+  });
+  delete d.prevPids;
+  return d;
+}
+/* strict check for anything that unlocks content or records a solve: the pupil must have signed in (be on the Pupils
+   tab) and, with approvals on, be approved on the Access tab. A made-up ID gets nothing. */
+function trusted_(id) {
+  if (isRemoved_(id)) return false;
+  var r = accRows_().filter(function (x) { return String(x[0]) === id; })[0];
+  if (r) return String(r[1]) === 'approved' || !REQUIRE_APPROVAL;
+  return !!pupilsSheet_().getRange('A:A').createTextFinder(id).matchEntireCell(true).findNext();   // signed up before approvals began
+}
+function approvedId_(raw) {
+  if (!/^[0-9a-f]{16}$/.test(String(raw))) return null;
+  var id = resolve_(String(raw)); return trusted_(id) ? id : null;
+}
+function pupilInfo_(id) {
+  var ps = pupilsSheet_(), c = ps.getRange('A:A').createTextFinder(id).matchEntireCell(true).findNext();
+  return c ? { name: String(ps.getRange(c.getRow(), 2).getValue()).replace(/^'/, ''), cls: String(ps.getRange(c.getRow(), 3).getValue()) } : { name: '', cls: '' };
+}
+function updateRow_(id, fn) {   // read, change and re-sign one pupil's stored progress
+  var lock = LockService.getScriptLock(); lock.waitLock(15000);
+  try {
+    var sh = sheet_(), r = rowFor_(sh, id), d;
+    if (r) { try { d = JSON.parse(String(sh.getRange(r, 6).getValue())).data; } catch (e) { } }
+    if (!d) { var pi = pupilInfo_(id); d = { app: 'MrButlersCTF', v: 1, pid: id, name: pi.name, cls: pi.cls, exported: Date.now(), score: 0, solved: {}, hints: {}, revealed: {}, tries: {}, tut: {}, wrong: 0, created: Date.now() }; }
+    d.solved = d.solved || {}; d.revealed = d.revealed || {};
+    fn(d); d.exported = Date.now();
+    var json = JSON.stringify(sign_(d));
+    var row = [id, safeText_(d.name), Number(d.score) || 0, Object.keys(d.solved).length, new Date(), json, safeText_(String(d.cls || '')).slice(0, 12)];
+    if (r) sh.getRange(r, 1, 1, row.length).setValues([row]); else sh.appendRow(row);
+  } finally { lock.releaseLock(); }
+}
+function submit_(q) {
+  var ANS = answers_(), cid = String(q.cid || ''), f = ANS[cid];
+  if (!installed_() || !f) return { ok: false, error: 'setup' };
+  var test = q.mode === 'test', id = test ? null : approvedId_(q.id);
+  if (!test && !id) return { ok: false, error: 'access' };
+  if (test && !(/^[0-9a-f]{12}$/.test(String(q.tid)) && approvedId_(q.id))) return { ok: false, error: 'access' };
+  var cache = CacheService.getScriptCache(), rk = 'sub:' + (q.id || ''), n = +(cache.get(rk) || 0);
+  if (n >= 30) return { ok: false, error: 'slow' };   // at most 30 guesses a minute per pupil
+  cache.put(rk, String(n + 1), 60);
+  var g = String(q.flag || '').trim().toLowerCase().slice(0, 200);
+  if (g !== f[0]) return { ok: true, correct: false, close: !/^\w+\{/.test(g) && ('flag{' + g + '}') === f[0] };
+  if (test) return { ok: true, correct: true, p: proof_(String(q.tid), f[0]), pts: f[1] };
+  var p = proof_(id, f[0]);
+  updateRow_(id, function (d) { if (!d.solved[cid]) d.solved[cid] = { t: Date.now(), p: p, h: +q.h || 0, r: d.revealed[cid] ? 1 : 0 }; });
+  return { ok: true, correct: true, p: p, pts: f[1], id: id };
+}
+function reveal_(q) {
+  var id = approvedId_(q.id), cid = String(q.cid || '');
+  if (!id) return { ok: false, error: 'access' };
+  var a = solution_(cid); if (!installed_() || !a) return { ok: false, error: 'setup' };
+  updateRow_(id, function (d) { if (!d.revealed[cid]) d.revealed[cid] = Date.now(); });
+  return { ok: true, f: a.f, sol: a.sol, walk: a.walk };
+}
+function ckey_(q) {   // the content key: only for approved pupils and teachers
+  var k = PropertiesService.getScriptProperties().getProperty('contentKey');
+  if (!k) return { ok: false, error: 'setup' };
+  if (q.key === TEACHER_KEY || approvedId_(q.id)) return { ok: true, k: k, ver: installed_() };
+  return { ok: false, error: 'access' };
+}
+function install_(b) {
+  if (b.key !== TEACHER_KEY) return { ok: false, error: 'key' };
+  var ans = b.answers || {}, ids = Object.keys(ans);
+  if (!ids.length || !/^[A-Za-z0-9+/=]{40,}$/.test(String(b.k || ''))) return { ok: false, error: 'bad request' };
+  var sh = ansSheet_();
+  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 4).clearContent();
+  sh.getRange(2, 1, ids.length, 4).setValues(ids.map(function (cid) { var a = ans[cid]; return [cid, "'" + String(a[0]), +a[1] || 0, "'" + String(a[2] || '').slice(0, 40000)]; }));
+  var pr = PropertiesService.getScriptProperties();
+  pr.setProperty('contentKey', String(b.k)); pr.setProperty('contentVer', String(b.ver || '')); if (b.testpw) pr.setProperty('testPassword', String(b.testpw));
+  CacheService.getScriptCache().removeAll(['ans2', 'board', 'flags']);
+  // clean every stored row once: anything that can't be proved is dropped
+  var ANS = answers_(), A = aliases_(), AW = awards_(), ps = sheet_(), n = ps.getLastRow() - 1, cleaned = 0;
+  if (n > 0) ps.getRange(2, 1, n, 7).getValues().forEach(function (r, i) {
+    if (!r[5]) return; var d; try { d = JSON.parse(String(r[5])).data; } catch (e) { return; }
+    var before = Object.keys(d.solved || {}).length; cleanSolves_(String(r[0]), d, ANS, A, AW);
+    if (Object.keys(d.solved || {}).length !== before) cleaned++;
+    ps.getRange(i + 2, 4, 1, 3).setValues([[Object.keys(d.solved || {}).length, r[4], JSON.stringify(sign_(d))]]);
+  });
+  return { ok: true, installed: ids.length, ver: installed_(), cleaned: cleaned };
+}
+function testpass_(q) {
+  var pw = PropertiesService.getScriptProperties().getProperty('testPassword');
+  if (!pw) return { ok: false, error: 'setup' };
+  return { ok: true, pass: String(q.pw || '').trim() === pw };
 }
 
 function removedSheet_() {
@@ -321,12 +439,14 @@ function safeText_(s) {
 function doPost(e) {
   var body;
   try { body = JSON.parse(e.postData.contents); } catch (err) { return out_({ ok: false, error: 'bad json' }); }
+  if (body && body.kind === 'install') return out_(install_(body));   // teacher › Install answers
   var d = body && body.data;
   if (!d || d.app !== 'MrButlersCTF' || !/^[0-9a-f]{16}$/.test(String(d.pid)) || typeof body.check !== 'string') {
     return out_({ ok: false, error: 'not ctf progress' });
   }
   if (isRemoved_(d.pid)) return out_({ ok: true, removed: true });
   if (REQUIRE_APPROVAL && statusOf_(resolve_(String(d.pid))) !== 'approved') return out_({ ok: true, waiting: true });
+  if (installed_() && !approvedId_(d.pid)) return out_({ ok: true, waiting: true, unknown: true });   // never signed in: not saved
   if (JSON.stringify(body).length > MAX_JSON) return out_({ ok: false, error: 'too large' });
 
   var lock = LockService.getScriptLock();
@@ -336,6 +456,7 @@ function doPost(e) {
     // combine with what's already on the sheet (another computer, or a merged login), so solves are never lost
     if (r) { try { var prev = JSON.parse(String(sh.getRange(r, 6).getValue()) || '{}').data; if (prev) d = union_(prev, d); } catch (x) { } }
     if (merged) { d.pid = id; if (r) { d.name = String(sh.getRange(r, 2).getValue()).replace(/^'/, ''); d.cls = String(sh.getRange(r, 7).getValue()); } }
+    if (installed_()) { d = cleanSolves_(id, d, answers_(), aliases_(), awards_()); merged = true; }   // only provable solves are kept
     var json = (r || merged) ? JSON.stringify(sign_(d)) : JSON.stringify(body);
     if (json.length > MAX_JSON) return out_({ ok: false, error: 'too large' });
     var row = [id, safeText_(d.name), Number(d.score) || 0, Object.keys(d.solved || {}).length, new Date(), json, safeText_(String(d.cls || '')).slice(0, 12)];
@@ -351,7 +472,11 @@ function doGet(e) {
   var p = (e && e.parameter) || {};
   if (p.action === 'whois') return out_(whois_(p.name, p.cls, p.pin, p.id));   // pupils signing in (no key)
   if (p.action === 'forgot') return out_(forgot_());
-  if (p.action === 'access' || p.action === 'status') return out_(/^[0-9a-f]{16}$/.test(String(p.id)) ? { ok: true, status: statusOf_(resolve_(String(p.id))) } : { ok: false });   // a pupil's device: approved yet?
+  if (p.action === 'submit') return out_(submit_(p));     // a pupil submitting a flag: checked here, never on their computer
+  if (p.action === 'reveal') return out_(reveal_(p));     // a pupil choosing to see the answer (scores 0)
+  if (p.action === 'ckey') return out_(ckey_(p));         // the key that unlocks the challenges (approved pupils and teachers only)
+  if (p.action === 'testpass') return out_(testpass_(p)); // the Test area password
+  if (p.action === 'access' || p.action === 'status') { if (!/^[0-9a-f]{16}$/.test(String(p.id))) return out_({ ok: false }); var sid = resolve_(String(p.id)), st = statusOf_(sid); return out_({ ok: true, status: st === 'approved' && !trusted_(sid) ? 'unknown' : st }); }   // a pupil's device: approved yet?
   if (p.action === 'board') {   // pupils' leaderboard: checked scores only, no proofs or IDs
     try { return out_(board_()); } catch (err) { return out_({ ok: false, error: 'script', detail: String(err && err.message || err).slice(0, 200) }); }
   }
@@ -367,6 +492,7 @@ function doGet(e) {
   var sh = sheet_();
   if (sh.getRange(1, 7).getValue() !== 'Class') sh.getRange(1, 7).setValue('Class');
   if (p.action === 'testmail') return out_(testEmail());
+  if (p.action === 'answer') { var a = solution_(String(p.cid || '')); return out_(a ? { ok: true, f: a.f, sol: a.sol, walk: a.walk } : { ok: false, error: 'setup' }); }
   if (p.action === 'approve' || p.action === 'decline') return out_(decide_(p.pids, p.action === 'approve' ? 'approved' : 'declined'));   // the teacher answers sign-up requests
   if (p.action === 'merge') return out_(merge_(String(p.from), String(p.to)));
   if (p.action === 'award' || p.action === 'unaward') return out_(setAward_(String(p.pid), String(p.cid), p.action === 'award'));
@@ -407,5 +533,5 @@ function doGet(e) {
       rows.push({ seen: r[4] instanceof Date ? r[4].getTime() : 0, json: r[5] });
     });
   }
-  return out_({ ok: true, now: Date.now(), rows: rows, awards: awards_(), aliases: aliases_(), pending: pending_(), approval: REQUIRE_APPROVAL, mail: { on: EMAIL_SIGNINS, error: PropertiesService.getScriptProperties().getProperty('mailError') || '' } });
+  return out_({ ok: true, now: Date.now(), rows: rows, awards: awards_(), aliases: aliases_(), pending: pending_(), approval: REQUIRE_APPROVAL, mail: { on: EMAIL_SIGNINS, error: PropertiesService.getScriptProperties().getProperty('mailError') || '' }, installed: installed_() });
 }
