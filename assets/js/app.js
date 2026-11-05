@@ -1458,7 +1458,7 @@
       Object.keys(AL).forEach(function (old) { var k = AL[old], n = 0; while (AL[k] && n++ < 20) k = AL[k]; (T.aliasOf[k] = T.aliasOf[k] || []).push(old); });
       Object.keys(byPid).forEach(function (k) { injectAwards(byPid[k].data); });
       T.rows = Object.keys(byPid).map(function (k) { return byPid[k]; });
-      renderTeacher(); renderLiveTests(tests); renderPending(res.pending || [], res.approval);
+      renderTeacher(); renderLiveTests(tests); renderPending(res.pending || [], res.approval, res.mail);
       var n = (res.rows || []).length, active = (res.rows || []).filter(function (x) { return Date.now() - x.seen < 5 * 60000; }).length;
       liveInfo('good-text', '🔴 Live · ' + n + ' pupil' + (n === 1 ? '' : 's') + ' (' + active + ' active now) · refreshed ' + new Date().toLocaleTimeString() + (bad ? ' · ' + bad + ' unreadable row(s)' : ''));
     }).catch(function () { liveInfo('bad-text', 'Couldn\'t reach the Google Sheet — trying again in a moment…'); });
@@ -1494,14 +1494,16 @@
   }
   // ---------- teacher: approve new pupils ----------
   var PEND = { list: [], seen: null };
-  function renderPending(list, on) {
+  function renderPending(list, on, mail) {
+    if (mail !== undefined) PEND.mail = mail;
     PEND.list = list; var box = $('#pendBox'); if (!box) return;
     var waiting = list.filter(function (x) { return x.status === 'pending'; }), declined = list.filter(function (x) { return x.status === 'declined'; });
     var tab = $('#navTeacher'); if (tab) tab.innerHTML = '👩‍🏫 Teacher' + (waiting.length ? ' <span class="pend-count">' + waiting.length + '</span>' : '');
     var ids = waiting.map(function (x) { return x.pid; }).join(',');
     if (PEND.seen !== null && waiting.length > PEND.seen) toast('🙋 ' + (waiting.length - PEND.seen) + ' new pupil' + (waiting.length - PEND.seen === 1 ? '' : 's') + ' waiting for approval', 5000);
     PEND.seen = waiting.length;
-    if (!on && !list.length) { box.innerHTML = ''; return; }
+    var oldScript = on === undefined;   // the live feed has no approval info: the script predates approvals and sign-up emails
+    if (on === false && !list.length) { box.innerHTML = ''; return; }
     function row(x) {
       return '<div class="pend-row"><span><b>' + esc(x.name) + '</b> <span class="muted small">' + esc(x.cls) + (x.at ? ' · asked ' + fmtDate(x.at) : '') + '</span></span><span class="pend-btns">' +
         (x.status === 'declined' ? '<span class="muted small">Declined · </span>' : '') + '<button class="btn primary small" data-appr="' + esc(x.pid) + '">Approve</button>' + (x.status === 'pending' ? '<button class="btn small" data-decl="' + esc(x.pid) + '">Decline</button>' : '') + '</span></div>';
@@ -1509,9 +1511,23 @@
     box.innerHTML = '<div class="pend-box' + (waiting.length ? ' has' : '') + '"><div class="pend-head"><b>🙋 ' + (waiting.length ? waiting.length + ' waiting for approval' : 'Awaiting approval') + '</b>' +
       (waiting.length > 1 ? '<button class="btn primary small" id="pendAll">Approve all ' + waiting.length + '</button>' : '') + '</div>' +
       (waiting.length ? waiting.map(row).join('') : '<p class="muted small">Nobody is waiting. New pupils appear here as soon as they sign in for the first time.</p>') +
-      (declined.length ? '<details class="pend-declined"><summary>Declined (' + declined.length + ')</summary>' + declined.map(row).join('') + '</details>' : '') + '</div>';
+      (declined.length ? '<details class="pend-declined"><summary>Declined (' + declined.length + ')</summary>' + declined.map(row).join('') + '</details>' : '') +
+      '<div class="pend-mail small">' + (oldScript ? '<span class="bad-text">⚠ Your Google script is an older version, so approvals and sign-up emails are off. Paste in the latest Code.gs, run “authorise” once, then deploy a New version.</span> ' : PEND.mail && PEND.mail.error ? '<span class="bad-text">⚠ The last sign-up email failed: ' + esc(PEND.mail.error) + '</span> ' : PEND.mail && PEND.mail.on === false ? '<span class="muted">Sign-up emails are off (EMAIL_SIGNINS = false).</span> ' : '<span class="muted">You get an email for each new sign-up.</span> ') +
+      '<button class="btn small" id="pendMail">✉ Send test email</button> <span id="pendMailMsg"></span></div></div>';
     $$('[data-appr]', box).forEach(function (b) { b.addEventListener('click', function () { setAccessFor(b.dataset.appr, true); }); });
     $$('[data-decl]', box).forEach(function (b) { b.addEventListener('click', function () { var x = list.filter(function (y) { return y.pid === b.dataset.decl; })[0]; if (confirm('Decline ' + (x ? x.name : 'this pupil') + '? They won’t be able to use Mr Butler’s CTF under this name. You can approve them later from the Declined list.')) setAccessFor(b.dataset.decl, false); }); });
+    $('#pendMail').addEventListener('click', function () {
+      var b = this, m = $('#pendMailMsg'); if (!LIVE.key && !askLiveKey()) return;
+      b.disabled = true; m.className = 'muted'; m.textContent = 'Sending…';
+      fetch(liveUrl('&action=testmail'), { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (txt) {
+        var j = null; try { j = JSON.parse(txt); } catch (e) { }
+        b.disabled = false;
+        if (!j) { m.className = 'bad-text'; m.textContent = 'The script gave an error page — it probably needs permission: in Apps Script run “authorise” once, then deploy a New version.'; return; }
+        if (j.ok && j.sent) { m.className = 'good-text'; m.textContent = '✓ Sent to ' + j.to + ' — check that inbox (and junk). ' + j.quota + ' emails left today.' + (j.signins ? '' : ' Note: EMAIL_SIGNINS is false, so sign-ups won’t be emailed.'); return; }
+        m.className = 'bad-text';
+        m.textContent = j.error === 'key' ? 'Teacher key not accepted.' : j.error && j.error !== 'key' && j.ok === false && !/permission|authori/i.test(j.error) ? '✕ ' + j.error : /permission|authori/i.test(j.error || '') ? '✕ The script isn’t allowed to send email yet: in Apps Script run “authorise” once and accept, then deploy a New version.' : '✕ Your script is an older version without emails — paste in the latest Code.gs and deploy a New version.';
+      }).catch(function () { b.disabled = false; m.className = 'bad-text'; m.textContent = 'Couldn’t reach the script.'; });
+    });
     var all = $('#pendAll'); if (all) all.addEventListener('click', function () { setAccessFor(ids, true); });
   }
   function setAccessFor(pids, ok) {

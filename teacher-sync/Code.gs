@@ -133,8 +133,19 @@ function notify_(what, name, cls, more) {
     var who = String(name || '').replace(/^'/, '') + ' (' + String(cls || '').replace(/^'/, '') + ')';
     MailApp.sendEmail(to, "Mr Butler's CTF: " + what + ': ' + who, what + ': ' + who + '\n' + more + '\n\n' + new Date().toLocaleString('en-GB') + '\n' + SITE_URL +
       '\nApprove or decline on the Teacher tab › Awaiting approval. To stop these emails, set EMAIL_SIGNINS to false in the Apps Script.');
-    pr.setProperty('mails:' + day, String(n + 1));
-  } catch (e) { }
+    pr.setProperty('mails:' + day, String(n + 1)); pr.deleteProperty('mailError');
+  } catch (e) { try { PropertiesService.getScriptProperties().setProperty('mailError', new Date().toLocaleString('en-GB') + ': ' + String(e && e.message || e).slice(0, 200)); } catch (x) { } }
+}
+/* Teacher tab › Send test email: proves emails work and shows where they go. Also runnable from the editor. */
+function testEmail() {
+  var to = RECOVERY_EMAIL || Session.getEffectiveUser().getEmail();
+  if (!to) return { ok: false, error: 'This script can’t see an email address to send to. Set RECOVERY_EMAIL at the top of the script.' };
+  try {
+    MailApp.sendEmail(to, "Mr Butler's CTF: test email", 'Emails from your CTF script are working.\n\nNew sign-up requests ' + (EMAIL_SIGNINS ? 'will' : 'will NOT (EMAIL_SIGNINS is false)') + ' be emailed here.\nApprovals are ' + (REQUIRE_APPROVAL ? 'switched on.' : 'switched OFF (REQUIRE_APPROVAL is false).') + '\n\n' + SITE_URL);
+    PropertiesService.getScriptProperties().deleteProperty('mailError');
+    Logger.log('Test email sent to ' + to);
+    return { ok: true, sent: true, to: to, quota: MailApp.getRemainingDailyQuota(), signins: EMAIL_SIGNINS, approval: REQUIRE_APPROVAL };
+  } catch (e) { return { ok: false, error: String(e && e.message || e).slice(0, 250) }; }
 }
 
 /* Forgotten password: email the key to the fixed recovery address (never to an address the site supplies).
@@ -355,6 +366,7 @@ function doGet(e) {
 
   var sh = sheet_();
   if (sh.getRange(1, 7).getValue() !== 'Class') sh.getRange(1, 7).setValue('Class');
+  if (p.action === 'testmail') return out_(testEmail());
   if (p.action === 'approve' || p.action === 'decline') return out_(decide_(p.pids, p.action === 'approve' ? 'approved' : 'declined'));   // the teacher answers sign-up requests
   if (p.action === 'merge') return out_(merge_(String(p.from), String(p.to)));
   if (p.action === 'award' || p.action === 'unaward') return out_(setAward_(String(p.pid), String(p.cid), p.action === 'award'));
@@ -395,5 +407,5 @@ function doGet(e) {
       rows.push({ seen: r[4] instanceof Date ? r[4].getTime() : 0, json: r[5] });
     });
   }
-  return out_({ ok: true, now: Date.now(), rows: rows, awards: awards_(), aliases: aliases_(), pending: pending_(), approval: REQUIRE_APPROVAL });
+  return out_({ ok: true, now: Date.now(), rows: rows, awards: awards_(), aliases: aliases_(), pending: pending_(), approval: REQUIRE_APPROVAL, mail: { on: EMAIL_SIGNINS, error: PropertiesService.getScriptProperties().getProperty('mailError') || '' } });
 }
