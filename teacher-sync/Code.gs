@@ -123,6 +123,51 @@ function decide_(pids, status) {
   try { String(pids || '').split(',').forEach(function (x) { if (/^[0-9a-f]{16}$/.test(x)) { setAccess_(x, status); done++; } }); } finally { lock.releaseLock(); }
   return { ok: true, access: status, done: done };
 }
+/* ---------- emails: one branded HTML layout (with a plain-text copy for mail apps that want it) ---------- */
+function esc_(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+/* o: { preheader, tag, heading, intro, rows: [[label, value]], code, button: { text, url }, note, footer } */
+function mailHtml_(o) {
+  var F = "font-family:'Segoe UI',Helvetica,Arial,sans-serif;";
+  var rows = (o.rows || []).map(function (r, i) {
+    return '<tr><td style="' + F + 'padding:10px 14px;font-size:13px;color:#64748b;width:38%;border-top:' + (i ? '1px solid #e2e8f0' : '0') + ';">' + esc_(r[0]) + '</td>' +
+      '<td style="' + F + 'padding:10px 14px;font-size:14px;color:#0f172a;font-weight:600;border-top:' + (i ? '1px solid #e2e8f0' : '0') + ';">' + esc_(r[1]) + '</td></tr>';
+  }).join('');
+  return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>' +
+    '<body style="margin:0;padding:0;background:#eef2f7;">' +
+    '<div style="display:none;max-height:0;overflow:hidden;opacity:0;">' + esc_(o.preheader || '') + '</div>' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef2f7;"><tr><td align="center" style="padding:28px 12px;">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #dbe3ee;">' +
+    // header band
+    '<tr><td style="background:#0b1220;padding:20px 28px;border-bottom:4px solid #4ade80;">' +
+      '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>' +
+      '<td style="' + F + 'color:#ffffff;font-size:17px;font-weight:700;letter-spacing:.5px;"><span style="color:#4ade80;">&#9873;</span>&nbsp; MR BUTLER&#8217;S CTF</td>' +
+      '<td align="right" style="' + F + 'color:#94a3b8;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;">' + esc_(o.tag || 'Teacher notice') + '</td>' +
+      '</tr></table></td></tr>' +
+    // body
+    '<tr><td style="padding:30px 28px 8px;">' +
+      '<h1 style="' + F + 'margin:0 0 12px;font-size:21px;line-height:1.3;color:#0f172a;">' + esc_(o.heading) + '</h1>' +
+      (o.intro ? '<p style="' + F + 'margin:0 0 20px;font-size:15px;line-height:1.6;color:#334155;">' + o.intro + '</p>' : '') +
+      (rows ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin:0 0 22px;">' + rows + '</table>' : '') +
+      (o.code ? '<div style="' + F + 'margin:0 0 22px;padding:16px;text-align:center;background:#f0fdf4;border:1px dashed #22c55e;border-radius:8px;"><span style="font-family:Consolas,Menlo,monospace;font-size:22px;letter-spacing:2px;color:#14532d;font-weight:700;">' + esc_(o.code) + '</span></div>' : '') +
+      (o.button ? '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="border-radius:8px;background:#16a34a;">' +
+        '<a href="' + esc_(o.button.url) + '" style="' + F + 'display:inline-block;padding:12px 22px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">' + esc_(o.button.text) + ' &rarr;</a></td></tr></table>' : '') +
+      (o.note ? '<p style="' + F + 'margin:0 0 22px;font-size:13px;line-height:1.6;color:#64748b;">' + o.note + '</p>' : '') +
+    '</td></tr>' +
+    // footer
+    '<tr><td style="' + F + 'padding:16px 28px 22px;border-top:1px solid #e2e8f0;font-size:12px;line-height:1.6;color:#94a3b8;">' +
+      (o.footer || '') + (o.footer ? '<br>' : '') + 'Sent automatically by your Mr Butler&#8217;s CTF Google script &middot; ' + esc_(Utilities.formatDate(new Date(), 'Europe/London', 'd MMM yyyy, HH:mm')) +
+      '<br><a href="' + esc_(SITE_URL) + '" style="color:#16a34a;text-decoration:none;">' + esc_(SITE_URL.replace(/^https?:\/\//, '').replace(/\/$/, '')) + '</a>' +
+    '</td></tr></table></td></tr></table></body></html>';
+}
+function mailText_(o) {
+  return [o.heading, '', String(o.intro || '').replace(/<[^>]+>/g, '')].concat((o.rows || []).map(function (r) { return r[0] + ': ' + r[1]; }))
+    .concat(o.code ? ['', o.code] : []).concat(o.button ? ['', o.button.text + ': ' + o.button.url] : []).concat(o.note ? ['', String(o.note).replace(/<[^>]+>/g, '')] : [])
+    .concat(['', '— Mr Butler’s CTF', SITE_URL]).join('\n');
+}
+function sendMail_(to, subject, o) {
+  MailApp.sendEmail({ to: to, subject: subject, name: "Mr Butler's CTF", body: mailText_(o), htmlBody: mailHtml_(o) });
+}
+
 /* one email per new sign-up, as in the revision app (never more than 90 a day) */
 function notify_(what, name, cls, more) {
   if (!EMAIL_SIGNINS) return;
@@ -130,9 +175,18 @@ function notify_(what, name, cls, more) {
     var pr = PropertiesService.getScriptProperties(), day = Utilities.formatDate(new Date(), 'Europe/London', 'yyyy-MM-dd');
     var n = +(pr.getProperty('mails:' + day) || 0); if (n >= 90 || MailApp.getRemainingDailyQuota() < 5) return;
     var to = RECOVERY_EMAIL || Session.getEffectiveUser().getEmail(); if (!to) return;
-    var who = String(name || '').replace(/^'/, '') + ' (' + String(cls || '').replace(/^'/, '') + ')';
-    MailApp.sendEmail(to, "Mr Butler's CTF: " + what + ': ' + who, what + ': ' + who + '\n' + more + '\n\n' + new Date().toLocaleString('en-GB') + '\n' + SITE_URL +
-      '\nApprove or decline on the Teacher tab › Awaiting approval. To stop these emails, set EMAIL_SIGNINS to false in the Apps Script.');
+    var nm = String(name || '').replace(/^'/, ''), c = String(cls || '').replace(/^'/, '').toUpperCase(), waiting = 0;
+    try { waiting = pending_().filter(function (r) { return r.status === 'pending'; }).length; } catch (x) { }
+    sendMail_(to, (REQUIRE_APPROVAL ? 'Approval needed: ' : 'New sign-up: ') + nm + ' (' + c + ')', {
+      preheader: nm + ' (' + c + ') ' + (REQUIRE_APPROVAL ? 'is waiting for you to approve them.' : 'has signed up.'),
+      tag: REQUIRE_APPROVAL ? 'Access request' : 'New sign-up',
+      heading: REQUIRE_APPROVAL ? 'A pupil is waiting for approval' : 'A new pupil has signed up',
+      intro: REQUIRE_APPROVAL ? 'A pupil has signed up to Mr Butler&#8217;s CTF and can&#8217;t see any challenges until you approve them.' : esc_(more),
+      rows: [['Pupil', nm], ['Form class', c], ['Requested', Utilities.formatDate(new Date(), 'Europe/London', 'EEEE d MMMM, HH:mm')]].concat(REQUIRE_APPROVAL && waiting ? [['Waiting in total', String(waiting)]] : []),
+      button: { text: REQUIRE_APPROVAL ? 'Review requests' : 'Open the Teacher tab', url: SITE_URL },
+      note: REQUIRE_APPROVAL ? 'Open the site on a teacher PC, then go to <b>Teacher</b> &rsaquo; <b>Awaiting approval</b> to approve or decline. The pupil&#8217;s screen opens by itself within 20 seconds of approval.' : '',
+      footer: 'To stop these emails, set <code>EMAIL_SIGNINS</code> to <code>false</code> in the Apps Script.'
+    });
     pr.setProperty('mails:' + day, String(n + 1)); pr.deleteProperty('mailError');
   } catch (e) { try { PropertiesService.getScriptProperties().setProperty('mailError', new Date().toLocaleString('en-GB') + ': ' + String(e && e.message || e).slice(0, 200)); } catch (x) { } }
 }
@@ -141,7 +195,13 @@ function testEmail() {
   var to = RECOVERY_EMAIL || Session.getEffectiveUser().getEmail();
   if (!to) return { ok: false, error: 'This script can’t see an email address to send to. Set RECOVERY_EMAIL at the top of the script.' };
   try {
-    MailApp.sendEmail(to, "Mr Butler's CTF: test email", 'Emails from your CTF script are working.\n\nNew sign-up requests ' + (EMAIL_SIGNINS ? 'will' : 'will NOT (EMAIL_SIGNINS is false)') + ' be emailed here.\nApprovals are ' + (REQUIRE_APPROVAL ? 'switched on.' : 'switched OFF (REQUIRE_APPROVAL is false).') + '\n\n' + SITE_URL);
+    sendMail_(to, "Mr Butler's CTF: test email", {
+      preheader: 'Emails from your CTF script are working.', tag: 'Test email',
+      heading: 'Emails are working',
+      intro: 'This is a test from your Mr Butler&#8217;s CTF Google script. Notifications will arrive at this address.',
+      rows: [['Sent to', to], ['Sign-up emails', EMAIL_SIGNINS ? 'On' : 'Off (EMAIL_SIGNINS is false)'], ['Pupil approval', REQUIRE_APPROVAL ? 'Required' : 'Off (REQUIRE_APPROVAL is false)'], ['Answers installed', installed_() ? 'Yes' : 'Not yet: sign in on the site as a teacher']],
+      button: { text: 'Open Mr Butler’s CTF', url: SITE_URL }
+    });
     PropertiesService.getScriptProperties().deleteProperty('mailError');
     Logger.log('Test email sent to ' + to);
     return { ok: true, sent: true, to: to, quota: MailApp.getRemainingDailyQuota(), signins: EMAIL_SIGNINS, approval: REQUIRE_APPROVAL };
@@ -155,14 +215,14 @@ function forgot_() {
   if (cache.get('forgot')) return { ok: true, sent: false, wait: true };
   var to = RECOVERY_EMAIL || Session.getEffectiveUser().getEmail();
   if (!to) return { ok: false, error: 'no recovery email' };
-  MailApp.sendEmail({
-    to: to,
-    subject: "Mr Butler's CTF: your teacher password",
-    body: "Someone pressed 'Email it to me' on the Teacher access screen of Mr Butler's CTF.\n\n" +
-          'Teacher password / live view key: ' + TEACHER_KEY + '\n\n' +
-          "If that wasn't you, nothing has changed: this email only ever comes to you.\n" +
-          'To change the password, edit TEACHER_KEY in the Apps Script (and ask Claude to re-lock the answer book with the same password).',
-    name: "Mr Butler's CTF"
+  sendMail_(to, "Mr Butler's CTF: your teacher password", {
+    preheader: 'The Teacher login password you asked for.', tag: 'Password reminder',
+    heading: 'Your teacher password',
+    intro: 'Someone pressed <b>Email it to me</b> on the Teacher login screen. Here is the password for Teacher login and the live class view:',
+    code: TEACHER_KEY,
+    button: { text: 'Go to Teacher login', url: SITE_URL },
+    note: 'If that wasn&#8217;t you, nothing has changed. This email is only ever sent to this address, at most once every 10 minutes.',
+    footer: 'To change the password, edit <code>TEACHER_KEY</code> in the Apps Script and have the answer book re-locked with the same password.'
   });
   cache.put('forgot', '1', 600);
   var at = to.indexOf('@');
