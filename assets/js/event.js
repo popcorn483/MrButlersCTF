@@ -71,12 +71,12 @@
     if (EV.title) $('#evTitle').value = EV.title;
     $('#evDur').value = String(EV.durMin);
     scr.hidden = false; document.body.classList.add('event-open');
-    paintClock(); setButtons(); renderBoard(); startTicker();
+    paintClock(); setButtons(); renderBoard(); startTicker(); startRefresh();
     if (EV.running) startTimer();
   }
   function close() {
     scr.hidden = true; document.body.classList.remove('event-open');
-    stopTimer(); stopTicker();
+    stopTimer(); stopTicker(); stopRefresh();
     if (document.fullscreenElement) { try { document.exitFullscreen(); } catch (e) { } }
   }
   var ob = document.getElementById('openEvent'); if (ob) ob.addEventListener('click', open);
@@ -126,9 +126,27 @@
         U.toast && U.toast('Loaded ' + (res.length - bad) + ' result(s)' + (bad ? ', ' + bad + ' skipped' : ''));
       });
   });
-  $('#evClear').addEventListener('click', function () { rows = []; renderBoard(); });
+  $('#evClear').addEventListener('click', function () { rows = rows.filter(function (r) { return r.data.live; }); renderBoard(); });
+
+  // ---------- which leaderboard, and a refresh every minute while the screen is open ----------
+  var chal = [], lastScore = {}, refreshT = null, lastAt = 0;
+  if (!EV.src) EV.src = 'challenges';
+  var srcSel = $('#evSource'); srcSel.value = EV.src;
+  srcSel.addEventListener('change', function () { EV.src = this.value; save(); lastScore = {}; renderBoard(); });
+  window.CTFEventChallenges = function (list) { chal = list; lastAt = Date.now(); renderBoard(); };
+  function refresh() {
+    var ok = window.CTFLiveNow && window.CTFLiveNow();
+    if (!ok) { $('#evUpdated').innerHTML = '<span class="bad-text">Sign in as the teacher on this PC (Teacher tab) to fill this in automatically.</span>'; }
+  }
+  function startRefresh() { stopRefresh(); refresh(); refreshT = setInterval(refresh, 60000); paintUpdated(); }
+  function stopRefresh() { if (refreshT) { clearInterval(refreshT); refreshT = null; } }
+  function paintUpdated() {
+    var el = $('#evUpdated'); if (!el || !lastAt) return;
+    el.innerHTML = '<span class="live-dot"></span>Updated ' + new Date(lastAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' · refreshes every minute';
+  }
   // live results from the Teacher tab's live view (Google Sheet) — merged with any loaded files
   window.CTFEventLive = function (list) {
+    lastAt = Date.now();
     rows = rows.filter(function (r) { return !r.data.live; });
     list.forEach(function (d) {
       var cur = rows.filter(function (r) { return r.data.pid === d.pid; })[0];
@@ -138,18 +156,32 @@
     renderBoard();
   };
   function renderBoard() {
-    var box = $('#evBoard');
-    if (!rows.length) { box.innerHTML = '<p class="ev-empty">No results loaded yet. As teams finish, load their result files and the scoreboard fills in.</p>'; return; }
-    var list = rows.map(function (r) { return r.data; }).sort(function (a, b) { return (b.score - a.score) || (a.timeUsedMs - b.timeUsedMs); });
+    var box = $('#evBoard'); paintUpdated();
+    var src = EV.src || 'challenges', list;
+    if (src === 'challenges') {
+      list = chal.map(function (d) { return { pid: d.pid, name: d.name, sub: d.cls, score: d.pts, flags: d.n + ' flag' + (d.n === 1 ? '' : 's'), tie: -(d.last || 0) }; });
+    } else {
+      list = rows.map(function (r) { return r.data; }).filter(function (d) { return (d.paper || 'p0') === src || (!d.paper && !d.live); })
+        .map(function (d) { return { pid: d.pid, name: d.name || '(no name)', score: d.score, flags: d.solvedCount + '/' + d.paperSize, tie: d.timeUsedMs || 0, running: d.status === 'running' }; });
+    }
+    if (!list.length) {
+      box.innerHTML = '<p class="ev-empty">' + (src === 'challenges' ? 'Nobody has scored on the challenge board yet.' : 'Nobody has started ' + esc(srcSel.options[srcSel.selectedIndex].text.replace(/^\S+\s/, '')) + ' yet. Teams appear here as soon as they begin.') + '</p>';
+      return;
+    }
+    list.sort(function (a, b) { return (b.score - a.score) || (a.tie - b.tie); });
+    var rank = 0, prev = null;
     box.innerHTML = list.map(function (d, i) {
-      var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
-      return '<div class="ev-row' + (i < 3 ? ' top' : '') + '">' +
+      if (prev === null || d.score !== prev) rank = i + 1; prev = d.score;   // equal points share a place
+      var medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+      var up = lastScore[d.pid] !== undefined && d.score > lastScore[d.pid];
+      return '<div class="ev-row' + (rank <= 3 ? ' top' : '') + (up ? ' ev-up' : '') + '">' +
         '<span class="ev-rank">' + medal + '</span>' +
-        '<span class="ev-name">' + esc(d.name || '(no name)') + '</span>' +
+        '<span class="ev-name"><span class="ev-nm">' + esc(d.name) + '</span>' + (d.sub || d.running ? '<small class="ev-sub">' + (d.sub ? esc(d.sub) : '') + (d.running ? '<span class="ev-running">● live</span>' : '') + '</small>' : '') + '</span>' +
         '<span class="ev-pts">' + d.score + '<small> pts</small></span>' +
-        '<span class="ev-flags">' + d.solvedCount + '/' + d.paperSize + '</span>' +
+        '<span class="ev-flags">' + d.flags + '</span>' +
         '</div>';
     }).join('');
+    lastScore = {}; list.forEach(function (d) { lastScore[d.pid] = d.score; });
   }
 
   // ---------- sounds ----------

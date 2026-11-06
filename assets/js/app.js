@@ -1629,8 +1629,8 @@
     liveSignedIn(); return true;
   }
   function liveUrl(extra) { return SYNC_URL + (SYNC_URL.indexOf('?') < 0 ? '?' : '&') + 'key=' + encodeURIComponent(LIVE.key) + (extra || '') + '&t=' + Date.now(); }
-  function liveFetch() {
-    if (!LIVE.on || document.hidden) return;
+  function liveFetch(force) {
+    if ((!LIVE.on && !force) || (document.hidden && !force)) return;
     fetch(liveUrl(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (res) {
       if (!res.ok) {
         if (res.error === 'key') { stopLive(); try { localStorage.removeItem(LIVE_KEY_STORE); } catch (e) { } LIVE.key = ''; try { localStorage.removeItem(TEACHER_PC); sessionStorage.removeItem(STAFF_SS); } catch (e) { } liveSignedIn(); liveInfo('bad-text', 'The teacher password has changed. Sign in again with the new one.'); openTeacherSignIn(); $('#tmMsg').className = 'flag-msg'; $('#tmMsg').textContent = 'The teacher password has changed — enter the new one.'; }
@@ -1656,11 +1656,19 @@
       Object.keys(AL).forEach(function (old) { var k = AL[old], n = 0; while (AL[k] && n++ < 20) k = AL[k]; (T.aliasOf[k] = T.aliasOf[k] || []).push(old); });
       Object.keys(byPid).forEach(function (k) { injectAwards(byPid[k].data); });
       T.rows = Object.keys(byPid).map(function (k) { return byPid[k]; });
-      renderTeacher(); renderLiveTests(tests); renderPending(res.pending || [], res.approval, res.mail); renderInstall(res.installed);
+      renderTeacher(); renderLiveTests(tests); feedEventChallenges(); renderPending(res.pending || [], res.approval, res.mail); renderInstall(res.installed);
       var n = T.rows.filter(function (r) { return r.seen || r.fresh; }).length, active = (res.rows || []).filter(function (x) { return Date.now() - x.seen < 5 * 60000; }).length;
       liveInfo('muted', '<span class="live-dot"></span>Live · ' + n + ' pupil' + (n === 1 ? '' : 's') + ' · ' + active + ' active · updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + (bad ? ' · ' + bad + ' unreadable' : ''));
     }).catch(function () { liveInfo('bad-text', 'Couldn\'t reach the Google Sheet — trying again in a moment…'); });
   }
+  // ---------- projector event screen: the practice-challenge leaderboard, and a refresh it can ask for ----------
+  function feedEventChallenges() {
+    if (!window.CTFEventChallenges) return;
+    var list = T.rows.map(function (r) { var st = rowStats(r); return { pid: st.pid, name: st.name, cls: st.cls, pts: st.pts, n: st.n, last: st.last }; })
+      .filter(function (x) { return x.pts > 0 || x.n > 0; });
+    try { window.CTFEventChallenges(list); } catch (e) { }
+  }
+  window.CTFLiveNow = function () { if (!SYNC_URL || !LIVE.key) return false; liveFetch(true); return true; };
   // ---------- teacher: live Test area (mock competition) results ----------
   function testRow(t, seen) {
     var pts = 0, n = 0, unv = 0;

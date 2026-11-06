@@ -500,14 +500,21 @@
     <div class="ev-side">
       <div class="ev-side-head">
         <h2>Live standings</h2>
+        <select id="evSource" class="io ev-source" aria-label="Which leaderboard to show">
+          <option value="challenges">🏆 Challenge leaderboard</option>
+          <option value="p1">🌱 Paper 1 · Foundations</option>
+          <option value="p2">⚡ Paper 2 · Challenger</option>
+          <option value="p3">🌌 Paper 3 · Final Boss</option>
+        </select>
         <div class="ev-side-btns no-print">
           <label class="btn small" for="evFiles">⬆ Load team results</label>
           <input type="file" id="evFiles" accept=".json,application/json" multiple hidden>
           <button class="btn small" id="evClear">Clear</button>
         </div>
       </div>
+      <div class="ev-updated" id="evUpdated"></div>
       <div id="evBoard" class="ev-board"></div>
-      <p class="ev-hint">Pupils: open <b>🔒 Test area</b>, enter your <b>team name</b> and the password, and race the clock on this screen. With live view on, scores appear here automatically as teams solve. Otherwise, download your result when you finish and send it to your teacher.</p>
+      <p class="ev-hint">Pupils: open <b>🔒 Test area</b>, choose the paper, enter your <b>team name</b> and the password, and race the clock on this screen. Scores appear here by themselves and refresh every minute.</p>
     </div>
   </div>
 </div>

@@ -1,10 +1,10 @@
 {
-  "version": "mbctf-v48",
+  "version": "mbctf-v49",
   "date": "2026-11-05",
   "notes": [
+    "\ud83d\udda5 Projector screen: pick the challenge leaderboard or a test paper; it fills in by itself and refreshes every minute",
     "\u2728 Tidier board: each category shows 5 challenges to start \u2014 solve 3 to reveal the next 5",
     "\ud83d\udd11 Each practice test paper now has its own password from your teacher",
-    "\ud83c\udfc1 1,000 challenges!",
-    "\ud83d\udcdd Three new practice tests in the Test area: Foundations, Challenger and Final Boss"
+    "\ud83c\udfc1 1,000 challenges!"
   ]
 }
