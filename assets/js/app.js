@@ -27,6 +27,11 @@
   var TIER_NUMS = [1, 2, 3, 4, 5, 6, 7];
   var UNREAL_NEED = 3;   // Competition Grade solves needed to unlock Unreal
   var ELITE_NEED = 5;   // Hard/Expert solves needed to unlock Competition Grade
+  // the board shows 5 challenges per category to start with; solving 3 of them reveals the next 5, and so on
+  var REVEAL_STEP = 5, REVEAL_AT = 3;
+  function revealCount(solvedHere) { return REVEAL_STEP * (1 + Math.floor((solvedHere + (REVEAL_STEP - REVEAL_AT)) / REVEAL_STEP)); }
+  var REVEAL_KEY = 'mbctf-reveal-v1', REVEAL_SEEN = {};
+  try { REVEAL_SEEN = JSON.parse(localStorage.getItem(REVEAL_KEY) || '{}') || {}; } catch (e) { }
   var RANKS = [[0, 'Script Kiddie'], [150, 'Packet Sniffer'], [500, 'Bug Hunter'], [1200, 'Flag Collector'],
     [2500, 'Cipher Breaker'], [4500, 'Exploit Engineer'], [7000, 'Red Teamer'], [10000, 'Zero-Day Legend']];
   var TOTAL_PTS = CH.reduce(function (s, c) { return s + c.pts; }, 0);
@@ -224,9 +229,23 @@
         if (unlock.locked && c.tier >= 4 && !S.solved[c.id]) { hiddenHard.push(c); return false; }
         return true;
       });
-      if (!list.length && !hiddenHard.length) return;
       var all = CH.filter(function (c) { return c.cat === cat.id; });
       var done = all.filter(function (c) { return S.solved[c.id]; }).length;
+      // progressive reveal: only the first few unsolved challenges show; solving more reveals the next batch (teacher PCs see everything)
+      var showAll = isTeacherDevice(), reveal = showAll ? all.length : Math.min(all.length, revealCount(done));
+      var open = {}, fresh = {}, prevSeen = REVEAL_SEEN[cat.id] || 0;
+      var NEW = REVEAL_SEEN._new || (REVEAL_SEEN._new = {});
+      all.slice(0, reveal).forEach(function (c, i) { open[c.id] = 1; if (!showAll && prevSeen && i >= prevSeen) { fresh[c.id] = 1; NEW[c.id] = 1; } });
+      Object.keys(NEW).forEach(function (id) { if (open[id] && !S.solved[id]) fresh[id] = 1; });
+      var unrevealed = all.filter(function (c) { return !open[c.id] && !S.solved[c.id]; }).length;
+      list = list.filter(function (c) { return open[c.id] || S.solved[c.id]; });
+      hiddenHard = hiddenHard.filter(function (c) { return open[c.id]; });
+      if (!showAll && reveal > prevSeen) {
+        var nNew = reveal - prevSeen;
+        if (prevSeen) toast('🔓 ' + nNew + ' new ' + cat.name + ' challenge' + (nNew > 1 ? 's' : '') + ' revealed!', 3500);
+        REVEAL_SEEN[cat.id] = reveal; try { localStorage.setItem(REVEAL_KEY, JSON.stringify(REVEAL_SEEN)); } catch (e) { }
+      }
+      if (!list.length && !hiddenHard.length && !(unrevealed && !F.q)) return;
       var sec = document.createElement('section'); sec.className = 'cat';
       sec.innerHTML = '<div class="cat-head"><div class="cat-title"><span class="cat-icon">' + cat.icon + '</span>' + esc(cat.name) +
         '</div><div class="cat-blurb">' + esc(cat.blurb) + '</div><button class="cat-guide" data-guide="' + cat.id + '">How to approach</button>' +
@@ -234,9 +253,12 @@
       var tiles = $('.tiles', sec);
       list.forEach(function (c) {
         var b = document.createElement('button');
-        b.className = 'tile ' + TIERS[c.tier].cls + (S.solved[c.id] ? ' solved' : '') + (S.tut && S.tut[c.id] ? ' tut-used' : '');
+        b.className = 'tile ' + TIERS[c.tier].cls + (S.solved[c.id] ? ' solved' : '') + (S.tut && S.tut[c.id] ? ' tut-used' : '') + (fresh[c.id] && !S.solved[c.id] ? ' tile-new' : '');
         b.innerHTML = (S.tut && S.tut[c.id] ? '<span class="tut-mark" title="Tutorial used">📘</span>' : '') + '<div class="tile-title">' + esc(c.title) + '</div><div class="tile-foot"><span>' + TIERS[c.tier].name + '</span><span class="tile-pts">' + c.pts + '</span></div>';
-        b.addEventListener('click', function () { openChal(c.id); });
+        b.addEventListener('click', function () {
+          if (REVEAL_SEEN._new && REVEAL_SEEN._new[c.id]) { delete REVEAL_SEEN._new[c.id]; try { localStorage.setItem(REVEAL_KEY, JSON.stringify(REVEAL_SEEN)); } catch (e) { } b.classList.remove('tile-new'); }
+          openChal(c.id);
+        });
         tiles.appendChild(b);
       });
       if (hiddenHard.length) {
@@ -246,6 +268,14 @@
           '</div><div class="tile-foot"><span>' + (unlock.unreal ? 'Solve ' + remain + ' more Competition Grade to unlock' : unlock.elite ? 'Solve ' + remain + ' more Hard/Expert to unlock' : 'Solve ' + remain + ' more here to unlock') + '</span></div>';
         lb.addEventListener('click', function () { toast(unlock.unreal ? '🌌 Unreal unlocks once you have solved ' + UNREAL_NEED + ' Competition Grade challenges (' + unlock.have + '/' + UNREAL_NEED + ' so far).' : unlock.elite ? '🏆 Competition Grade unlocks once you have solved ' + ELITE_NEED + ' Hard or Expert challenges (' + unlock.have + '/' + ELITE_NEED + ' so far).' : '🔒 Solve ' + remain + ' more ' + cat.name + ' challenge' + (remain > 1 ? 's' : '') + ' to unlock the harder ones.', 4000); });
         tiles.appendChild(lb);
+      }
+      if (unrevealed && !F.q) {
+        var needMore = 1; while (revealCount(done + needMore) <= reveal) needMore++;
+        var nb = document.createElement('button'); nb.className = 'tile tile-locked tile-more';
+        nb.innerHTML = '<span class="lock-ic">✨</span><div class="tile-title">' + Math.min(REVEAL_STEP, unrevealed) + ' more to reveal</div>' +
+          '<div class="tile-foot"><span>Solve ' + needMore + ' more here</span><span class="tile-pts">' + unrevealed + ' left</span></div>';
+        nb.addEventListener('click', function () { toast('✨ Solve ' + needMore + ' more ' + cat.name + ' challenge' + (needMore > 1 ? 's' : '') + ' to reveal the next ' + Math.min(REVEAL_STEP, unrevealed) + '. ' + unrevealed + ' still hidden in this category.', 4000); });
+        tiles.appendChild(nb);
       }
       board.appendChild(sec);
     });

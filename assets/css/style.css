@@ -1154,3 +1154,11 @@ html.mb-locked #waitModal, html.mb-locked #whoModal { display: grid !important; 
 .tpw-msg { grid-column: 1 / -1; min-height: 0; }
 .tpw-msg:empty { display: none; }
 @media (max-width: 560px) { .tpw-row { grid-template-columns: 1fr auto; } .tpw-name { grid-column: 1 / -1; } }
+
+/* board: progressive reveal */
+.tile.tile-more { border-left-color: var(--amber); }
+.tile.tile-more .tile-title { color: var(--text); }
+.tile.tile-new { animation: tile-reveal .6s cubic-bezier(.2,1.5,.4,1) both; box-shadow: 0 0 0 1px color-mix(in srgb, var(--amber) 55%, transparent), 0 0 18px -4px color-mix(in srgb, var(--amber) 60%, transparent); }
+.tile.tile-new::after { content: 'NEW'; position: absolute; top: 6px; right: 8px; padding: 0 5px; border-radius: 4px; background: var(--amber); color: #1a1205; font: 800 .58rem var(--mono); letter-spacing: .06em; }
+@keyframes tile-reveal { from { opacity: 0; transform: translateY(8px) scale(.94); } }
+@media (prefers-reduced-motion: reduce) { .tile.tile-new { animation: none; } }
