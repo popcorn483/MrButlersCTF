@@ -193,7 +193,19 @@
         setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
       } catch (e) { alert('Could not prepare the download: ' + e.message); }
     }
-    $('#dlPdf').addEventListener('click', function () { dl(DATA.pdf, 'application/pdf', 'MrButlersCTF-all-challenges.pdf'); });
+    $('#dlPdf').addEventListener('click', function () {
+      if (!DATA.pdfFile) return dl(DATA.pdf, 'application/pdf', 'MrButlersCTF-all-challenges.pdf');
+      // the full solutions PDF is its own encrypted file (its key is in this answer book), fetched only when wanted
+      var b = this, old = b.textContent; b.disabled = true; b.textContent = 'Preparing…';
+      fetch(DATA.pdfFile, { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error('download'); return r.arrayBuffer(); }).then(function (buf) {
+        var u = new Uint8Array(buf);
+        return crypto.subtle.importKey('raw', bin(DATA.pdfKey), 'AES-GCM', false, ['decrypt']).then(function (k) { return crypto.subtle.decrypt({ name: 'AES-GCM', iv: u.slice(0, 12) }, k, u.slice(12)); });
+      }).then(function (pt) {
+        var url = URL.createObjectURL(new Blob([pt], { type: 'application/pdf' }));
+        var a = document.createElement('a'); a.href = url; a.download = 'MrButlersCTF-answer-book-all-' + DATA.ch.length + '.pdf';
+        document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
+      }).catch(function (e) { alert('Could not prepare the download: ' + e.message); }).then(function () { b.disabled = false; b.textContent = old; });
+    });
     if (DATA.worksheetsPdf) {
       var wb = $('#dlWorksheets'); wb.hidden = false;
       wb.addEventListener('click', function () { dl(DATA.worksheetsPdf, 'application/pdf', 'MrBsCTF-Worksheets-Teacher.pdf'); });

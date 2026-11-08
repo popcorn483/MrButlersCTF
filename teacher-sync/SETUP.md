@@ -57,7 +57,9 @@ Until this is done pupils see “The challenges aren’t ready yet”. The answe
 - **Mark several at once:** in a pupil’s breakdown press **☑ Select challenges to mark completed**, tick the squares (or **Tick all attempted**), optionally open **Also mark for other pupils** (e.g. **Tick everyone in 11B**), then **✅ Mark completed**. **Undo marks** reverses the same selection.
 - **Pupils’ leaderboard** (🏆 Leaderboard tab): names show as first name + surname initial, with class. Only solves the script itself has checked count. Set `BOARD_PUBLIC = false` in the script to hide it.
 - **Security:** flags are checked by the script, never on pupils' computers (at most 30 guesses a minute each). Unapproved, declined, deleted or made-up logins get no challenges, can't submit flags and nothing they send is saved. Pupils who reveal an answer get it from the script, which records the reveal. The Test area password is checked by the script too.
-- **Clear live data** empties the Sheet — use it before a new group. Pupils' own progress is untouched and re-sends when they next solve.
+- **End-of-year clear-down** (Teacher tab › ⋯) removes every pupil from the Sheet — names, PIN codes, progress, test results, approvals — after optionally saving a dated copy to your Drive. Pupils' computers notice and start afresh, so old progress isn't sent back. Answers, the challenge key, test passwords and settings are kept.
+- **Test resits:** pupils can't clear their own test result. On the Teacher tab's live test table, **↺ Allow resit** clears that attempt; it disappears from the pupil's computer next time they open the Test area.
+- **If the script goes down mid-test:** pupils' flags are saved and checked automatically when it's back (they count from the time they were sent). If it's down when a paper starts, you can type the staff password on the pupil's PC to start the paper anyway.
 - The Sheet itself is readable too (name, score, flags, last update), but the Teacher tab is better: it checks each solve's proof code, so anything tampered with shows as *edited* / *unverified*.
 
 ## Notes

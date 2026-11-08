@@ -71,13 +71,33 @@
     if (run) { use(run); renderBoard(); startTimer(); return; }
     // a paper whose clock ran out while the pupil was away: close it off
     PAPERS.forEach(function (p) { var t = stateFor(p); if (t && t.started && !t.finished) { use(p); TS.finished = true; TS.end = TS.start + p.minutes * 60000; TS.endReason = 'time'; save(); } });
-    if (pid && paperById(pid)) { use(paperById(pid)); if (TS.finished) return renderResults(); return renderStart(); }
+    if (pid && paperById(pid)) { use(paperById(pid)); if (TS.finished) { checkResets(); return renderResults(); } return renderStart(); }
     renderPicker();
   }
 
   // ---------- choose a paper ----------
+  // the teacher can allow a resit from the Teacher tab: ask the script whether any of this device's papers were reset
+  var resetAsked = 0;
+  function checkResets() {
+    if (!window.CTFApi || Date.now() - resetAsked < 15000) return; resetAsked = Date.now();
+    var tids = PAPERS.map(function (p) { var t = stateFor(p); return t && t.started ? t.pid : null; }).filter(Boolean);
+    if (!tids.length) return;
+    window.CTFApi('action=testresets&tids=' + tids.join(',')).then(function (j) {
+      if (!j || !j.ok || !j.resets) return;
+      var changed = [];
+      PAPERS.forEach(function (p) {
+        var t = stateFor(p); if (!t || !j.resets[t.pid] || j.resets[t.pid] < t.start) return;
+        delete ALL.papers[p.id]; if (ALL.active === p.id) ALL.active = null; changed.push(p);
+      });
+      if (!changed.length) return;
+      try { localStorage.setItem(KEY, JSON.stringify(ALL)); } catch (e) { }
+      use(paperById(ALL.active) || PAPERS[0]);
+      toast('↺ Your teacher has reset ' + changed.map(function (p) { return p.title; }).join(' and ') + ' — you can sit it again.', 5000);
+      var v = document.getElementById('view-test'); if (v && v.classList.contains('active')) renderPicker();
+    }, function () { });
+  }
   function renderPicker() {
-    stopTimer();
+    stopTimer(); checkResets();
     var cards = PAPERS.map(function (p) {
       var t = stateFor(p), done = t && t.finished, tiers = {};
       p.ids.forEach(function (id) { tiers[BY_ID[id].tier] = 1; });
@@ -136,15 +156,35 @@
       btn.disabled = true; m.className = 'flag-msg'; m.textContent = 'Checking…';
       window.CTFApi('action=testpass&paper=' + P.id + '&pw=' + encodeURIComponent(pass)).then(function (j) {
         btn.disabled = false; m.className = 'flag-msg bad';
-        if (!j || !j.ok) { m.textContent = j && j.error === 'setup' ? '✗ The test isn\'t set up yet — ask your teacher.' : '✗ Couldn\'t check the password. Try again.'; return; }
+        if (!j || !j.ok) { m.textContent = j && j.error === 'setup' ? '✗ The test isn\'t set up yet — ask your teacher.' : '✗ Couldn\'t check the password. Try again.'; if (!(j && j.error === 'setup')) offerOverride(nm); return; }
         if (!j.pass) { m.textContent = '✗ That password is not right for ' + P.title + '. Ask your teacher.'; return; }
         begin(nm);
-      }, function () { btn.disabled = false; m.className = 'flag-msg bad'; m.textContent = '✗ Couldn\'t reach Mr Butler\'s script. Check the internet and try again.'; });
+      }, function () { btn.disabled = false; m.className = 'flag-msg bad'; m.textContent = '✗ Couldn\'t reach Mr Butler\'s script. Check the internet and try again.'; offerOverride(nm); });
     });
   }
+  // Backup plan: if the Google script is down, the teacher can start the paper on this PC with the staff password.
+  // It's checked here by unlocking the answer book (no internet to the script needed); flags are then queued until the script is back.
+  function offerOverride(nm) {
+    if (document.getElementById('testOverride') || !(window.CTF && window.CTF.openVault)) return;
+    var f = document.createElement('form'); f.id = 'testOverride'; f.className = 'test-override';
+    f.innerHTML = '<p class="small"><b>🛟 Script not answering?</b> Your teacher can start this paper anyway. Flags you enter are saved and checked as soon as the script is back — they count from the moment you sent them.</p>' +
+      '<label class="field-label">Teacher: staff password</label><input class="io" type="password" id="testOvPw" autocomplete="off">' +
+      '<div class="flag-msg bad" id="testOvMsg"></div><button class="btn" type="submit">Start without the script</button>';
+    $('#testStartForm').after(f);
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var pw = $('#testOvPw').value, mm = $('#testOvMsg'), b = f.querySelector('button'); if (!pw) return;
+      b.disabled = true; mm.className = 'flag-msg'; mm.textContent = 'Checking…';
+      window.CTF.openVault(pw).then(function (v) {
+        if (v && v.info && v.info.contentKey && window.CTF.useKey) window.CTF.useKey(v.info.contentKey);
+        TS_offline = true; begin(($('#testName') && $('#testName').value.trim().slice(0, 40)) || nm);
+      }, function () { b.disabled = false; mm.className = 'flag-msg bad'; mm.textContent = '✗ That isn\'t the staff password.'; });
+    });
+  }
+  var TS_offline = false;
   function begin(nm) {
     if (runningPaper()) { toast('Finish the paper you have already started first.'); return enter(); }
-    TS = blank(); TS.name = nm; TS.started = true; TS.start = Date.now(); save();
+    TS = blank(); TS.name = nm; TS.started = true; TS.start = Date.now(); if (TS_offline) TS.offline = true; TS_offline = false; save();
     renderBoard(); startTimer();
     toast('Good luck! The clock has started.');
   }
@@ -270,7 +310,10 @@
     if (btn) btn.disabled = true; msg.className = 'flag-msg'; msg.textContent = 'Checking…';
     window.CTFApi('action=submit&mode=test&id=' + encodeURIComponent(window.CTF.getState().pid) + '&tid=' + TS.pid + '&cid=' + encodeURIComponent(c.id) + '&flag=' + encodeURIComponent(raw)).then(function (j) {
       if (btn) btn.disabled = false;
-      if (!j || !j.ok) { msg.className = 'flag-msg bad'; msg.textContent = j && j.error === 'slow' ? 'Too many guesses — wait a minute and try again.' : '✗ Couldn\'t check that flag just now. Try again.'; return; }
+      if (!j || !j.ok) {
+        if (j && j.error === 'slow') { msg.className = 'flag-msg bad'; msg.textContent = 'Too many guesses — wait a minute and try again.'; return; }
+        queueFlag(c, raw); msg.className = 'flag-msg'; msg.textContent = '⏳ Saved. It can\'t be checked just now, so it will be checked automatically as soon as it can — and it counts from now.'; return;
+      }
       if (j.correct) {
         if (!TS.solved[c.id]) { TS.solved[c.id] = { t: Date.now(), p: j.p }; save(); updateHud(); markSolved(c.id); toast('✓ Flag captured (+' + c.pts + ')'); }
         msg.className = 'flag-msg ok'; msg.textContent = '✓ Correct.';
@@ -280,15 +323,51 @@
       msg.className = 'flag-msg bad';
       msg.textContent = /^flag\{.*\}$/i.test(raw) ? '✗ Incorrect.' : '✗ Incorrect. Flags look like flag{...}.';
       var f = $('#tFlagForm'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake');
-    }, function () { if (btn) btn.disabled = false; msg.className = 'flag-msg bad'; msg.textContent = '✗ Couldn\'t reach Mr Butler\'s script — check the internet and try again.'; });
+    }, function () { if (btn) btn.disabled = false; queueFlag(c, raw); msg.className = 'flag-msg'; msg.textContent = '⏳ Saved. Mr Butler\'s script can\'t be reached, so your answer is kept and checked automatically as soon as it\'s back — it counts from now. Keep going!'; });
   });
+
+  // ---------- backup plan: answers that couldn't be checked are queued and retried ----------
+  function queueFlag(c, raw) {
+    TS.queue = (TS.queue || []).filter(function (q) { return !(q.cid === c.id && q.f.toLowerCase() === raw.toLowerCase()); });
+    TS.queue.push({ cid: c.id, f: raw, t: Date.now() }); save(); markSolved(); startRetry();
+  }
+  function queued(t) { return (t && t.queue) || []; }
+  function anyQueued() { return PAPERS.some(function (p) { var t = p.id === P.id ? TS : stateFor(p); return queued(t).length; }); }
+  var retryT = null, flushing = false;
+  function startRetry() { if (!retryT) retryT = setInterval(flushQueue, 20000); }
+  function flushQueue() {
+    if (flushing || !window.CTFApi) return;
+    if (!anyQueued()) { clearInterval(retryT); retryT = null; return; }
+    flushing = true;
+    var jobs = [];
+    PAPERS.forEach(function (p) { var t = p.id === P.id ? TS : stateFor(p); queued(t).forEach(function (q) { jobs.push({ p: p, q: q, tid: t.pid }); }); });
+    (function next(i) {
+      if (i >= jobs.length) { flushing = false; return; }
+      var jb = jobs[i];
+      window.CTFApi('action=submit&mode=test&id=' + encodeURIComponent(window.CTF.getState().pid) + '&tid=' + jb.tid + '&cid=' + encodeURIComponent(jb.q.cid) + '&flag=' + encodeURIComponent(jb.q.f)).then(function (j) {
+        if (!j || !j.ok) { flushing = false; return; }   // still down (or too fast): try again next round
+        settle(jb.p, jb.q, j);
+        setTimeout(function () { next(i + 1); }, 1200);
+      }, function () { flushing = false; });
+    })(0);
+  }
+  function settle(p, q, j) {
+    var t = p.id === P.id ? TS : stateFor(p);
+    t.queue = queued(t).filter(function (x) { return x !== q && !(x.cid === q.cid && x.f === q.f); });
+    var c = BY_ID[q.cid];
+    if (j.correct) { if (!t.solved[q.cid]) { t.solved[q.cid] = { t: q.t, p: j.p }; toast('✓ Checked: ' + (c ? c.title : 'flag') + ' was right (+' + (c ? c.pts : 0) + ')', 4000); } }
+    else { t.wrong++; toast('✗ Checked: your answer for ' + (c ? c.title : 'a challenge') + ' was not right.', 4000); }
+    if (p.id === P.id) { save(); updateHud(); markSolved(); var v = document.querySelector('.test-results'); if (v) renderResults(); }
+    else { ALL.papers[p.id] = t; try { localStorage.setItem(KEY, JSON.stringify(ALL)); } catch (e) { } }
+  }
+  if (anyQueued()) startRetry();
   function markSolved(id) {
     // lightweight refresh of solved styling on the board tiles
     var grid = $('#testBoardGrid'); if (!grid) return;
     var tiles = U.$$('.tile', grid), i = 0;
     var byCat = {}; PAPER.forEach(function (id) { var c = BY_ID[id]; (byCat[c.cat] = byCat[c.cat] || []).push(c); });
     CATS.filter(function (cat) { return byCat[cat.id]; }).forEach(function (cat) {
-      byCat[cat.id].forEach(function (c) { var t = tiles[i++]; if (t) t.classList.toggle('solved', !!TS.solved[c.id]); });
+      byCat[cat.id].forEach(function (c) { var t = tiles[i++]; if (t) { t.classList.toggle('solved', !!TS.solved[c.id]); t.classList.toggle('queued', !TS.solved[c.id] && queued(TS).some(function (q) { return q.cid === c.id; })); } });
     });
   }
 
@@ -350,8 +429,10 @@
       '<button class="btn primary" id="testDownload">⬇ Download my result for my teacher</button>' +
       '<button class="btn" id="testPapers">← All practice tests</button>' +
       '<button class="btn" data-goto="board">Back to practice</button>' +
-      '<button class="btn danger" id="testReset">Clear this result</button>' +
+      (window.CTF && window.CTF.isTeacher && window.CTF.isTeacher() ? '<button class="btn danger" id="testReset">Clear this result (teacher)</button>' : '') +
       '</div>' +
+      (queued(TS).length ? '<div class="callout">⏳ ' + queued(TS).length + ' answer' + (queued(TS).length > 1 ? 's are' : ' is') + ' still waiting to be checked. Leave this page open — your score updates by itself when Mr Butler\'s script is back.</div>' : '') +
+      '<p class="muted small">Want another go? Ask your teacher — they can reset this paper for you from the Teacher tab.</p>' +
       '<p class="muted small">Assistance (hints and walkthroughs) is back on now the test is over.</p>' +
       '</div>';
     $('#testDownload').addEventListener('click', function () {
@@ -362,7 +443,7 @@
       toast('Result downloaded — send it to your teacher');
     });
     $('#testPapers').addEventListener('click', function () { renderPicker(); });
-    $('#testReset').addEventListener('click', function () {
+    var tr = $('#testReset'); if (tr) tr.addEventListener('click', function () {
       if (confirm('Clear this test result so the paper can be sat again?')) { TS = blank(); save(); renderPicker(); }
     });
   }

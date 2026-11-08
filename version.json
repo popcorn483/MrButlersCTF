@@ -1,10 +1,10 @@
 {
-  "version": "mbctf-v49",
+  "version": "mbctf-v50",
   "date": "2026-11-05",
   "notes": [
+    "\ud83d\udedf Test area: if the connection drops, your answers are saved and checked when it's back",
+    "\u21ba Test resits are now set by your teacher",
     "\ud83d\udda5 Projector screen: pick the challenge leaderboard or a test paper; it fills in by itself and refreshes every minute",
-    "\u2728 Tidier board: each category shows 5 challenges to start \u2014 solve 3 to reveal the next 5",
-    "\ud83d\udd11 Each practice test paper now has its own password from your teacher",
-    "\ud83c\udfc1 1,000 challenges!"
+    "\u2728 Tidier board: each category shows 5 challenges to start \u2014 solve 3 to reveal the next 5"
   ]
 }

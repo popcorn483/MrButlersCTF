@@ -1038,6 +1038,16 @@
     fetch(SYNC_URL + (SYNC_URL.indexOf('?') < 0 ? '?' : '&') + 'action=access&id=' + encodeURIComponent(S.pid) + '&t=' + Date.now(), { cache: 'no-store', credentials: 'omit' })
       .then(function (r) { return r.json(); }).then(function (j) {
         // only pending / declined block; anything else (approved, an older script, offline) lets them in, so nobody is locked out by a fault
+        if (j && j.ok && j.season && Number(S.season || 0) !== Number(j.season)) {
+          // the teacher has done an end-of-year clear-down since this device was last used: start afresh
+          if ((S.created || 0) < Number(j.season)) {
+            var keepEggs = null; try { keepEggs = localStorage.getItem('mbctf-eggs-v1'); } catch (e) { }
+            S = blankState(); S.season = Number(j.season); save();
+            try { ['mbctf-test-v2', 'mbctf-reveal-v1', 'mbctf-saved-v1'].forEach(function (k) { localStorage.removeItem(k); }); if (keepEggs) localStorage.setItem('mbctf-eggs-v1', keepEggs); } catch (e) { }
+            wipeContent(); location.reload(); return;
+          }
+          S.season = Number(j.season); save();
+        }
         var st = j && j.ok && /^(pending|declined|unknown)$/.test(j.status || '') ? j.status : 'approved';
         if (st === 'unknown') {   // not registered (e.g. deleted by the teacher): sign in again
           S.pinOk = false; S.access = ''; save(); wipeContent();
@@ -1696,8 +1706,19 @@
         var st = d.status === 'running' ? '<span class="badge live">running · ' + mmss(d.left) + ' left</span>' : d.status === 'finished' ? '<span class="badge good">finished</span>' : '<span class="badge">time up</span>';
         rank = d.paper === lastPaper ? rank + 1 : 1; lastPaper = d.paper;
         return '<tr><td class="num">' + rank + '</td><td>' + esc(d.name) + '</td><td>' + esc(d.paperTitle) + '</td><td class="num">' + d.score + '</td><td class="num">' + d.solvedCount + '/' + d.paperSize + '</td><td>' + st +
-          '</td><td class="num">' + mmss(d.timeUsedMs) + '</td><td class="num">' + d.wrong + '</td><td>' + (d.unv ? '<span class="badge bad">' + d.unv + ' unverified</span>' : '') + '</td></tr>';
+          '</td><td class="num">' + mmss(d.timeUsedMs) + '</td><td class="num">' + d.wrong + '</td><td>' + (d.unv ? '<span class="badge bad">' + d.unv + ' unverified</span> ' : '') +
+          '<button class="btn small" data-resit="' + esc(d.pid) + '" data-who="' + esc(d.name) + '" data-paper="' + esc(d.paperTitle) + '" title="Clear this attempt so they can sit the paper again">↺ Allow resit</button></td></tr>';
       }).join('') + '</tbody></table>';
+    $$('[data-resit]', box).forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (!confirm('Let ' + b.dataset.who + ' sit ' + b.dataset.paper + ' again?\n\nTheir result for this paper is cleared on their computer the next time they open the Test area.')) return;
+        b.disabled = true;
+        fetch(liveUrl('&action=testreset&tid=' + encodeURIComponent(b.dataset.resit)), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+          if (j && j.ok) { b.textContent = '✓ Resit allowed'; toast('↺ ' + b.dataset.who + ' can sit ' + b.dataset.paper + ' again'); }
+          else { b.disabled = false; toast(j && j.error === 'key' ? 'Teacher key not accepted' : 'Your Google script needs updating for resits — paste in the latest Code.gs and deploy a New version.', 6000); }
+        }).catch(function () { b.disabled = false; toast('Couldn’t reach the sheet'); });
+      });
+    });
   }
   // ---------- teacher: sign-up requests (approve / decline / delete declined) ----------
   var PEND = { list: [], seen: null, tab: 'waiting', busy: {}, joined: {} };
@@ -1886,6 +1907,32 @@
         else if (msg) { $('#installBox').hidden = false; msg.className = 'small bad-text'; msg.textContent = j && j.error === 'key' ? 'The script rejected the teacher key.' : 'Your Google script needs updating first (see teacher-sync/SETUP.md).'; }
       }).catch(function () { T.installing = false; if (msg) { $('#installBox').hidden = false; msg.className = 'small bad-text'; msg.textContent = 'Couldn’t reach the script (it may need updating — see teacher-sync/SETUP.md).'; } });
   }
+  // ---------- teacher: end-of-year clear-down (every pupil's data off the sheet, optionally backed up first) ----------
+  function openClearDown() {
+    var box = $('#clearDownBox'); if (!box) return;
+    if (!box.hidden) { box.hidden = true; return; }
+    if (!LIVE.key && !askLiveKey()) return;
+    box.hidden = false; box.className = 'tpw-card cd-card';
+    box.innerHTML = '<div class="tpw-head"><h3>🧹 End-of-year clear-down</h3><button class="ibtn" id="cdClose" aria-label="Close">✕</button></div>' +
+      '<p class="small">This removes <b>every pupil</b> from your Google Sheet: names, classes, PIN codes, progress, test results, approvals and marked-complete flags. Pupils\' computers notice and start afresh, so last year\'s progress isn\'t sent back. Your answers, challenge key, test passwords and settings are kept.</p>' +
+      '<label class="cd-check"><input type="checkbox" id="cdBackup" checked> Save a dated copy of the sheet in my Google Drive first <span class="muted">(delete it when you no longer need it)</span></label>' +
+      '<label class="field-label" for="cdType">Type <b>DELETE</b> to confirm</label>' +
+      '<div class="cd-row"><input class="io" id="cdType" autocomplete="off" spellcheck="false" placeholder="DELETE"><button class="btn danger" id="cdGo" disabled>🧹 Clear all pupil data</button></div>' +
+      '<div class="small" id="cdMsg"></div>';
+    box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    $('#cdClose').addEventListener('click', function () { box.hidden = true; });
+    var go = $('#cdGo'); $('#cdType').addEventListener('input', function () { go.disabled = this.value.trim() !== 'DELETE'; });
+    go.addEventListener('click', function () {
+      var m = $('#cdMsg'); go.disabled = true; m.className = 'small muted'; m.textContent = $('#cdBackup').checked ? 'Making a backup copy, then clearing… (this can take half a minute)' : 'Clearing…';
+      fetch(liveUrl('&action=cleardown&confirm=DELETE&backup=' + ($('#cdBackup').checked ? '1' : '0')), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+        if (!j || !j.ok || !j.cleared) { go.disabled = false; m.className = 'small bad-text'; m.textContent = j && j.error === 'key' ? 'Teacher key not accepted.' : 'Your Google script needs updating for this — paste in the latest Code.gs and deploy a New version.'; return; }
+        T.rows = T.rows.filter(function (r) { return !r.seen && !r.fresh; }); renderTeacher(); renderLiveTests([]); renderPending([]);
+        m.className = 'small good-text';
+        m.innerHTML = '✓ All pupil data cleared.' + (j.backup ? ' Backup saved as <a href="' + esc(j.backup.url) + '" target="_blank" rel="noopener">' + esc(j.backup.name) + '</a>.' : '');
+        $('#cdType').value = '';
+      }).catch(function () { go.disabled = false; m.className = 'small bad-text'; m.textContent = 'Couldn’t reach the Google script.'; });
+    });
+  }
   // ---------- teacher: a password for each practice test paper (kept on the Google script, never on this site) ----------
   function openTestPw() {
     var box = $('#testPwBox'); if (!box) return;
@@ -1993,14 +2040,7 @@
       liveSignedIn(); show('home'); toast('Signed out of teacher access on this PC');
     });
     liveSignedIn();
-    $('#liveClear').addEventListener('click', function () {
-      if (!LIVE.key && !askLiveKey()) return;
-      if (!confirm('Clear ALL pupils\' live progress from the Google Sheet? Use this before a new group or a fresh competition. Pupils keep their progress on their own computers and it re-sends next time they solve.')) return;
-      fetch(liveUrl('&action=clear'), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (res) {
-        if (!res.ok) return toast('Not cleared — check the teacher key');
-        T.rows = T.rows.filter(function (r) { return !r.seen; }); renderTeacher(); toast('Live data cleared');
-      }).catch(function () { toast('Couldn\'t reach the sheet'); });
-    });
+    $('#liveClear').addEventListener('click', function () { openClearDown(); });
     document.addEventListener('visibilitychange', function () { if (!document.hidden && LIVE.on) liveFetch(); });
     if (LIVE.key) startLive(); else liveInfo('muted', 'Press ▶ and enter your teacher key to see the class live.');
   })();
@@ -2062,6 +2102,9 @@
 
   // ---------- hooks for features.js (badges, daily challenge, streaks, certificate) ----------
   window.CTF.getState = function () { return S; };
+  window.CTF.isTeacher = isTeacherDevice;
+  window.CTF.openVault = openVault;
+  window.CTF.useKey = function (k) { try { localStorage.setItem(CKEY_STORE, k); } catch (e) { } ensureContent(k); };
   window.CTF.openChal = openChal;
   window.CTF.show = show;
   window.CTF.CH = CH; window.CTF.CATS = CATS; window.CTF.TIERS = TIERS;

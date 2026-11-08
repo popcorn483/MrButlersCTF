@@ -508,6 +508,47 @@ function setTestpw_(paper, pw) {
   return testpws_();
 }
 
+/* Test area resits: the teacher clears one team's paper so it can be sat again.
+   Stored as a script property per test attempt (the attempt's own random ID); the pupil's device asks and clears itself. */
+function testReset_(tid) {
+  if (!/^[0-9a-z]{6,24}$/.test(String(tid))) return { ok: false, error: 'bad id' };
+  PropertiesService.getScriptProperties().setProperty('testReset_' + tid, String(Date.now()));
+  return { ok: true, reset: tid };
+}
+function testResets_(tids) {
+  var pr = PropertiesService.getScriptProperties(), out = {};
+  String(tids || '').split(',').slice(0, 10).forEach(function (t) {
+    if (!/^[0-9a-z]{6,24}$/.test(t)) return;
+    var v = pr.getProperty('testReset_' + t); if (v) out[t] = Number(v);
+  });
+  return { ok: true, resets: out };
+}
+
+/* End of year: clear every pupil's data off the sheet (optionally keeping a dated copy in your Drive first).
+   Keeps the answers, the challenge key and your settings. Pupils' devices notice the new "season" and start afresh. */
+function clearDown_(backup) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet(), copy = null;
+  var lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    if (backup) {
+      var f = ss.copy('Mr B’s CTF backup ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Europe/London', 'yyyy-MM-dd HH:mm'));
+      copy = { name: f.getName(), url: f.getUrl() };
+    }
+    var names = [SHEET_NAME, PUPILS_SHEET, 'Access', REMOVED_SHEET, AWARDS_SHEET, ALIAS_SHEET], cleared = [];
+    names.forEach(function (n) {
+      var sh = ss.getSheetByName(n); if (!sh) return;
+      if (sh.getLastRow() > 1) sh.deleteRows(2, sh.getLastRow() - 1);
+      cleared.push(n);
+    });
+    var pr = PropertiesService.getScriptProperties(), props = pr.getProperties();
+    Object.keys(props).forEach(function (k) { if (/^testReset_/.test(k)) pr.deleteProperty(k); });
+    pr.deleteProperty('mailError');
+    pr.setProperty('season', String(Date.now()));
+  } finally { lock.releaseLock(); }
+  return { ok: true, cleared: cleared, backup: copy };
+}
+function season_() { return Number(PropertiesService.getScriptProperties().getProperty('season') || 0); }
+
 function removedSheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(REMOVED_SHEET);
@@ -570,7 +611,8 @@ function doGet(e) {
   if (p.action === 'reveal') return out_(reveal_(p));     // a pupil choosing to see the answer (scores 0)
   if (p.action === 'ckey') return out_(ckey_(p));         // the key that unlocks the challenges (approved pupils and teachers only)
   if (p.action === 'testpass') return out_(testpass_(p)); // the Test area password
-  if (p.action === 'access' || p.action === 'status') { if (!/^[0-9a-f]{16}$/.test(String(p.id))) return out_({ ok: false }); var sid = resolve_(String(p.id)), st = statusOf_(sid); return out_({ ok: true, status: st === 'approved' && !trusted_(sid) ? 'unknown' : st }); }   // a pupil's device: approved yet?
+  if (p.action === 'testresets') return out_(testResets_(p.tids));   // has the teacher cleared this test attempt for a resit?
+  if (p.action === 'access' || p.action === 'status') { if (!/^[0-9a-f]{16}$/.test(String(p.id))) return out_({ ok: false }); var sid = resolve_(String(p.id)), st = statusOf_(sid); return out_({ ok: true, status: st === 'approved' && !trusted_(sid) ? 'unknown' : st, season: season_() }); }   // a pupil's device: approved yet?
   if (p.action === 'board') {   // pupils' leaderboard: checked scores only, no proofs or IDs
     try { return out_(board_()); } catch (err) { return out_({ ok: false, error: 'script', detail: String(err && err.message || err).slice(0, 200) }); }
   }
@@ -588,6 +630,8 @@ function doGet(e) {
   if (p.action === 'testmail') return out_(testEmail());
   if (p.action === 'testpws') return out_(testpws_());                                   // Teacher tab › Test passwords
   if (p.action === 'settestpw') return out_(setTestpw_(String(p.paper || ''), p.pw));
+  if (p.action === 'testreset') return out_(testReset_(String(p.tid || '')));           // Teacher tab › Test results › Allow resit
+  if (p.action === 'cleardown') { if (p.confirm !== 'DELETE') return out_({ ok: false, error: 'confirm' }); return out_(clearDown_(p.backup === '1')); }   // end of year
   if (p.action === 'answer') { var a = solution_(String(p.cid || '')); return out_(a ? { ok: true, f: a.f, sol: a.sol, walk: a.walk } : { ok: false, error: 'setup' }); }
   if (p.action === 'approve' || p.action === 'decline') return out_(decide_(p.pids, p.action === 'approve' ? 'approved' : 'declined'));   // the teacher answers sign-up requests
   if (p.action === 'merge') return out_(merge_(String(p.from), String(p.to)));
