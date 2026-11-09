@@ -877,6 +877,7 @@
   function askWho(editing) {
     if (document.getElementById('whoModal') || (isTeacherDevice() && !editing)) return;
     editing = !!editing && whoDone();
+    warmScript();   // wake the Google script while they type, so signing in is quick
     var d = document.createElement('div'); d.id = 'whoModal'; d.className = 'who-modal';
     d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.setAttribute('aria-labelledby', 'whoH');
     d.innerHTML = '<form class="who-card" novalidate>' +
@@ -943,7 +944,9 @@
         if (found && found.json) { try { var r = parseImport(found.json); if (r.ok && r.data.pid === S.pid) added = applyImport(r.data); } catch (x) { } }
         save(); refreshHeader(); renderBoard(); renderProgress();
         try { document.dispatchEvent(new CustomEvent('ctf:refresh')); } catch (x) { }
-        close(); if (S.access !== 'approved') { wipeContent(); if (CONTENT_READY) { location.reload(); return; } showWaiting(); return; } pushSync(); setTimeout(fetchAwards, 1500); if (found) ensureContent();
+        if (found && found.k && S.access === 'approved') { try { localStorage.setItem(CKEY_STORE, found.k); } catch (x) { } }   // sign-in hands back the key: no extra request
+        close(); if (S.access !== 'approved') { wipeContent(); if (CONTENT_READY) { location.reload(); return; } showWaiting(); return; }
+        if (found) ensureContent(found.k); setTimeout(pushSync, 300); setTimeout(fetchAwards, 2500);
         toast(found && !found.fresh ? '👋 Welcome back, ' + S.name.split(' ')[0] + '!' + (added ? ' ' + added + ' solve' + (added === 1 ? '' : 's') + ' loaded from your other computer.' : '') : '👋 Hi ' + S.name.split(' ')[0] + ' — you’re signed in.', 4000);
         void offline;
       }
@@ -1011,6 +1014,16 @@
   window.CTF.fileText = fileText;
   var contentBusy = false, contentRetry = null, contentTries = 0;
   function setContentState(st) { CONTENT_STATE = st; if (!CONTENT_READY) { var b = $('#board'); if (b) b.innerHTML = contentNote(); } }
+  // the challenges are encrypted, so they can be downloaded before anyone signs in: start straight away
+  var bodyP = null;
+  function contentBody() {
+    if (!bodyP) {
+      bodyP = fetch(META.url).then(function (r) { if (!r.ok) throw new Error('offline'); return r.arrayBuffer(); });
+      bodyP.catch(function () { bodyP = null; });   // failed: the next attempt downloads again
+    }
+    return bodyP;
+  }
+  if (!CONTENT_READY && META.url && window.fetch) setTimeout(contentBody, 0);
   function ensureContent(givenKey) {
     if (CONTENT_READY || contentBusy || !META.url) return;
     if (!givenKey && !isTeacherDevice() && (accessBlocked() || needsSignIn() || !S.name)) return;
@@ -1023,8 +1036,7 @@
         if (j && j.ok && j.k) return j.k; throw new Error(j && j.ok ? 'setup' : ((j && j.error) || 'offline'));
       });
     // download the (encrypted) challenges at the same time as asking the script for the key, not after
-    var body = fetch(META.url).then(function (r) { if (!r.ok) throw new Error('offline'); return r.arrayBuffer(); });
-    body.catch(function () { });
+    var body = contentBody();
     getKey.then(function (k) {
       return body
         .then(function (b) { return ckDecrypt(b, k).then(gunzipIf, function () { throw new Error('key'); }); })

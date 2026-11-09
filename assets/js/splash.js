@@ -37,6 +37,6 @@
   el.addEventListener('pointerdown', function (e) { e.preventDefault(); done(); });
   el.addEventListener('click', done);
   window.addEventListener('keydown', done, true);
-  setTimeout(done, rm ? 650 : 1550);
+  setTimeout(done, rm ? 400 : 750);
   window.__splash = { skip: done };
 })();

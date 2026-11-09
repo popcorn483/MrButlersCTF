@@ -80,7 +80,8 @@ function whois_(name, cls, pin, devId) {
     try { sh.appendRow([String(devId), safeText_(name), cls, pinHash_(String(devId), pin), new Date()]); bumpAcc_(); } finally { lock.releaseLock(); }
     if (REQUIRE_APPROVAL) setAccess_(String(devId), 'pending', name, cls);
     notify_('New sign-up', name, cls, REQUIRE_APPROVAL ? 'A new pupil is waiting for you to approve them: Teacher tab › Awaiting approval.' : 'A new pupil has signed up.');
-    return { ok: true, id: String(devId), name: name, cls: cls, fresh: true, status: statusOf_(String(devId)) };
+    var st0 = statusOf_(String(devId)), k0 = st0 === 'approved' ? PropertiesService.getScriptProperties().getProperty('contentKey') : null;
+    return { ok: true, id: String(devId), name: name, cls: cls, fresh: true, status: st0, k: k0 || undefined };
   }
   var id = String(rows[at][0]), had = String(rows[at][3] || ''), cache = CacheService.getScriptCache(), fk = 'fail:' + id, fails = +(cache.get(fk) || 0);
   if (fails >= 5) return { ok: false, error: 'locked' };
@@ -89,7 +90,9 @@ function whois_(name, cls, pin, devId) {
   cache.remove(fk);
   var kept = resolve_(id), nm = String(rows[at][1]).replace(/^'/, ''), cl = String(rows[at][2]);
   if (kept !== id) for (var j = 0; j < rows.length; j++) if (String(rows[j][0]) === kept) { nm = String(rows[j][1]).replace(/^'/, ''); cl = String(rows[j][2]); break; }
-  return { ok: true, id: kept, name: nm, cls: cl, json: progressJson_(kept), status: statusOf_(kept) };
+  // speed: the PIN has just been checked, so an approved pupil gets the challenge key in this same reply (no second request)
+  var ct = cachedTrust_(kept), key = ct.id ? PropertiesService.getScriptProperties().getProperty('contentKey') : null;
+  return { ok: true, id: kept, name: nm, cls: cl, json: progressJson_(kept), status: ct.st, k: key || undefined };
 }
 
 // ---------- access approval (as in the revision app) ----------
