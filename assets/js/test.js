@@ -242,6 +242,7 @@
   // ---------- test challenge modal ----------
   var current = null;
   function openTest(id) {
+    if (window.CTFWarm) window.CTFWarm();
     if (!isLive()) { enter(); return; }
     var c = BY_ID[id]; if (!c) return; current = c;
     var cat = CATS.filter(function (x) { return x.id === c.cat; })[0];

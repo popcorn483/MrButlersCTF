@@ -400,6 +400,7 @@
   var current = null;
   function openChal(id) {
     var c = BY_ID[id]; if (!c) return;
+    warmScript();
     var tn = document.getElementById('chalTeacherNote'); if (tn) tn.remove();
     current = c;
     var cat = CATS.filter(function (x) { return x.id === c.cat; })[0];
@@ -662,7 +663,7 @@
         var rv = S.revealed[c.id] ? 1 : 0;
         var firstTry = !(S.tries && S.tries[c.id]);
         S.solved[c.id] = { t: Date.now(), p: proof, h: S.hints[c.id] || 0, r: rv };
-        save();
+        save(); scheduleSync(600);   // the script no longer writes solves itself: send this one straight away
         try { document.dispatchEvent(new CustomEvent('ctf:solve', { detail: { id: c.id, revealed: rv, firstTry: firstTry } })); } catch (e) { }
         var praise = ['Brilliant work', 'Nicely done', 'You got it', 'Spot on', 'Great solve', 'Well played'];
         var p = praise[Math.floor(Math.random() * praise.length)];
@@ -969,7 +970,13 @@
   setTimeout(function () { if (!isTeacherDevice() && !whoDone()) askWho(false); else if (!isTeacherDevice() && S.name) checkAccess(); }, 400);
 
   // ---------- unlocking the challenges ----------
+  // Google scripts nod off when nobody has used them for a while and take seconds to wake. A tiny "ping" when a pupil
+  // opens a challenge wakes it while they work, so checking their flag is quick.
+  var lastApi = 0;
+  function warmScript() { if (SYNC_URL && Date.now() - lastApi > 60000) { lastApi = Date.now(); api('action=ping').catch(function () { }); } }
+  window.CTFWarm = warmScript;
   function api(qs) {
+    lastApi = Date.now();
     return fetch(SYNC_URL + (SYNC_URL.indexOf('?') < 0 ? '?' : '&') + qs + '&t=' + Date.now(), { cache: 'no-store', credentials: 'omit' })
       .then(function (r) { return r.json(); });
   }

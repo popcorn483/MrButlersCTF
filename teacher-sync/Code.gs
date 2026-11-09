@@ -450,21 +450,24 @@ function updateRow_(id, fn) {   // read, change and re-sign one pupil's stored p
 function submit_(q) {
   var ANS = answers_(), cid = String(q.cid || ''), f = ANS[cid];
   if (!installed_() || !f) return { ok: false, error: 'setup' };
-  var test = q.mode === 'test', id = test ? null : approvedId_(q.id);
+  // speed: who's approved comes from the script cache (no Sheet reads), and nothing locks the script
+  var trust = /^[0-9a-f]{16}$/.test(String(q.id)) ? cachedTrust_(String(q.id)) : { id: null };
+  var test = q.mode === 'test', id = test ? null : trust.id;
   if (!test && !id) return { ok: false, error: 'access' };
-  if (test && !(/^[0-9a-f]{12}$/.test(String(q.tid)) && approvedId_(q.id))) return { ok: false, error: 'access' };
+  if (test && !(/^[0-9a-f]{12}$/.test(String(q.tid)) && trust.id)) return { ok: false, error: 'access' };
   var cache = CacheService.getScriptCache(), rk = 'sub:' + (q.id || ''), n = +(cache.get(rk) || 0);
   if (n >= 30) return { ok: false, error: 'slow' };   // at most 30 guesses a minute per pupil
   cache.put(rk, String(n + 1), 60);
   var g = String(q.flag || '').trim().toLowerCase().slice(0, 200);
   if (g !== f[0]) return { ok: true, correct: false, close: !/^\w+\{/.test(g) && ('flag{' + g + '}') === f[0] };
   if (test) return { ok: true, correct: true, p: proof_(String(q.tid), f[0]), pts: f[1] };
+  // the pupil's computer stores the solve with this proof and sends it straight away; the script checks the proof when it arrives
+  // (it used to rewrite the pupil's row here too, which locked the script for everyone — the main cause of slow checking)
   var p = proof_(id, f[0]);
-  updateRow_(id, function (d) { if (!d.solved[cid]) d.solved[cid] = { t: Date.now(), p: p, h: +q.h || 0, r: d.revealed[cid] ? 1 : 0 }; });
   return { ok: true, correct: true, p: p, pts: f[1], id: id };
 }
 function reveal_(q) {
-  var id = approvedId_(q.id), cid = String(q.cid || '');
+  var id = /^[0-9a-f]{16}$/.test(String(q.id)) ? cachedTrust_(String(q.id)).id : null, cid = String(q.cid || '');
   if (!id) return { ok: false, error: 'access' };
   var a = solution_(cid); if (!installed_() || !a) return { ok: false, error: 'setup' };
   updateRow_(id, function (d) { if (!d.revealed[cid]) d.revealed[cid] = Date.now(); });
@@ -619,6 +622,7 @@ function doPost(e) {
 /** The Teacher tab reads everyone's progress (or clears it) with the teacher key. */
 function doGet(e) {
   var p = (e && e.parameter) || {};
+  if (p.action === 'ping') return out_({ ok: true });   // wakes the script up when a pupil opens a challenge, so their flag check is quick
   if (p.action === 'whois') return out_(whois_(p.name, p.cls, p.pin, p.id));   // pupils signing in (no key)
   if (p.action === 'forgot') return out_(forgot_());
   if (p.action === 'submit') return out_(submit_(p));     // a pupil submitting a flag: checked here, never on their computer
