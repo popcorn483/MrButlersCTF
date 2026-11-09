@@ -77,7 +77,7 @@ function whois_(name, cls, pin, devId) {
     if (!/^[0-9a-f]{16}$/.test(String(devId))) return { ok: false, error: 'bad id' };
     if (isRemoved_(String(devId))) return { ok: false, error: 'removed' };
     var lock = LockService.getScriptLock(); lock.waitLock(15000);
-    try { sh.appendRow([String(devId), safeText_(name), cls, pinHash_(String(devId), pin), new Date()]); } finally { lock.releaseLock(); }
+    try { sh.appendRow([String(devId), safeText_(name), cls, pinHash_(String(devId), pin), new Date()]); bumpAcc_(); } finally { lock.releaseLock(); }
     if (REQUIRE_APPROVAL) setAccess_(String(devId), 'pending', name, cls);
     notify_('New sign-up', name, cls, REQUIRE_APPROVAL ? 'A new pupil is waiting for you to approve them: Teacher tab › Awaiting approval.' : 'A new pupil has signed up.');
     return { ok: true, id: String(devId), name: name, cls: cls, fresh: true, status: statusOf_(String(devId)) };
@@ -106,13 +106,27 @@ function statusOf_(id) {
   var r = accRows_().filter(function (x) { return String(x[0]) === id; })[0];
   return r ? String(r[1]) : 'approved';
 }
+/* Speed: a whole class asks "am I approved? / may I have the key?" at the start of a lesson. The answer is kept in the
+   script cache for a few minutes so each pupil doesn't re-read three tabs of the Sheet. Any change to who's allowed in
+   (approve, decline, delete, merge, clear-down) bumps a counter, which makes every cached answer out of date at once. */
+function accGen_() { return PropertiesService.getScriptProperties().getProperty('accGen') || '0'; }
+function bumpAcc_() { PropertiesService.getScriptProperties().setProperty('accGen', String(Date.now())); }
+function cachedTrust_(raw) {   // -> { id: resolved id or null, st: status }
+  var c = CacheService.getScriptCache(), k = 'acc_' + accGen_() + '_' + raw, hit = c.get(k);
+  if (hit) { try { return JSON.parse(hit); } catch (e) { } }
+  var sid = resolve_(String(raw)), st = statusOf_(sid), ok = trusted_(sid);
+  var v = { id: ok ? sid : null, st: st === 'approved' && !ok ? 'unknown' : st };
+  try { c.put(k, JSON.stringify(v), 300); } catch (e) { }
+  return v;
+}
 function setAccess_(id, status, name, cls) {
+  bumpAcc_();
   var sh = acc_(), rows = accRows_(), now = new Date(), i = -1;
   for (var k = 0; k < rows.length; k++) if (String(rows[k][0]) === id) { i = k; break; }
   if (i >= 0) { sh.getRange(i + 2, 2).setValue(status); if (status !== 'pending') sh.getRange(i + 2, 6).setValue(now); }
   else sh.appendRow([id, status, safeText_(name || ''), String(cls || '').toUpperCase().slice(0, 12), now, status === 'pending' ? '' : now]);
 }
-function dropAccess_(ids) { var sh = acc_(), rows = accRows_(); for (var i = rows.length - 1; i >= 0; i--) if (ids.indexOf(String(rows[i][0])) >= 0) sh.deleteRow(i + 2); }
+function dropAccess_(ids) { bumpAcc_(); var sh = acc_(), rows = accRows_(); for (var i = rows.length - 1; i >= 0; i--) if (ids.indexOf(String(rows[i][0])) >= 0) sh.deleteRow(i + 2); }
 function pending_() {
   return accRows_().filter(function (r) { var v = String(r[1]); return v === 'pending' || v === 'declined'; }).map(function (r) {
     return { pid: String(r[0]), status: String(r[1]), name: String(r[2]).replace(/^'/, ''), cls: String(r[3]), at: r[4] instanceof Date ? r[4].getTime() : 0 };
@@ -310,7 +324,7 @@ function merge_(from, to) {
       sh.getRange(rt, 1, 1, 7).setValues([[to, sh.getRange(rt, 2).getValue(), sh.getRange(rt, 3).getValue(), Object.keys(keep.solved || {}).length, new Date(), body, sh.getRange(rt, 7).getValue()]]);
       sh.deleteRow(rf);
     }
-    aliasSheet_().appendRow([from, to, safeText_(oldName), new Date()]);
+    aliasSheet_().appendRow([from, to, safeText_(oldName), new Date()]); bumpAcc_();
     if (statusOf_(to) !== 'approved' && statusOf_(from) === 'approved') setAccess_(to, 'approved');
     dropAccess_([from]);
     var aw = awardsSheet_(), n = aw.getLastRow() - 1;   // the old login's teacher marks move across
@@ -459,7 +473,7 @@ function reveal_(q) {
 function ckey_(q) {   // the content key: only for approved pupils and teachers
   var k = PropertiesService.getScriptProperties().getProperty('contentKey');
   if (!k) return { ok: false, error: 'setup' };
-  if (q.key === TEACHER_KEY || approvedId_(q.id)) return { ok: true, k: k, ver: installed_() };
+  if (q.key === TEACHER_KEY || (/^[0-9a-f]{16}$/.test(String(q.id)) && cachedTrust_(String(q.id)).id)) return { ok: true, k: k, ver: installed_() };
   return { ok: false, error: 'access' };
 }
 function install_(b) {
@@ -543,7 +557,7 @@ function clearDown_(backup) {
     var pr = PropertiesService.getScriptProperties(), props = pr.getProperties();
     Object.keys(props).forEach(function (k) { if (/^testReset_/.test(k)) pr.deleteProperty(k); });
     pr.deleteProperty('mailError');
-    pr.setProperty('season', String(Date.now()));
+    pr.setProperty('season', String(Date.now())); bumpAcc_();
   } finally { lock.releaseLock(); }
   return { ok: true, cleared: cleared, backup: copy };
 }
@@ -612,7 +626,7 @@ function doGet(e) {
   if (p.action === 'ckey') return out_(ckey_(p));         // the key that unlocks the challenges (approved pupils and teachers only)
   if (p.action === 'testpass') return out_(testpass_(p)); // the Test area password
   if (p.action === 'testresets') return out_(testResets_(p.tids));   // has the teacher cleared this test attempt for a resit?
-  if (p.action === 'access' || p.action === 'status') { if (!/^[0-9a-f]{16}$/.test(String(p.id))) return out_({ ok: false }); var sid = resolve_(String(p.id)), st = statusOf_(sid); return out_({ ok: true, status: st === 'approved' && !trusted_(sid) ? 'unknown' : st, season: season_() }); }   // a pupil's device: approved yet?
+  if (p.action === 'access' || p.action === 'status') { if (!/^[0-9a-f]{16}$/.test(String(p.id))) return out_({ ok: false }); var ct = cachedTrust_(String(p.id)); return out_({ ok: true, status: ct.st, season: season_() }); }   // a pupil's device: approved yet?
   if (p.action === 'board') {   // pupils' leaderboard: checked scores only, no proofs or IDs
     try { return out_(board_()); } catch (err) { return out_({ ok: false, error: 'script', detail: String(err && err.message || err).slice(0, 200) }); }
   }
@@ -651,7 +665,7 @@ function doGet(e) {
       var cell = sh.getRange('A:A').createTextFinder(p.pid).matchEntireCell(true).findNext();
       var name = cell ? sh.getRange(cell.getRow(), 2).getValue() : '';
       if (cell) sh.deleteRow(cell.getRow());
-      if (!isRemoved_(p.pid)) removedSheet_().appendRow([p.pid, name, new Date()]);
+      if (!isRemoved_(p.pid)) removedSheet_().appendRow([p.pid, name, new Date()]); bumpAcc_();
       var ps = pupilsSheet_(), pc = ps.getRange('A:A').createTextFinder(String(p.pid)).matchEntireCell(true).findNext();
       if (pc) ps.deleteRow(pc.getRow());   // frees the name: they can sign in again as a new pupil
       dropAccess_([String(p.pid)]);

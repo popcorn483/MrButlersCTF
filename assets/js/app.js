@@ -459,8 +459,8 @@
       row.addEventListener('click', function (e) {
         var b = e.target.closest('button'); if (!b) return;
         var act = b.dataset.f;
-        if (act === 'view') { showText(f.name, f.text); }
-        if (act === 'dl') { if (f.url || f.enc) fileBlob(f).then(function (bl) { var a = document.createElement('a'); a.href = URL.createObjectURL(bl); a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 60000); }, function () { toast('Couldn’t open that file — check the internet connection.'); }); else download(f.name, f.text, 'text/plain'); }
+        if (act === 'view') { b.disabled = true; fileText(f).then(function (t) { b.disabled = false; showText(f.name, t); }, function () { b.disabled = false; toast('Couldn’t open that file — check the internet connection.'); }); }
+        if (act === 'dl') { if ((f.url || f.enc) && f.text === undefined) fileBlob(f).then(function (bl) { var a = document.createElement('a'); a.href = URL.createObjectURL(bl); a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 60000); }, function () { toast('Couldn’t open that file — check the internet connection.'); }); else download(f.name, f.text, 'text/plain'); }
         if (act === 'hex') { CTFReturn.set('board', c.id, c.title); closeModal($('#chalModal')); show('toolkit'); Toolkit.open('hex', { file: f }); }
         if (act === 'img') { CTFReturn.set('board', c.id, c.title); closeModal($('#chalModal')); show('toolkit'); Toolkit.open('image', { file: f }); }
       });
@@ -981,14 +981,28 @@
       return crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.slice(0, 12) }, key, b.slice(12));
     });
   }
+  // challenge data is gzipped before it's encrypted (about a quarter of the size to download)
+  function gunzipIf(buf) {
+    var u = new Uint8Array(buf);
+    if (!(u[0] === 0x1f && u[1] === 0x8b)) return Promise.resolve(buf);
+    if (typeof DecompressionStream === 'undefined') return Promise.reject(new Error('storage'));
+    return new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+  }
   function fileBlob(f) {   // challenge files are encrypted too; decrypt on demand
     if (!f.enc) return f.url ? fetch(f.url).then(function (r) { return r.blob(); }) : Promise.resolve(new Blob([f.text || ''], { type: 'text/plain' }));
     var k = ''; try { k = localStorage.getItem(CKEY_STORE) || ''; } catch (e) { }
     return fetch(f.enc).then(function (r) { if (!r.ok) throw new Error('fetch'); return r.arrayBuffer(); }).then(function (b) { return ckDecrypt(b, k); })
-      .then(function (pt) { return new Blob([pt], { type: f.mime || 'application/octet-stream' }); });
+      .then(function (pt) { return f.gz ? gunzipIf(pt) : pt; })
+      .then(function (pt) { return new Blob([pt], { type: f.mime || (f.kind === 'text' ? 'text/plain' : 'application/octet-stream') }); });
+  }
+  // big text files (logs, word lists…) are fetched only when a pupil opens them, so the challenge list stays small
+  function fileText(f) {
+    if (f.text !== undefined) return Promise.resolve(f.text);
+    return fileBlob(f).then(function (bl) { return bl.text(); }).then(function (t) { f.text = t; return t; });
   }
   window.CTF.fileBlob = fileBlob;
-  var contentBusy = false, contentRetry = null;
+  window.CTF.fileText = fileText;
+  var contentBusy = false, contentRetry = null, contentTries = 0;
   function setContentState(st) { CONTENT_STATE = st; if (!CONTENT_READY) { var b = $('#board'); if (b) b.innerHTML = contentNote(); } }
   function ensureContent(givenKey) {
     if (CONTENT_READY || contentBusy || !META.url) return;
@@ -1001,9 +1015,12 @@
       api('action=ckey&' + (isTeacherDevice() && lk ? 'key=' + encodeURIComponent(lk) : 'id=' + encodeURIComponent(S.pid))).then(function (j) {
         if (j && j.ok && j.k) return j.k; throw new Error(j && j.ok ? 'setup' : ((j && j.error) || 'offline'));
       });
+    // download the (encrypted) challenges at the same time as asking the script for the key, not after
+    var body = fetch(META.url).then(function (r) { if (!r.ok) throw new Error('offline'); return r.arrayBuffer(); });
+    body.catch(function () { });
     getKey.then(function (k) {
-      return fetch(META.url).then(function (r) { if (!r.ok) throw new Error('offline'); return r.arrayBuffer(); })
-        .then(function (b) { return ckDecrypt(b, k); })
+      return body
+        .then(function (b) { return ckDecrypt(b, k).then(gunzipIf, function () { throw new Error('key'); }); })
         .then(function (pt) {
           var data = JSON.parse(new TextDecoder().decode(pt));
           try { localStorage.setItem(CKEY_STORE, k); localStorage.setItem(CONTENT_STORE, JSON.stringify({ ver: META.ver, data: data })); } catch (e) { }
@@ -1011,7 +1028,7 @@
           if (!back || back.ver !== META.ver) throw new Error('storage');
           location.reload();
         }, function (err) {
-          if (err && /^(offline|storage)$/.test(err.message)) throw err;
+          if (err && err.message !== 'key') throw err;
           try { localStorage.removeItem(CKEY_STORE); } catch (e) { }   // wrong / old key: ask the script next time
           throw new Error(k === stored ? 'retry' : 'setup');
         });
@@ -1021,7 +1038,9 @@
       if (m === 'retry') return ensureContent();
       setContentState(/^(setup|access|storage)$/.test(m) ? m : 'offline');
       if (m === 'access') checkAccess();
-      clearTimeout(contentRetry); if (m !== 'storage') contentRetry = setTimeout(function () { if (!document.hidden) ensureContent(); else contentRetry = setTimeout(ensureContent, 30000); }, m === 'setup' ? 30000 : 20000);
+      contentTries++;
+      var wait = m === 'setup' ? 30000 : Math.min(20000, 2500 * Math.pow(2, contentTries - 1)) + Math.random() * 1500;
+      clearTimeout(contentRetry); if (m !== 'storage') contentRetry = setTimeout(function () { if (!document.hidden) ensureContent(); else contentRetry = setTimeout(ensureContent, 30000); }, wait);
     });
   }
   document.addEventListener('click', function (e) {
@@ -1029,7 +1048,7 @@
     var pw = prompt('Teacher password:'); if (!pw) return;
     openVault(pw).then(function (d) { try { sessionStorage.setItem(STAFF_SS, pw); } catch (x) { } useVault(d, pw); }, function () { alert('That password isn’t right.'); });
   });
-  setTimeout(function () { if (!CONTENT_READY && (isTeacherDevice() || (!accessBlocked() && !needsSignIn() && S.name))) ensureContent(); }, 600);
+  setTimeout(function () { if (!CONTENT_READY && (isTeacherDevice() || (!accessBlocked() && !needsSignIn() && S.name))) ensureContent(); }, 0);
 
   // ---------- access approval: new pupils wait until a teacher lets them in ----------
   var waitTimer = null;

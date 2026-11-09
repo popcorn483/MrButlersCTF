@@ -284,7 +284,7 @@
       row.innerHTML = '<span class="fname">📄 ' + esc(f.name) + '</span>' + btns;
       row.addEventListener('click', function (e) {
         var b = e.target.closest('button'); if (!b) return;
-        if (b.dataset.f === 'view') window.CTFShowSource(f.name, f.text);
+        if (b.dataset.f === 'view') (window.CTF.fileText ? window.CTF.fileText(f) : Promise.resolve(f.text)).then(function (t) { window.CTFShowSource(f.name, t); }, function () { toast('Couldn’t open that file — check the internet connection.'); });
         if (b.dataset.f === 'hex') { if (window.CTFReturn) window.CTFReturn.set('test', c.id, c.title); window.CTFModal.close('#testModal'); window.CTFShow('toolkit'); window.Toolkit.open('hex', { file: f }); }
         if (b.dataset.f === 'img') { if (window.CTFReturn) window.CTFReturn.set('test', c.id, c.title); window.CTFModal.close('#testModal'); window.CTFShow('toolkit'); window.Toolkit.open('image', { file: f }); }
       });
