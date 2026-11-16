@@ -569,6 +569,38 @@ function clearDown_(backup) {
 }
 function season_() { return Number(PropertiesService.getScriptProperties().getProperty('season') || 0); }
 
+/* Teacher tab › Pupil logins: every pupil who has signed up, whether they have a PIN, whether they're locked out
+   after wrong PINs, and whether they're approved — so the teacher can get anyone back in. */
+function pupilList_() {
+  var ps = pupilsSheet_(), n = ps.getLastRow() - 1, rows = n > 0 ? ps.getRange(2, 1, n, 5).getValues() : [];
+  var acc = {}; accRows_().forEach(function (r) { acc[String(r[0])] = String(r[1]); });
+  var rm = {}, rs = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REMOVED_SHEET);
+  if (rs && rs.getLastRow() > 1) rs.getRange(2, 1, rs.getLastRow() - 1, 1).getValues().forEach(function (r) { rm[String(r[0])] = 1; });
+  var A = aliases_(), ids = rows.map(function (r) { return String(r[0]); }).filter(function (id) { return /^[0-9a-f]{16}$/.test(id); });
+  var fails = ids.length ? CacheService.getScriptCache().getAll(ids.map(function (id) { return 'fail:' + id; })) : {};
+  var out = [];
+  rows.forEach(function (r) {
+    var id = String(r[0]); if (!/^[0-9a-f]{16}$/.test(id) || rm[id] || A[id]) return;   // removed, or merged into another login
+    out.push({ pid: id, name: String(r[1]).replace(/^'/, ''), cls: String(r[2]), pin: !!String(r[3] || ''),
+      locked: +(fails['fail:' + id] || 0) >= 5, fails: +(fails['fail:' + id] || 0),
+      status: REQUIRE_APPROVAL ? (acc[id] || 'approved') : 'approved', at: r[4] instanceof Date ? r[4].getTime() : 0 });
+  });
+  out.sort(function (a, b) { return a.cls.localeCompare(b.cls) || a.name.localeCompare(b.name); });
+  return { ok: true, pupils: out, approval: REQUIRE_APPROVAL };
+}
+/* The teacher sets a pupil's PIN (and clears any wrong-PIN lock). The pupil then signs in on any computer with
+   their name, class and this PIN, and gets their existing account and progress back. */
+function setPin_(pid, pin) {
+  pid = String(pid || ''); pin = String(pin || '');
+  if (!/^[0-9a-f]{16}$/.test(pid)) return { ok: false, error: 'bad id' };
+  if (!/^\d{4}$/.test(pin)) return { ok: false, error: 'pin' };
+  var ps = pupilsSheet_(), c = ps.getRange('A:A').createTextFinder(pid).matchEntireCell(true).findNext();
+  if (!c) return { ok: false, error: 'not registered' };
+  ps.getRange(c.getRow(), 4).setValue(pinHash_(pid, pin));
+  CacheService.getScriptCache().remove('fail:' + pid);
+  return { ok: true, set: pid };
+}
+
 function removedSheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(REMOVED_SHEET);
@@ -657,6 +689,9 @@ function doGet(e) {
   if (p.action === 'approve' || p.action === 'decline') return out_(decide_(p.pids, p.action === 'approve' ? 'approved' : 'declined'));   // the teacher answers sign-up requests
   if (p.action === 'merge') return out_(merge_(String(p.from), String(p.to)));
   if (p.action === 'award' || p.action === 'unaward') return out_(setAward_(String(p.pid), String(p.cid), p.action === 'award'));
+  if (p.action === 'pupils') return out_(pupilList_());                                 // Teacher tab › Pupil logins
+  if (p.action === 'setpin') return out_(setPin_(p.pid, p.pin));                         // the teacher gives a pupil a new PIN
+  if (p.action === 'unlockpin') { CacheService.getScriptCache().remove('fail:' + String(p.pid || '')); return out_({ ok: true, unlocked: String(p.pid || '') }); }
   if (p.action === 'resetpin') {   // the pupil chooses a new PIN next time they sign in
     var ps = pupilsSheet_(), c = ps.getRange('A:A').createTextFinder(String(p.pid)).matchEntireCell(true).findNext();
     if (!c) return out_({ ok: false, error: 'not registered' });

@@ -957,8 +957,8 @@
           { cache: 'no-store', credentials: 'omit', signal: ctl ? ctl.signal : undefined })
           .then(function (x) { return x.json(); }).then(function (j) {
             if (t) clearTimeout(t);
-            if (j && j.error === 'pin') { go.disabled = false; pinI.value = ''; pinI.focus(); m.textContent = 'That PIN doesn’t match the one for ' + name + '.' + (j.left != null ? ' ' + j.left + ' ' + (j.left === 1 ? 'try' : 'tries') + ' left.' : '') + ' Forgotten it? Ask your teacher to reset it.'; return; }
-            if (j && j.error === 'locked') { go.disabled = false; m.textContent = 'Too many wrong PINs. Try again in 15 minutes, or ask your teacher to reset your PIN.'; return; }
+            if (j && j.error === 'pin') { go.disabled = false; pinI.value = ''; pinI.focus(); m.textContent = 'That PIN doesn’t match the one for ' + name + '.' + (j.left != null ? ' ' + j.left + ' ' + (j.left === 1 ? 'try' : 'tries') + ' left.' : '') + ' Forgotten it? Ask your teacher to set you a new PIN.'; return; }
+            if (j && j.error === 'locked') { go.disabled = false; m.textContent = 'Too many wrong PINs. Try again in 15 minutes, or ask your teacher to set you a new PIN.'; return; }
             if (j && j.error === 'removed' && retry) { S.pid = randId(); return call(false); }
             if (j && j.ok && j.id) return finish(j, false);
             finish(null, true);   // older teacher script, or it said no: carry on, the PIN is checked next time
@@ -1945,6 +1945,77 @@
         else if (msg) { $('#installBox').hidden = false; msg.className = 'small bad-text'; msg.textContent = j && j.error === 'key' ? 'The script rejected the teacher key.' : 'Your Google script needs updating first (see teacher-sync/SETUP.md).'; }
       }).catch(function () { T.installing = false; if (msg) { $('#installBox').hidden = false; msg.className = 'small bad-text'; msg.textContent = 'Couldn’t reach the script (it may need updating — see teacher-sync/SETUP.md).'; } });
   }
+  // ---------- teacher: pupil logins — see everyone, give a new PIN, unlock, approve ----------
+  var LG = { list: [], q: '' };
+  function openLogins() {
+    var box = $('#loginsBox'); if (!box) return;
+    if (!box.hidden) { box.hidden = true; return; }
+    if (!LIVE.key && !askLiveKey()) return;
+    box.hidden = false; box.className = 'tpw-card lg-card';
+    box.innerHTML = '<div class="tpw-head"><h3>🧑‍🎓 Pupil logins &amp; PINs</h3><button class="ibtn" id="lgClose" aria-label="Close">✕</button></div><p class="muted small">Loading pupils…</p>';
+    $('#lgClose').addEventListener('click', function () { box.hidden = true; });
+    box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    loadLogins();
+  }
+  function loadLogins() {
+    var box = $('#loginsBox');
+    fetch(liveUrl('&action=pupils'), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || !j.ok || !j.pupils) { box.innerHTML = '<div class="tpw-head"><h3>🧑‍🎓 Pupil logins &amp; PINs</h3><button class="ibtn" id="lgClose" aria-label="Close">✕</button></div><p class="bad-text small">' + (j && j.error === 'key' ? 'Teacher key not accepted.' : 'Your Google script needs updating for this: paste in the latest teacher-sync/Code.gs, then Deploy › Manage deployments › New version.') + '</p>'; $('#lgClose').addEventListener('click', function () { box.hidden = true; }); return; }
+      LG.list = j.pupils; drawLogins();
+    }).catch(function () { var p = box.querySelector('p'); if (p) { p.className = 'bad-text small'; p.textContent = 'Couldn’t reach the Google script.'; } });
+  }
+  function drawLogins() {
+    var box = $('#loginsBox'), q = LG.q.toLowerCase();
+    var list = LG.list.filter(function (x) { return !q || (x.name + ' ' + x.cls).toLowerCase().indexOf(q) >= 0; });
+    var stuck = LG.list.filter(function (x) { return x.locked || x.status !== 'approved'; }).length;
+    function badge(x) { return x.locked ? '<span class="badge bad">🔒 locked — 5 wrong PINs</span>' : x.status === 'pending' ? '<span class="badge warn">⏳ waiting for approval</span>' : x.status === 'declined' ? '<span class="badge bad">declined</span>' : !x.pin ? '<span class="badge">no PIN yet</span>' : '<span class="badge good">✓ can sign in</span>'; }
+    box.innerHTML = '<div class="tpw-head"><h3>🧑‍🎓 Pupil logins &amp; PINs</h3><button class="ibtn" id="lgClose" aria-label="Close">✕</button></div>' +
+      '<p class="muted small">To get a pupil back in: <b>set a new PIN</b>, then tell them to sign in on any computer with exactly the <b>name and class shown here</b> and that PIN. Their progress comes back with them. ' + LG.list.length + ' pupils' + (stuck ? ' · <b class="bad-text">' + stuck + ' can’t get in right now</b>' : '') + '.</p>' +
+      '<div class="lg-tools"><input class="io" id="lgSearch" placeholder="Search name or class…" value="' + esc(LG.q) + '" autocomplete="off"><button class="btn small" id="lgRefresh">↻ Refresh</button></div>' +
+      '<div class="lg-list">' + (list.length ? list.map(function (x) {
+        var st = badge(x);
+        return '<div class="lg-row" data-pid="' + esc(x.pid) + '">' +
+          '<span class="lg-who"><b>' + esc(x.name) + '</b><span class="muted small">Class <code>' + esc(x.cls) + '</code>' + (x.at ? ' · joined ' + fmtDate(x.at) : '') + '</span></span>' +
+          '<span class="lg-st">' + st + '</span>' +
+          '<form class="lg-pin"><input class="io" inputmode="numeric" maxlength="4" pattern="\\d{4}" placeholder="New PIN" aria-label="New 4-digit PIN for ' + esc(x.name) + '"><button class="btn small primary" type="submit">Set PIN</button></form>' +
+          '<span class="lg-more">' + (x.status !== 'approved' ? '<button class="btn small" data-lgappr="1">✓ Approve</button>' : '') + (x.locked ? '<button class="btn small" data-lgunlock="1">Unlock</button>' : '') + '</span>' +
+          '<span class="lg-msg small"></span></div>';
+      }).join('') : '<p class="muted small">No pupils match.</p>') + '</div>';
+    $('#lgClose').addEventListener('click', function () { box.hidden = true; });
+    $('#lgRefresh').addEventListener('click', function () { this.disabled = true; loadLogins(); });
+    var se = $('#lgSearch'); se.addEventListener('input', function () { LG.q = this.value; var pos = this.selectionStart; drawLogins(); var n = $('#lgSearch'); n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) { } });
+    $$('.lg-row', box).forEach(function (row) {
+      var pid = row.dataset.pid, x = LG.list.filter(function (y) { return y.pid === pid; })[0], m = row.querySelector('.lg-msg');
+      function done(ok, text) {
+        m.className = 'lg-msg small ' + (ok ? 'good-text' : 'bad-text'); m.textContent = text;
+        row.querySelector('.lg-st').innerHTML = badge(x);
+        if (!x.locked) { var u = row.querySelector('[data-lgunlock]'); if (u) u.remove(); }
+      }
+      row.querySelector('.lg-pin').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var inp = this.querySelector('input'), b = this.querySelector('button'), pin = inp.value.trim();
+        if (!/^\d{4}$/.test(pin)) { done(false, 'Type 4 digits.'); inp.focus(); return; }
+        b.disabled = true;
+        fetch(liveUrl('&action=setpin&pid=' + pid + '&pin=' + pin), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+          b.disabled = false;
+          if (j && j.ok && j.set) { x.pin = true; x.locked = false; inp.value = ''; done(true, '✓ PIN set to ' + pin + '. ' + x.name.split(' ')[0] + ' signs in with “' + x.name + '”, class ' + x.cls + ', PIN ' + pin + '.' + (x.status !== 'approved' ? ' They also need approving.' : '')); }
+          else done(false, j && j.error === 'not registered' ? 'Not found — refresh the list.' : 'Not saved — update your Google script (Code.gs) and deploy a New version.');
+        }).catch(function () { b.disabled = false; done(false, 'Couldn’t reach the script.'); });
+      });
+      var ap = row.querySelector('[data-lgappr]'); if (ap) ap.addEventListener('click', function () {
+        ap.disabled = true;
+        fetch(liveUrl('&action=approve&pids=' + pid), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+          if (j && j.ok) { x.status = 'approved'; ap.remove(); done(true, '✓ Approved — they’re let in within 20 seconds.'); } else { ap.disabled = false; done(false, 'Not approved — check the teacher key.'); }
+        }).catch(function () { ap.disabled = false; done(false, 'Couldn’t reach the script.'); });
+      });
+      var ul = row.querySelector('[data-lgunlock]'); if (ul) ul.addEventListener('click', function () {
+        ul.disabled = true;
+        fetch(liveUrl('&action=unlockpin&pid=' + pid), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+          if (j && j.ok && j.unlocked) { x.locked = false; ul.remove(); done(true, '✓ Unlocked — they can try their PIN again.'); } else { ul.disabled = false; done(false, 'Update your Google script (Code.gs) for this.'); }
+        }).catch(function () { ul.disabled = false; done(false, 'Couldn’t reach the script.'); });
+      });
+    });
+  }
   // ---------- teacher: end-of-year clear-down (every pupil's data off the sheet, optionally backed up first) ----------
   function openClearDown() {
     var box = $('#clearDownBox'); if (!box) return;
@@ -2060,7 +2131,7 @@
     document.addEventListener('click', function (e) { if (!menu.hidden && !e.target.closest('.tmenu')) closeMenu(); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !menu.hidden) closeMenu(); });
     if (!SYNC_URL) {
-      ['#liveBtn', '#tdReq', '#tdInstall', '#tdTestPw', '#tdMail', '#liveKeyBtn', '#liveClear'].forEach(function (k) { var e = $(k); if (e) e.hidden = true; });
+      ['#liveBtn', '#tdReq', '#tdInstall', '#tdLogins', '#tdTestPw', '#tdMail', '#liveKeyBtn', '#liveClear'].forEach(function (k) { var e = $(k); if (e) e.hidden = true; });
       liveInfo('muted', 'Not set up yet. Connect a Google Sheet once and every pupil\'s progress arrives here automatically — no files to collect. Follow <a href="https://github.com/popcorn483/MrButlersCTF/blob/main/teacher-sync/SETUP.md" target="_blank" rel="noopener">the 5-minute setup guide</a>.');
       return;
     }
@@ -2069,6 +2140,7 @@
     $('#tdReq').addEventListener('click', function () { PEND.open = !PEND.open; renderPending(PEND.list || []); var pb = $('#pendBox'); if (PEND.open && pb.firstChild) pb.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); });
     $('#tdInstall').addEventListener('click', function () { installAnswers(true); });
     $('#tdTestPw').addEventListener('click', function () { openTestPw(); });
+    $('#tdLogins').addEventListener('click', function () { openLogins(); });
     $('#tdMail').addEventListener('click', function () { PEND.open = true; renderPending(PEND.list || []); var m = $('#pendMail'); if (m) m.click(); });
     $('#liveKeyBtn').addEventListener('click', function () { if (askLiveKey() && LIVE.on) liveFetch(); });
     $('#liveSignOut').addEventListener('click', function () {

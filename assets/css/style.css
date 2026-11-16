@@ -1190,3 +1190,19 @@ html.mb-locked #waitModal, html.mb-locked #whoModal { display: grid !important; 
 .tile.queued::after { content: '⏳'; position: absolute; top: 6px; right: 8px; font-size: .85rem; }
 .test-override { margin-top: 14px; padding: 12px 14px; border: 1px dashed var(--line2); border-radius: 12px; background: var(--bg2); display: grid; gap: 6px; }
 .test-override p { margin: 0; }
+
+/* Teacher tab › Pupil logins & PINs */
+.lg-tools { display: flex; gap: 8px; margin: 4px 0 10px; }
+.lg-tools .io { flex: 1; max-width: 320px; }
+.lg-list { max-height: 60vh; overflow: auto; border-top: 1px solid var(--line); }
+.lg-row { display: grid; grid-template-columns: minmax(170px, 1.3fr) minmax(150px, 1fr) auto auto; align-items: center; gap: 6px 12px; padding: 9px 2px; border-bottom: 1px solid var(--line); }
+.lg-who { display: flex; flex-direction: column; min-width: 0; }
+.lg-who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lg-pin { display: flex; gap: 6px; }
+.lg-pin .io { width: 110px; font-family: var(--mono); letter-spacing: .15em; }
+.lg-pin .io::placeholder { letter-spacing: 0; font-family: var(--sans, inherit); }
+.lg-more { display: flex; gap: 6px; }
+.lg-msg { grid-column: 1 / -1; }
+.lg-msg:empty { display: none; }
+.badge.warn { color: var(--amber); border-color: var(--amber); }
+@media (max-width: 720px) { .lg-row { grid-template-columns: 1fr auto; } .lg-pin, .lg-more { grid-column: 1 / -1; } }
