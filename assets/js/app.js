@@ -1122,6 +1122,7 @@
           }
           S.season = Number(j.season); save();
         }
+        if (j && j.ok && j.name && (j.name !== S.name || (j.cls && j.cls !== S.cls) || (j.user || '') !== (S.user || ''))) { S.name = j.name; if (j.cls) S.cls = j.cls; S.user = j.user || ''; save(); refreshHeader(); }
         var st = j && j.ok && /^(pending|declined|unknown)$/.test(j.status || '') ? j.status : 'approved';
         if (st === 'unknown') {   // not registered (e.g. deleted by the teacher): sign in again
           S.pinOk = false; S.access = ''; save(); wipeContent();
@@ -2015,8 +2016,14 @@
         return '<div class="lg-row" data-pid="' + esc(x.pid) + '">' +
           '<span class="lg-who"><b>' + esc(x.name) + '</b><span class="muted small">Class <code>' + esc(x.cls) + '</code>' + (x.user ? ' · <span class="lg-user">' + esc(x.user) + '</span>' : '') + (x.at ? ' · joined ' + fmtDate(x.at) : '') + '</span></span>' +
           '<span class="lg-st">' + st + '</span>' +
-          '<form class="lg-pin"><input class="io lg-u" maxlength="20" autocapitalize="off" spellcheck="false" placeholder="Username" value="' + esc(x.user || suggestUser(x.name)) + '" aria-label="Username for ' + esc(x.name) + '"><input class="io lg-p" inputmode="numeric" maxlength="4" placeholder="New PIN" aria-label="New 4-digit PIN for ' + esc(x.name) + '"><button class="btn small primary" type="submit">Save login</button></form>' +
-          '<span class="lg-more">' + (x.status !== 'approved' ? '<button class="btn small" data-lgappr="1">✓ Approve</button>' : '') + (x.locked ? '<button class="btn small" data-lgunlock="1">Unlock</button>' : '') + '</span>' +
+          '<span class="lg-more">' + (x.status !== 'approved' ? '<button class="btn small" data-lgappr="1">✓ Approve</button>' : '') + (x.locked ? '<button class="btn small" data-lgunlock="1">Unlock</button>' : '') + '<button class="btn small' + (x.user ? '' : ' primary') + '" data-lgedit="1">' + (x.user ? '✏️ Edit' : '🔑 Give login') + '</button></span>' +
+          '<form class="lg-edit" hidden>' +
+            '<label><span>Name</span><input class="io lg-en" maxlength="40" value="' + esc(x.name) + '"></label>' +
+            '<label><span>Class</span><input class="io lg-ec" maxlength="12" value="' + esc(x.cls) + '"></label>' +
+            '<label><span>Username</span><input class="io lg-eu" maxlength="20" autocapitalize="off" spellcheck="false" value="' + esc(x.user || suggestUser(x.name)) + '" placeholder="none"></label>' +
+            '<label><span>New PIN</span><input class="io lg-ep" inputmode="numeric" maxlength="4" placeholder="' + (x.pin && !x.locked ? 'keep' : '4 digits') + '"></label>' +
+            '<span class="lg-ebtns"><button class="btn small primary" type="submit">Save</button><button class="btn small" type="button" data-lgcancel="1">Cancel</button></span>' +
+          '</form>' +
           '<span class="lg-msg small"></span></div>';
       }).join('') : '<p class="muted small">No pupils match.</p>') + '</div>';
     $('#lgClose').addEventListener('click', function () { box.hidden = true; });
@@ -2059,16 +2066,30 @@
         row.querySelector('.lg-st').innerHTML = badge(x);
         if (!x.locked) { var u = row.querySelector('[data-lgunlock]'); if (u) u.remove(); }
       }
-      row.querySelector('.lg-pin').addEventListener('submit', function (e) {
+      var ef = row.querySelector('.lg-edit'), eb = row.querySelector('[data-lgedit]');
+      eb.addEventListener('click', function () { ef.hidden = !ef.hidden; if (!ef.hidden) (x.user ? ef.querySelector('.lg-eu') : ef.querySelector('.lg-ep')).focus(); });
+      ef.querySelector('[data-lgcancel]').addEventListener('click', function () { ef.hidden = true; });
+      ef.addEventListener('submit', function (e) {
         e.preventDefault();
-        var uin = this.querySelector('.lg-u'), inp = this.querySelector('.lg-p'), b = this.querySelector('button'), pin = inp.value.trim(), un = uin.value.replace(/\s+/g, '').toLowerCase();
-        if (!/^[a-z0-9][a-z0-9._-]{2,19}$/.test(un)) { done(false, 'Usernames are 3–20 letters or numbers (dots, dashes and underscores are fine).'); uin.focus(); return; }
-        if (!/^\d{4}$/.test(pin)) { done(false, 'Type a 4-digit PIN.'); inp.focus(); return; }
+        var nm = ef.querySelector('.lg-en').value.replace(/\s+/g, ' ').trim(), cl = ef.querySelector('.lg-ec').value.replace(/\s+/g, '').toUpperCase(),
+          un = ef.querySelector('.lg-eu').value.replace(/\s+/g, '').toLowerCase(), pn = ef.querySelector('.lg-ep').value.trim(), b = ef.querySelector('button[type=submit]');
+        if (nm.split(' ').length < 2) { done(false, 'Name: first name and surname.'); return; }
+        if (!/^[A-Z0-9]{1,12}$/.test(cl)) { done(false, 'Class: letters and numbers, e.g. 11R.'); return; }
+        if (un && !/^[a-z0-9][a-z0-9._-]{2,19}$/.test(un)) { done(false, 'Username: 3–20 letters or numbers (dots, dashes and underscores are fine), or leave it empty for none.'); return; }
+        if (pn && !/^\d{4}$/.test(pn)) { done(false, 'PIN: 4 digits, or leave it empty to keep the current one.'); return; }
+        if (un && !pn && !x.pin) { done(false, 'They don’t have a PIN yet — type one so they can sign in with their username.'); return; }
+        if (x.locked && !pn) { done(false, 'They’re locked out after 5 wrong PINs — type a new PIN for them.'); ef.querySelector('.lg-ep').focus(); return; }
         b.disabled = true;
-        fetch(liveUrl('&action=setlogin&pid=' + pid + '&u=' + encodeURIComponent(un) + '&pin=' + pin), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+        fetch(liveUrl('&action=editpupil&pid=' + pid + '&name=' + encodeURIComponent(nm) + '&cls=' + encodeURIComponent(cl) + '&u=' + encodeURIComponent(un) + (pn ? '&pin=' + pn : '')), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
           b.disabled = false;
-          if (j && j.ok && j.user) { x.pin = true; x.locked = false; x.user = j.user; x.status = 'approved'; inp.value = ''; done(true, '✓ ' + x.name.split(' ')[0] + ' signs in with username ' + j.user + ' and PIN ' + pin + '.'); }
-          else done(false, j && j.error === 'taken' ? 'That username is already used by another pupil.' : j && j.error === 'not registered' ? 'Not found — refresh the list.' : 'Not saved — update your Google script (Code.gs) and deploy a New version.');
+          if (j && j.ok && j.pid) {
+            x.name = j.name; x.cls = j.cls; x.user = j.user; if (j.pinSet) { x.pin = true; x.locked = false; x.status = 'approved'; }
+            var who = row.querySelector('.lg-who');
+            who.innerHTML = '<b>' + esc(x.name) + '</b><span class="muted small">Class <code>' + esc(x.cls) + '</code>' + (x.user ? ' · <span class="lg-user">' + esc(x.user) + '</span>' : '') + (x.at ? ' · joined ' + fmtDate(x.at) : '') + '</span>';
+            eb.textContent = x.user ? '✏️ Edit' : '🔑 Give login'; eb.classList.toggle('primary', !x.user);
+            ef.hidden = true; ef.querySelector('.lg-ep').value = ''; ef.querySelector('.lg-ep').placeholder = 'keep';
+            done(true, '✓ Saved.' + (x.user ? ' ' + x.name.split(' ')[0] + ' signs in with username ' + x.user + (pn ? ' and PIN ' + pn : ' and their usual PIN') + '.' : ' They sign in with their name, class ' + x.cls + (pn ? ' and PIN ' + pn : '') + '.'));
+          } else done(false, j && j.error === 'taken' ? 'That username is already used by another pupil.' : j && j.error === 'exists' ? 'Another pupil already has that name in that class.' : j && j.error === 'not registered' ? 'Not found — refresh the list.' : 'Not saved — update your Google script (Code.gs) and deploy a New version.');
         }).catch(function () { b.disabled = false; done(false, 'Couldn’t reach the script.'); });
       });
       var ap = row.querySelector('[data-lgappr]'); if (ap) ap.addEventListener('click', function () {
@@ -2222,7 +2243,7 @@
     document.addEventListener('click', function (e) { if (!menu.hidden && !e.target.closest('.tmenu')) closeMenu(); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !menu.hidden) closeMenu(); });
     if (!SYNC_URL) {
-      ['#liveBtn', '#tdReq', '#tdInstall', '#tdLogins', '#tdTestPw', '#tdMail', '#liveKeyBtn', '#liveClear'].forEach(function (k) { var e = $(k); if (e) e.hidden = true; });
+      ['#liveBtn', '#tdReq', '#tdLoginsBtn', '#tdInstall', '#tdLogins', '#tdTestPw', '#tdMail', '#liveKeyBtn', '#liveClear'].forEach(function (k) { var e = $(k); if (e) e.hidden = true; });
       liveInfo('muted', 'Not set up yet. Connect a Google Sheet once and every pupil\'s progress arrives here automatically — no files to collect. Follow <a href="https://github.com/popcorn483/MrButlersCTF/blob/main/teacher-sync/SETUP.md" target="_blank" rel="noopener">the 5-minute setup guide</a>.');
       return;
     }
@@ -2232,6 +2253,7 @@
     $('#tdInstall').addEventListener('click', function () { installAnswers(true); });
     $('#tdTestPw').addEventListener('click', function () { openTestPw(); });
     $('#tdLogins').addEventListener('click', function () { openLogins(); });
+    $('#tdLoginsBtn').addEventListener('click', function () { openLogins(); });
     $('#tdMail').addEventListener('click', function () { PEND.open = true; renderPending(PEND.list || []); var m = $('#pendMail'); if (m) m.click(); });
     $('#liveKeyBtn').addEventListener('click', function () { if (askLiveKey() && LIVE.on) liveFetch(); });
     $('#liveSignOut').addEventListener('click', function () {

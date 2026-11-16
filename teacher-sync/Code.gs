@@ -525,7 +525,45 @@ function approvedId_(raw) {
 }
 function pupilInfo_(id) {
   var ps = pupilsSheet_(), c = ps.getRange('A:A').createTextFinder(id).matchEntireCell(true).findNext();
-  return c ? { name: String(ps.getRange(c.getRow(), 2).getValue()).replace(/^'/, ''), cls: String(ps.getRange(c.getRow(), 3).getValue()) } : { name: '', cls: '' };
+  if (!c) return { name: '', cls: '', user: '' };
+  var v = ps.getRange(c.getRow(), 1, 1, 6).getValues()[0];
+  return { name: String(v[1]).replace(/^'/, ''), cls: String(v[2]), user: String(v[5] || '') };
+}
+/* The teacher's Pupils tab is the source of truth for names and classes (the teacher can change them), cached like approvals. */
+function cachedInfo_(id) {
+  var c = CacheService.getScriptCache(), k = 'inf_' + accGen_() + '_' + id, hit = c.get(k);
+  if (hit) { try { return JSON.parse(hit); } catch (e) { } }
+  var v = pupilInfo_(id); try { c.put(k, JSON.stringify(v), 300); } catch (e) { }
+  return v;
+}
+/* Teacher tab › Pupil logins › ✏️ Edit: change a pupil's name, class, username and/or PIN (anything left out stays the same). */
+function editPupil_(q) {
+  var pid = String(q.pid || ''), pinSet = false, name, cls, user, renamed = false;
+  if (!/^[0-9a-f]{16}$/.test(pid)) return { ok: false, error: 'bad id' };
+  var lock = LockService.getScriptLock(); lock.waitLock(15000);
+  try {
+    var P = pupilRows_(), at = -1;
+    for (var i = 0; i < P.rows.length; i++) if (String(P.rows[i][0]) === pid) { at = i; break; }
+    if (at < 0) return { ok: false, error: 'not registered' };
+    var cur = P.rows[at], oldName = String(cur[1]).replace(/^'/, ''), oldCls = String(cur[2]);
+    name = q.name != null && String(q.name).trim() ? String(q.name).replace(/\s+/g, ' ').trim().slice(0, 40) : oldName;
+    cls = q.cls != null && String(q.cls).trim() ? String(q.cls).toUpperCase().replace(/\s+/g, '').slice(0, 12) : oldCls;
+    user = q.u != null ? normUser_(q.u) : normUser_(cur[5]);
+    if (name.split(' ').length < 2) return { ok: false, error: 'name' };
+    if (!/^[A-Z0-9]{1,12}$/.test(cls)) return { ok: false, error: 'class' };
+    if (user && !okUser_(user)) return { ok: false, error: 'username' };
+    if (q.pin != null && String(q.pin) !== '' && !/^\d{4}$/.test(String(q.pin))) return { ok: false, error: 'pin' };
+    if (user && userTaken_(P.rows, user, pid)) return { ok: false, error: 'taken' };
+    renamed = normWho_(name, cls) !== normWho_(oldName, oldCls);
+    if (renamed) for (var j = 0; j < P.rows.length; j++) if (j !== at && normWho_(P.rows[j][1], P.rows[j][2]) === normWho_(name, cls)) return { ok: false, error: 'exists' };
+    P.sh.getRange(at + 2, 2, 1, 2).setValues([[safeText_(name), cls]]);
+    P.sh.getRange(at + 2, 6).setValue(user);
+    if (q.pin != null && String(q.pin) !== '') { P.sh.getRange(at + 2, 4).setValue(pinHash_(pid, String(q.pin))); pinSet = true; }
+  } finally { lock.releaseLock(); }
+  if (pinSet) CacheService.getScriptCache().remove('fail:' + pid);
+  if (renamed && rowFor_(sheet_(), pid)) updateRow_(pid, function (d) { d.name = name; d.cls = cls; });   // live view shows the new name straight away
+  if (pinSet && REQUIRE_APPROVAL && statusOf_(pid) !== 'approved') setAccess_(pid, 'approved'); else bumpAcc_();
+  return { ok: true, pid: pid, name: name, cls: cls, user: user, pinSet: pinSet };
 }
 function updateRow_(id, fn) {   // read, change and re-sign one pupil's stored progress
   var lock = LockService.getScriptLock(); lock.waitLock(15000);
@@ -733,6 +771,7 @@ function doPost(e) {
     // combine with what's already on the sheet (another computer, or a merged login), so solves are never lost
     if (r) { try { var prev = JSON.parse(String(sh.getRange(r, 6).getValue()) || '{}').data; if (prev) d = union_(prev, d); } catch (x) { } }
     if (merged) { d.pid = id; if (r) { d.name = String(sh.getRange(r, 2).getValue()).replace(/^'/, ''); d.cls = String(sh.getRange(r, 7).getValue()); } }
+    var inf = cachedInfo_(id); if (inf.name) { d.name = inf.name; d.cls = inf.cls; }   // the teacher may have renamed them
     if (installed_()) { d = cleanSolves_(id, d, answers_(), aliases_(), awards_()); merged = true; }   // only provable solves are kept
     var json = (r || merged) ? JSON.stringify(sign_(d)) : JSON.stringify(body);
     if (json.length > MAX_JSON) return out_({ ok: false, error: 'too large' });
@@ -756,7 +795,7 @@ function doGet(e) {
   if (p.action === 'ckey') return out_(ckey_(p));         // the key that unlocks the challenges (approved pupils and teachers only)
   if (p.action === 'testpass') return out_(testpass_(p)); // the Test area password
   if (p.action === 'testresets') return out_(testResets_(p.tids));   // has the teacher cleared this test attempt for a resit?
-  if (p.action === 'access' || p.action === 'status') { if (!/^[0-9a-f]{16}$/.test(String(p.id))) return out_({ ok: false }); var ct = cachedTrust_(String(p.id)); return out_({ ok: true, status: ct.st, season: season_() }); }   // a pupil's device: approved yet?
+  if (p.action === 'access' || p.action === 'status') { if (!/^[0-9a-f]{16}$/.test(String(p.id))) return out_({ ok: false }); var ct = cachedTrust_(String(p.id)), inf = ct.id ? cachedInfo_(ct.id) : {}; return out_({ ok: true, status: ct.st, season: season_(), name: inf.name || undefined, cls: inf.cls || undefined, user: inf.user || undefined }); }   // a pupil's device: approved yet?
   if (p.action === 'board') {   // pupils' leaderboard: checked scores only, no proofs or IDs
     try { return out_(board_()); } catch (err) { return out_({ ok: false, error: 'script', detail: String(err && err.message || err).slice(0, 200) }); }
   }
@@ -785,6 +824,7 @@ function doGet(e) {
   if (p.action === 'setlogin') return out_(setLogin_(p.pid, p.u, p.pin));                // … or a username and PIN
   if (p.action === 'addpupil') return out_(addPupil_(p.name, p.cls, p.u, p.pin));         // … or makes their account in advance
   if (p.action === 'autologins') return out_(autoLogins_(p.all === '1'));                 // … or gives everyone a username and PIN at once
+  if (p.action === 'editpupil') return out_(editPupil_(p));                               // … or changes a pupil's name, class, username or PIN
   if (p.action === 'unlockpin') { CacheService.getScriptCache().remove('fail:' + String(p.pid || '')); return out_({ ok: true, unlocked: String(p.pid || '') }); }
   if (p.action === 'resetpin') {   // the pupil chooses a new PIN next time they sign in
     var ps = pupilsSheet_(), c = ps.getRange('A:A').createTextFinder(String(p.pid)).matchEntireCell(true).findNext();

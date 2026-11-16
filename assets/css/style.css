@@ -1222,3 +1222,13 @@ html.mb-locked #waitModal, html.mb-locked #whoModal { display: grid !important; 
 .lg-add .io { flex: 1 1 120px; min-width: 0; }
 .lg-add .io.lg-addpin { flex: 0 0 90px; font-family: var(--mono); }
 .lg-bulk { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: -2px 0 10px; font-size: .85rem; }
+/* Pupil logins: edit form */
+.lg-row { grid-template-columns: minmax(170px, 1.4fr) minmax(140px, 1fr) auto; }
+.lg-edit { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; padding: 10px; border-radius: 10px; background: var(--bg2); border: 1px solid var(--line); }
+.lg-edit[hidden] { display: none; }
+.lg-edit label { display: flex; flex-direction: column; gap: 3px; font-size: .74rem; color: var(--muted); flex: 1 1 130px; min-width: 0; }
+.lg-edit label .io { font-size: .9rem; }
+.lg-edit .lg-eu, .lg-edit .lg-ep { font-family: var(--mono); }
+.lg-edit label:nth-child(2), .lg-edit label:nth-child(4) { flex: 0 1 100px; }
+.lg-ebtns { display: flex; gap: 6px; }
+@media (max-width: 720px) { .lg-row { grid-template-columns: 1fr auto; } .lg-more { grid-column: 1 / -1; } }
