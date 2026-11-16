@@ -1,10 +1,10 @@
 {
-  "version": "mbctf-v54",
+  "version": "mbctf-v55",
   "date": "2026-11-05",
   "notes": [
+    "\ud83d\udd11 Sign in with the username and PIN your teacher gives you",
     "\ud83d\udd11 Forgotten your PIN? Your teacher can now set you a new one",
     "\u26a1 Faster sign-in and start-up",
-    "\u26a1 Flag checking is much quicker",
-    "\u26a1 Challenges load much faster: a quarter of the download, and big files only load when you open them"
+    "\u26a1 Flag checking is much quicker"
   ]
 }

@@ -46,7 +46,8 @@ var PUPILS_SHEET = 'Pupils';
 function pupilsSheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(PUPILS_SHEET);
-  if (!sh) { sh = ss.insertSheet(PUPILS_SHEET); sh.appendRow(['Pupil ID', 'Name', 'Class', 'PIN hash (not the PIN)', 'Registered']); sh.setFrozenRows(1); }
+  if (!sh) { sh = ss.insertSheet(PUPILS_SHEET); sh.appendRow(['Pupil ID', 'Name', 'Class', 'PIN hash (not the PIN)', 'Registered', 'Username']); sh.setFrozenRows(1); }
+  else if (String(sh.getRange(1, 6).getValue()) !== 'Username') sh.getRange(1, 6).setValue('Username');
   return sh;
 }
 function pinSalt_() {
@@ -88,11 +89,100 @@ function whois_(name, cls, pin, devId) {
   if (had && had !== pinHash_(id, pin)) { cache.put(fk, String(fails + 1), 900); return { ok: false, error: 'pin', left: 4 - fails }; }
   if (!had) sh.getRange(at + 2, 4).setValue(pinHash_(id, pin));
   cache.remove(fk);
-  var kept = resolve_(id), nm = String(rows[at][1]).replace(/^'/, ''), cl = String(rows[at][2]);
+  return welcome_(rows, at);
+}
+function welcome_(rows, at) {   // a pupil whose PIN has just been checked: their account, progress, status and (if approved) the challenge key
+  var id = String(rows[at][0]), kept = resolve_(id), nm = String(rows[at][1]).replace(/^'/, ''), cl = String(rows[at][2]);
   if (kept !== id) for (var j = 0; j < rows.length; j++) if (String(rows[j][0]) === kept) { nm = String(rows[j][1]).replace(/^'/, ''); cl = String(rows[j][2]); break; }
   // speed: the PIN has just been checked, so an approved pupil gets the challenge key in this same reply (no second request)
   var ct = cachedTrust_(kept), key = ct.id ? PropertiesService.getScriptProperties().getProperty('contentKey') : null;
-  return { ok: true, id: kept, name: nm, cls: cl, json: progressJson_(kept), status: ct.st, k: key || undefined };
+  return { ok: true, id: kept, name: nm, cls: cl, json: progressJson_(kept), status: ct.st, k: key || undefined, user: String(rows[at][5] || '') };
+}
+
+/* ---------- usernames: the teacher gives each pupil a username and PIN; pupils sign in with just those two ---------- */
+function normUser_(u) { return String(u || '').toLowerCase().replace(/\s+/g, '').slice(0, 20); }
+function okUser_(u) { return /^[a-z0-9][a-z0-9._-]{2,19}$/.test(u); }
+function login_(user, pin, devId) {
+  user = normUser_(user);
+  if (!okUser_(user)) return { ok: false, error: 'nouser' };
+  if (!/^\d{4}$/.test(String(pin || ''))) return { ok: false, error: 'pin' };
+  var sh = pupilsSheet_(), n = sh.getLastRow() - 1, rows = n > 0 ? sh.getRange(2, 1, n, 6).getValues() : [], at = -1;
+  for (var i = 0; i < rows.length; i++) if (normUser_(rows[i][5]) === user) { at = i; break; }
+  if (at < 0) return { ok: false, error: 'nouser' };
+  var id = String(rows[at][0]), cache = CacheService.getScriptCache(), fk = 'fail:' + id, fails = +(cache.get(fk) || 0);
+  if (fails >= 5) return { ok: false, error: 'locked' };
+  if (String(rows[at][3] || '') !== pinHash_(id, pin)) { cache.put(fk, String(fails + 1), 900); return { ok: false, error: 'pin', left: 4 - fails }; }
+  cache.remove(fk);
+  return welcome_(rows, at);
+}
+function pupilRows_() { var sh = pupilsSheet_(), n = sh.getLastRow() - 1; return { sh: sh, rows: n > 0 ? sh.getRange(2, 1, n, 6).getValues() : [] }; }
+function userTaken_(rows, user, exceptId) { for (var i = 0; i < rows.length; i++) if (normUser_(rows[i][5]) === user && String(rows[i][0]) !== exceptId) return true; return false; }
+function setLogin_(pid, user, pin) {   // give an existing pupil a username and PIN (and let them in)
+  pid = String(pid || ''); user = normUser_(user); pin = String(pin || '');
+  if (!/^[0-9a-f]{16}$/.test(pid)) return { ok: false, error: 'bad id' };
+  if (!okUser_(user)) return { ok: false, error: 'username' };
+  if (!/^\d{4}$/.test(pin)) return { ok: false, error: 'pin' };
+  var lock = LockService.getScriptLock(); lock.waitLock(15000);
+  try {
+    var P = pupilRows_(), at = -1;
+    for (var i = 0; i < P.rows.length; i++) if (String(P.rows[i][0]) === pid) { at = i; break; }
+    if (at < 0) return { ok: false, error: 'not registered' };
+    if (userTaken_(P.rows, user, pid)) return { ok: false, error: 'taken' };
+    P.sh.getRange(at + 2, 4).setValue(pinHash_(pid, pin));
+    P.sh.getRange(at + 2, 6).setValue(user);
+  } finally { lock.releaseLock(); }
+  CacheService.getScriptCache().remove('fail:' + pid);
+  if (REQUIRE_APPROVAL) setAccess_(pid, 'approved'); else bumpAcc_();
+  return { ok: true, pid: pid, user: user };
+}
+function newPid_() { return Utilities.getUuid().replace(/-/g, '').slice(0, 16).toLowerCase(); }
+function addPupil_(name, cls, user, pin) {   // the teacher creates a pupil's account in advance
+  name = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+  cls = String(cls || '').toUpperCase().replace(/\s+/g, '').slice(0, 12);
+  user = normUser_(user); pin = String(pin || '');
+  if (name.split(' ').length < 2) return { ok: false, error: 'name' };
+  if (!/^[A-Z0-9]{1,12}$/.test(cls)) return { ok: false, error: 'class' };
+  if (!okUser_(user)) return { ok: false, error: 'username' };
+  if (!/^\d{4}$/.test(pin)) return { ok: false, error: 'pin' };
+  var pid, lock = LockService.getScriptLock(); lock.waitLock(15000);
+  try {
+    var P = pupilRows_(), want = normWho_(name, cls);
+    for (var i = 0; i < P.rows.length; i++) if (normWho_(P.rows[i][1], P.rows[i][2]) === want) return { ok: false, error: 'exists', pid: String(P.rows[i][0]) };
+    if (userTaken_(P.rows, user, '')) return { ok: false, error: 'taken' };
+    pid = newPid_();
+    P.sh.appendRow([pid, safeText_(name), cls, pinHash_(pid, pin), new Date(), user]);
+  } finally { lock.releaseLock(); }
+  if (REQUIRE_APPROVAL) setAccess_(pid, 'approved', name, cls); else bumpAcc_();
+  return { ok: true, pid: pid, user: user, name: name, cls: cls };
+}
+/* One click: a username and a random PIN for every pupil who hasn't got a username yet (or everyone, with all=1).
+   Returns them once so the teacher can print login slips — PINs are only ever stored scrambled. */
+function autoLogins_(all) {
+  var out = [], lock = LockService.getScriptLock(); lock.waitLock(30000);
+  var rm = {}, rs = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REMOVED_SHEET);
+  if (rs && rs.getLastRow() > 1) rs.getRange(2, 1, rs.getLastRow() - 1, 1).getValues().forEach(function (r) { rm[String(r[0])] = 1; });
+  var A = aliases_(), acc = {}; accRows_().forEach(function (r) { acc[String(r[0])] = String(r[1]); });
+  try {
+    var P = pupilRows_(), used = {};
+    P.rows.forEach(function (r) { var u = normUser_(r[5]); if (u && !all) used[u] = 1; });
+    P.rows.forEach(function (r, i) {
+      var id = String(r[0]); if (!/^[0-9a-f]{16}$/.test(id) || rm[id] || A[id] || acc[id] === 'declined') return;
+      if (!all && normUser_(r[5])) return;
+      var parts = String(r[1]).replace(/^'/, '').toLowerCase().replace(/[^a-z ]/g, '').trim().split(/\s+/);
+      var base = ((parts[0] || 'p').charAt(0) + (parts[parts.length - 1] || 'pupil')).slice(0, 16), u = base, k = 2;
+      if (base.length < 3) base = u = (base + 'ctf');
+      while (used[u]) u = base + (k++);
+      used[u] = 1;
+      var pin = String(1000 + Math.floor(Math.random() * 9000));
+      P.sh.getRange(i + 2, 4).setValue(pinHash_(id, pin));
+      P.sh.getRange(i + 2, 6).setValue(u);
+      out.push({ pid: id, name: String(r[1]).replace(/^'/, ''), cls: String(r[2]), user: u, pin: pin, was: acc[id] || '' });
+    });
+  } finally { lock.releaseLock(); }
+  if (REQUIRE_APPROVAL) out.forEach(function (x) { if (x.was && x.was !== 'approved') setAccess_(x.pid, 'approved'); });
+  bumpAcc_();
+  var c = CacheService.getScriptCache(); out.forEach(function (x) { c.remove('fail:' + x.pid); delete x.was; });
+  return { ok: true, logins: out };
 }
 
 // ---------- access approval (as in the revision app) ----------
@@ -572,7 +662,7 @@ function season_() { return Number(PropertiesService.getScriptProperties().getPr
 /* Teacher tab › Pupil logins: every pupil who has signed up, whether they have a PIN, whether they're locked out
    after wrong PINs, and whether they're approved — so the teacher can get anyone back in. */
 function pupilList_() {
-  var ps = pupilsSheet_(), n = ps.getLastRow() - 1, rows = n > 0 ? ps.getRange(2, 1, n, 5).getValues() : [];
+  var ps = pupilsSheet_(), n = ps.getLastRow() - 1, rows = n > 0 ? ps.getRange(2, 1, n, 6).getValues() : [];
   var acc = {}; accRows_().forEach(function (r) { acc[String(r[0])] = String(r[1]); });
   var rm = {}, rs = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REMOVED_SHEET);
   if (rs && rs.getLastRow() > 1) rs.getRange(2, 1, rs.getLastRow() - 1, 1).getValues().forEach(function (r) { rm[String(r[0])] = 1; });
@@ -581,7 +671,7 @@ function pupilList_() {
   var out = [];
   rows.forEach(function (r) {
     var id = String(r[0]); if (!/^[0-9a-f]{16}$/.test(id) || rm[id] || A[id]) return;   // removed, or merged into another login
-    out.push({ pid: id, name: String(r[1]).replace(/^'/, ''), cls: String(r[2]), pin: !!String(r[3] || ''),
+    out.push({ pid: id, name: String(r[1]).replace(/^'/, ''), cls: String(r[2]), pin: !!String(r[3] || ''), user: String(r[5] || ''),
       locked: +(fails['fail:' + id] || 0) >= 5, fails: +(fails['fail:' + id] || 0),
       status: REQUIRE_APPROVAL ? (acc[id] || 'approved') : 'approved', at: r[4] instanceof Date ? r[4].getTime() : 0 });
   });
@@ -659,6 +749,7 @@ function doGet(e) {
   var p = (e && e.parameter) || {};
   if (p.action === 'ping') return out_({ ok: true });   // wakes the script up when a pupil opens a challenge, so their flag check is quick
   if (p.action === 'whois') return out_(whois_(p.name, p.cls, p.pin, p.id));   // pupils signing in (no key)
+  if (p.action === 'login') return out_(login_(p.u, p.pin, p.id));             // pupils signing in with the username their teacher gave them
   if (p.action === 'forgot') return out_(forgot_());
   if (p.action === 'submit') return out_(submit_(p));     // a pupil submitting a flag: checked here, never on their computer
   if (p.action === 'reveal') return out_(reveal_(p));     // a pupil choosing to see the answer (scores 0)
@@ -691,6 +782,9 @@ function doGet(e) {
   if (p.action === 'award' || p.action === 'unaward') return out_(setAward_(String(p.pid), String(p.cid), p.action === 'award'));
   if (p.action === 'pupils') return out_(pupilList_());                                 // Teacher tab › Pupil logins
   if (p.action === 'setpin') return out_(setPin_(p.pid, p.pin));                         // the teacher gives a pupil a new PIN
+  if (p.action === 'setlogin') return out_(setLogin_(p.pid, p.u, p.pin));                // … or a username and PIN
+  if (p.action === 'addpupil') return out_(addPupil_(p.name, p.cls, p.u, p.pin));         // … or makes their account in advance
+  if (p.action === 'autologins') return out_(autoLogins_(p.all === '1'));                 // … or gives everyone a username and PIN at once
   if (p.action === 'unlockpin') { CacheService.getScriptCache().remove('fail:' + String(p.pid || '')); return out_({ ok: true, unlocked: String(p.pid || '') }); }
   if (p.action === 'resetpin') {   // the pupil chooses a new PIN next time they sign in
     var ps = pupilsSheet_(), c = ps.getRange('A:A').createTextFinder(String(p.pid)).matchEntireCell(true).findNext();

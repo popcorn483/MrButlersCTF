@@ -882,11 +882,14 @@
     d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.setAttribute('aria-labelledby', 'whoH');
     d.innerHTML = '<form class="who-card" novalidate>' +
       '<div class="who-flag">⚑</div><h2 id="whoH">Who’s practising?</h2>' +
-      '<p class="muted small">Enter your name, form class and a 4-digit PIN. Your progress is saved under your name, so it follows you to any computer, and your teacher can see how you’re getting on.</p>' +
+      '<div class="who-tabs" role="tablist"><button type="button" role="tab" class="who-tab" data-mode="user">🔑 Username &amp; PIN</button><button type="button" role="tab" class="who-tab" data-mode="name">✏️ Name &amp; class</button></div>' +
+      '<div class="who-userbits"><p class="muted small">Use the <b>username and PIN your teacher gave you</b>. It works on any computer, and your progress comes with you.</p>' +
+      '<label class="field-label" for="whoU">Username</label><input class="io" id="whoU" maxlength="20" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="e.g. amaguire"></div>' +
+      '<div class="who-namebits"><p class="muted small">No username yet? Enter your name, form class and a 4-digit PIN. Your progress is saved under your name, so it follows you to any computer, and your teacher can see how you’re getting on.</p>' +
       '<label class="field-label" for="whoN">First name and surname</label><input class="io" id="whoN" autocomplete="name" maxlength="40">' +
-      '<label class="field-label" for="whoC">Form class</label><input class="io" id="whoC" maxlength="12" placeholder="e.g. 11B or 13D" autocomplete="off">' +
+      '<label class="field-label" for="whoC">Form class</label><input class="io" id="whoC" maxlength="12" placeholder="e.g. 11B or 13D" autocomplete="off"></div>' +
       '<label class="field-label" for="whoP">PIN</label><input class="io" id="whoP" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="4 digits">' +
-      '<small class="muted">First time? Choose one you’ll remember. Use the same PIN on every computer.</small>' +
+      '<small class="muted who-pinhint">First time? Choose one you’ll remember. Use the same PIN on every computer.</small>' +
       '<div class="who-btns">' + (editing ? '<button type="button" class="btn" id="whoCancel">Cancel</button>' : '') + '<button class="btn primary" id="whoGo">Continue</button></div>' +
       '<p class="who-msg" aria-live="polite"></p>' +
       '<details class="who-load"' + (editing ? ' hidden' : '') + '><summary>📂 Started before? Load your progress file or resume code</summary>' +
@@ -896,8 +899,18 @@
       '<p class="who-load-msg small" aria-live="polite"></p></div></details>' +
       '<button type="button" class="linkish who-teacher" id="whoTeacher">👩‍🏫 Teacher? Sign in here</button></form>';
     document.body.appendChild(d); document.documentElement.style.overflow = 'hidden';
-    var n = $('#whoN', d), c = $('#whoC', d), pinI = $('#whoP', d), m = $('.who-msg', d), go = $('#whoGo', d);
-    n.value = S.name || ''; c.value = S.cls || '';
+    var n = $('#whoN', d), c = $('#whoC', d), pinI = $('#whoP', d), m = $('.who-msg', d), go = $('#whoGo', d), uI = $('#whoU', d);
+    n.value = S.name || ''; c.value = S.cls || ''; uI.value = S.user || '';
+    // two ways in: the username + PIN a teacher handed out (the default), or name + class + PIN
+    var mode = 'user'; try { mode = localStorage.getItem('mbctf-who-mode') || (editing && !S.user ? 'name' : 'user'); } catch (x) { }
+    function setMode(md) {
+      mode = md; try { localStorage.setItem('mbctf-who-mode', md); } catch (x) { }
+      d.querySelector('.who-card').classList.toggle('by-user', md === 'user');
+      $$('.who-tab', d).forEach(function (t) { var on = t.dataset.mode === md; t.classList.toggle('on', on); t.setAttribute('aria-selected', on); });
+      m.textContent = '';
+    }
+    $$('.who-tab', d).forEach(function (t) { t.addEventListener('click', function () { setMode(t.dataset.mode); (mode === 'user' ? (uI.value ? pinI : uI) : (n.value ? (c.value ? pinI : c) : n)).focus(); }); });
+    setMode(mode);
     function close() { d.remove(); document.documentElement.style.overflow = ''; refreshHeader(); renderSyncStatus(); }
     d.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (editing) close(); } }, true);
     var cancel = $('#whoCancel', d); if (cancel) cancel.addEventListener('click', close);
@@ -925,6 +938,29 @@
     });
     $('form', d).addEventListener('submit', function (e) {
       e.preventDefault();
+      if (mode === 'user') {
+        var un = uI.value.replace(/\s+/g, '').toLowerCase(), up = pinI.value.trim();
+        if (un.length < 3) { m.textContent = 'Type the username your teacher gave you.'; uI.focus(); return; }
+        if (!/^\d{4}$/.test(up)) { m.textContent = 'Please enter your 4-digit PIN.'; pinI.focus(); return; }
+        if (!SYNC_URL) { m.textContent = 'Usernames need your teacher’s sheet, which isn’t set up here.'; return; }
+        go.disabled = true; m.textContent = 'Checking…';
+        var ctl2 = window.AbortController ? new AbortController() : null, t2 = ctl2 && setTimeout(function () { ctl2.abort(); }, 12000);
+        fetch(SYNC_URL + (SYNC_URL.indexOf('?') < 0 ? '?' : '&') + 'action=login&u=' + encodeURIComponent(un) + '&pin=' + up + '&id=' + encodeURIComponent(S.pid) + '&t=' + Date.now(),
+          { cache: 'no-store', credentials: 'omit', signal: ctl2 ? ctl2.signal : undefined })
+          .then(function (x) { return x.json(); }).then(function (j) {
+            if (t2) clearTimeout(t2); go.disabled = false;
+            if (j && j.ok && j.id) {
+              // a different pupil used this computer before: start from a clean slate (their work is already on the sheet)
+              if (S.name && j.name && S.name.toLowerCase() !== String(j.name).toLowerCase()) { if (syncTimer) pushSync(true); S = blankState(); }
+              S.user = j.user || un; return finish(j, false);
+            }
+            if (j && j.error === 'pin') { pinI.value = ''; pinI.focus(); m.textContent = 'That PIN isn’t right for ' + un + '.' + (j.left != null ? ' ' + j.left + ' ' + (j.left === 1 ? 'try' : 'tries') + ' left.' : '') + ' Forgotten it? Ask your teacher.'; return; }
+            if (j && j.error === 'locked') { m.textContent = 'Too many wrong PINs. Try again in 15 minutes, or ask your teacher to set you a new PIN.'; return; }
+            if (j && j.error === 'nouser') { uI.focus(); m.textContent = 'We can’t find the username “' + un + '”. Check it with your teacher — or use the Name & class tab.'; return; }
+            m.textContent = 'Your teacher’s sheet needs updating for usernames. Use the Name & class tab for now.';
+          }).catch(function () { if (t2) clearTimeout(t2); go.disabled = false; m.textContent = 'Couldn’t reach your teacher’s sheet. Check the internet and try again.'; });
+        return;
+      }
       var name = n.value.replace(/\s+/g, ' ').trim(), cls = c.value.replace(/\s+/g, '').toUpperCase(), pin = pinI.value.trim();
       if (name.split(' ').length < 2) { m.textContent = 'Please enter your first name and surname.'; n.focus(); return; }
       if (!/^[A-Z0-9]{1,12}$/.test(cls)) { m.textContent = 'Please enter your form class, e.g. 11B.'; c.focus(); return; }
@@ -966,7 +1002,7 @@
       }
       call(true);
     });
-    setTimeout(function () { (S.name ? (S.cls ? pinI : c) : n).focus(); }, 60);
+    setTimeout(function () { (mode === 'user' ? (uI.value ? pinI : uI) : S.name ? (S.cls ? pinI : c) : n).focus(); }, 60);
   }
   window.CTFWho = askWho;
   if (accessBlocked()) { lockdown(true); setTimeout(showWaiting, 0); }
@@ -1966,23 +2002,55 @@
   }
   function drawLogins() {
     var box = $('#loginsBox'), q = LG.q.toLowerCase();
-    var list = LG.list.filter(function (x) { return !q || (x.name + ' ' + x.cls).toLowerCase().indexOf(q) >= 0; });
+    var list = LG.list.filter(function (x) { return !q || (x.name + ' ' + x.cls + ' ' + (x.user || '')).toLowerCase().indexOf(q) >= 0; });
     var stuck = LG.list.filter(function (x) { return x.locked || x.status !== 'approved'; }).length;
     function badge(x) { return x.locked ? '<span class="badge bad">🔒 locked — 5 wrong PINs</span>' : x.status === 'pending' ? '<span class="badge warn">⏳ waiting for approval</span>' : x.status === 'declined' ? '<span class="badge bad">declined</span>' : !x.pin ? '<span class="badge">no PIN yet</span>' : '<span class="badge good">✓ can sign in</span>'; }
     box.innerHTML = '<div class="tpw-head"><h3>🧑‍🎓 Pupil logins &amp; PINs</h3><button class="ibtn" id="lgClose" aria-label="Close">✕</button></div>' +
-      '<p class="muted small">To get a pupil back in: <b>set a new PIN</b>, then tell them to sign in on any computer with exactly the <b>name and class shown here</b> and that PIN. Their progress comes back with them. ' + LG.list.length + ' pupils' + (stuck ? ' · <b class="bad-text">' + stuck + ' can’t get in right now</b>' : '') + '.</p>' +
-      '<div class="lg-tools"><input class="io" id="lgSearch" placeholder="Search name or class…" value="' + esc(LG.q) + '" autocomplete="off"><button class="btn small" id="lgRefresh">↻ Refresh</button></div>' +
+      '<p class="muted small">The easiest way in: give each pupil a <b>username and PIN</b>. They choose <b>🔑 Username &amp; PIN</b> when they sign in, on any computer, and their progress comes with them. Saving a login also approves them. ' + LG.list.length + ' pupils' + (stuck ? ' · <b class="bad-text">' + stuck + ' can’t get in right now</b>' : '') + '.</p>' +
+      '<div class="lg-bulk"><button class="btn small primary" id="lgAuto">🎲 Usernames &amp; PINs for everyone without one</button><label><input type="checkbox" id="lgAll"> include pupils who already have one (new PINs for all)</label></div>' +
+      '<div class="lg-tools"><input class="io" id="lgSearch" placeholder="Search name, class or username…" value="' + esc(LG.q) + '" autocomplete="off"><button class="btn small" id="lgAddBtn">＋ Add pupil</button><button class="btn small" id="lgRefresh">↻ Refresh</button></div>' +
+      '<form class="lg-add" id="lgAdd"><input class="io" id="lgAddN" placeholder="First name and surname" maxlength="40"><input class="io" id="lgAddC" placeholder="Class, e.g. 11R" maxlength="12"><input class="io" id="lgAddU" placeholder="Username" maxlength="20" autocapitalize="off" spellcheck="false"><input class="io lg-addpin" id="lgAddP" placeholder="PIN" inputmode="numeric" maxlength="4"><button class="btn small primary" type="submit">Add</button><span class="small" id="lgAddMsg"></span></form>' +
       '<div class="lg-list">' + (list.length ? list.map(function (x) {
         var st = badge(x);
         return '<div class="lg-row" data-pid="' + esc(x.pid) + '">' +
-          '<span class="lg-who"><b>' + esc(x.name) + '</b><span class="muted small">Class <code>' + esc(x.cls) + '</code>' + (x.at ? ' · joined ' + fmtDate(x.at) : '') + '</span></span>' +
+          '<span class="lg-who"><b>' + esc(x.name) + '</b><span class="muted small">Class <code>' + esc(x.cls) + '</code>' + (x.user ? ' · <span class="lg-user">' + esc(x.user) + '</span>' : '') + (x.at ? ' · joined ' + fmtDate(x.at) : '') + '</span></span>' +
           '<span class="lg-st">' + st + '</span>' +
-          '<form class="lg-pin"><input class="io" inputmode="numeric" maxlength="4" pattern="\\d{4}" placeholder="New PIN" aria-label="New 4-digit PIN for ' + esc(x.name) + '"><button class="btn small primary" type="submit">Set PIN</button></form>' +
+          '<form class="lg-pin"><input class="io lg-u" maxlength="20" autocapitalize="off" spellcheck="false" placeholder="Username" value="' + esc(x.user || suggestUser(x.name)) + '" aria-label="Username for ' + esc(x.name) + '"><input class="io lg-p" inputmode="numeric" maxlength="4" placeholder="New PIN" aria-label="New 4-digit PIN for ' + esc(x.name) + '"><button class="btn small primary" type="submit">Save login</button></form>' +
           '<span class="lg-more">' + (x.status !== 'approved' ? '<button class="btn small" data-lgappr="1">✓ Approve</button>' : '') + (x.locked ? '<button class="btn small" data-lgunlock="1">Unlock</button>' : '') + '</span>' +
           '<span class="lg-msg small"></span></div>';
       }).join('') : '<p class="muted small">No pupils match.</p>') + '</div>';
     $('#lgClose').addEventListener('click', function () { box.hidden = true; });
     $('#lgRefresh').addEventListener('click', function () { this.disabled = true; loadLogins(); });
+    $('#lgAddBtn').addEventListener('click', function () { var f = $('#lgAdd'); f.classList.toggle('on'); if (f.classList.contains('on')) $('#lgAddN').focus(); });
+    $('#lgAddN').addEventListener('input', function () { var u = $('#lgAddU'); if (!u.dataset.typed) u.value = suggestUser(this.value); });
+    $('#lgAddU').addEventListener('input', function () { this.dataset.typed = '1'; });
+    if (!$('#lgAddP').value) $('#lgAddP').value = String(1000 + Math.floor(Math.random() * 9000));
+    $('#lgAdd').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var nm = $('#lgAddN').value.replace(/\s+/g, ' ').trim(), cl = $('#lgAddC').value.replace(/\s+/g, '').toUpperCase(), un = $('#lgAddU').value.replace(/\s+/g, '').toLowerCase(), pn = $('#lgAddP').value.trim(), am = $('#lgAddMsg'), b = this.querySelector('button');
+      function bad(t) { am.className = 'small bad-text'; am.textContent = t; }
+      if (nm.split(' ').length < 2) return bad('First name and surname, please.');
+      if (!/^[A-Z0-9]{1,12}$/.test(cl)) return bad('Class like 11R.');
+      if (!/^[a-z0-9][a-z0-9._-]{2,19}$/.test(un)) return bad('Username: 3–20 letters or numbers.');
+      if (!/^\d{4}$/.test(pn)) return bad('PIN: 4 digits.');
+      b.disabled = true; am.className = 'small muted'; am.textContent = 'Adding…';
+      fetch(liveUrl('&action=addpupil&name=' + encodeURIComponent(nm) + '&cls=' + encodeURIComponent(cl) + '&u=' + encodeURIComponent(un) + '&pin=' + pn), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+        b.disabled = false;
+        if (j && j.ok && j.pid) { LG.list.push({ pid: j.pid, name: j.name, cls: j.cls, user: j.user, pin: true, locked: false, fails: 0, status: 'approved', at: Date.now() }); LG.q = ''; drawLogins(); toast('✓ Added ' + j.name + ' — username ' + j.user + ', PIN ' + pn, 6000); return; }
+        bad(j && j.error === 'exists' ? 'There’s already a ' + nm + ' in ' + cl + ' — give them a login from the list instead.' : j && j.error === 'taken' ? 'That username is already used.' : 'Not added — update your Google script (Code.gs) and deploy a New version.');
+      }).catch(function () { b.disabled = false; bad('Couldn’t reach the script.'); });
+    });
+    $('#lgAuto').addEventListener('click', function () {
+      var all = $('#lgAll').checked, b = this, todo = LG.list.filter(function (x) { return x.status !== 'declined' && (all || !x.user); }).length;
+      if (!todo) { toast('Everyone already has a username. Tick the box to give everyone new PINs.', 5000); return; }
+      if (!confirm((all ? 'Give ALL ' + todo + ' pupils new PINs (and a username if they have none)?\n\nTheir old PINs stop working. ' : 'Give ' + todo + ' pupil' + (todo > 1 ? 's' : '') + ' a username and PIN?\n\n') + 'You’ll get login slips to print. PINs are only shown this once, so print or save them.')) return;
+      b.disabled = true; b.textContent = 'Making logins…';
+      fetch(liveUrl('&action=autologins' + (all ? '&all=1' : '')), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+        b.disabled = false; b.innerHTML = '🎲 Usernames &amp; PINs for everyone without one';
+        if (!j || !j.ok || !j.logins) { toast('Not done — update your Google script (Code.gs) and deploy a New version.', 6000); return; }
+        slips(j.logins, false); loadLogins();
+      }).catch(function () { b.disabled = false; toast('Couldn’t reach the script.'); });
+    });
     var se = $('#lgSearch'); se.addEventListener('input', function () { LG.q = this.value; var pos = this.selectionStart; drawLogins(); var n = $('#lgSearch'); n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) { } });
     $$('.lg-row', box).forEach(function (row) {
       var pid = row.dataset.pid, x = LG.list.filter(function (y) { return y.pid === pid; })[0], m = row.querySelector('.lg-msg');
@@ -1993,13 +2061,14 @@
       }
       row.querySelector('.lg-pin').addEventListener('submit', function (e) {
         e.preventDefault();
-        var inp = this.querySelector('input'), b = this.querySelector('button'), pin = inp.value.trim();
-        if (!/^\d{4}$/.test(pin)) { done(false, 'Type 4 digits.'); inp.focus(); return; }
+        var uin = this.querySelector('.lg-u'), inp = this.querySelector('.lg-p'), b = this.querySelector('button'), pin = inp.value.trim(), un = uin.value.replace(/\s+/g, '').toLowerCase();
+        if (!/^[a-z0-9][a-z0-9._-]{2,19}$/.test(un)) { done(false, 'Usernames are 3–20 letters or numbers (dots, dashes and underscores are fine).'); uin.focus(); return; }
+        if (!/^\d{4}$/.test(pin)) { done(false, 'Type a 4-digit PIN.'); inp.focus(); return; }
         b.disabled = true;
-        fetch(liveUrl('&action=setpin&pid=' + pid + '&pin=' + pin), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+        fetch(liveUrl('&action=setlogin&pid=' + pid + '&u=' + encodeURIComponent(un) + '&pin=' + pin), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
           b.disabled = false;
-          if (j && j.ok && j.set) { x.pin = true; x.locked = false; inp.value = ''; done(true, '✓ PIN set to ' + pin + '. ' + x.name.split(' ')[0] + ' signs in with “' + x.name + '”, class ' + x.cls + ', PIN ' + pin + '.' + (x.status !== 'approved' ? ' They also need approving.' : '')); }
-          else done(false, j && j.error === 'not registered' ? 'Not found — refresh the list.' : 'Not saved — update your Google script (Code.gs) and deploy a New version.');
+          if (j && j.ok && j.user) { x.pin = true; x.locked = false; x.user = j.user; x.status = 'approved'; inp.value = ''; done(true, '✓ ' + x.name.split(' ')[0] + ' signs in with username ' + j.user + ' and PIN ' + pin + '.'); }
+          else done(false, j && j.error === 'taken' ? 'That username is already used by another pupil.' : j && j.error === 'not registered' ? 'Not found — refresh the list.' : 'Not saved — update your Google script (Code.gs) and deploy a New version.');
         }).catch(function () { b.disabled = false; done(false, 'Couldn’t reach the script.'); });
       });
       var ap = row.querySelector('[data-lgappr]'); if (ap) ap.addEventListener('click', function () {
@@ -2015,6 +2084,28 @@
         }).catch(function () { ul.disabled = false; done(false, 'Couldn’t reach the script.'); });
       });
     });
+  }
+  function suggestUser(name) {
+    var p = String(name || '').toLowerCase().replace(/[^a-z ]/g, '').trim().split(/\s+/);
+    return p[0] ? ((p[0].charAt(0) + (p[p.length - 1] || '')).slice(0, 16)) : '';
+  }
+  // login slips to cut out and hand to pupils (PINs are only known at the moment they're made)
+  function slips(list) {
+    if (!list.length) return;
+    var url = location.href.split('#')[0].split('?')[0];
+    var html = '<!doctype html><html><head><meta charset="utf-8"><title>Mr B’s CTF login slips</title><style>' +
+      'body{font-family:Segoe UI,Arial,sans-serif;margin:16px;color:#111}h1{font-size:16px;margin:0 0 4px}p.n{font-size:12px;color:#555;margin:0 0 12px}' +
+      '.g{display:grid;grid-template-columns:repeat(2,1fr);gap:0}.s{border:1px dashed #999;padding:12px 14px;break-inside:avoid;min-height:120px}' +
+      '.s h2{font-size:15px;margin:0 0 2px}.s .c{font-size:12px;color:#555;margin-bottom:8px}.s .k{font-size:13px;margin:3px 0}.s .k b{font-family:Consolas,monospace;font-size:17px;letter-spacing:.06em}' +
+      '.s .u{font-size:11px;color:#555;margin-top:8px;word-break:break-all}.bar{margin-bottom:12px}@media print{.bar{display:none}body{margin:0}}</style></head><body>' +
+      '<div class="bar"><button onclick="print()">🖨 Print</button></div><h1>⚑ Mr B’s CTF — login slips</h1><p class="n">' + list.length + ' pupil' + (list.length > 1 ? 's' : '') + '. Cut along the dashed lines. On the site choose <b>🔑 Username &amp; PIN</b>.</p><div class="g">' +
+      list.slice().sort(function (a, b) { return (a.cls || '').localeCompare(b.cls || '') || a.name.localeCompare(b.name); }).map(function (x) {
+        return '<div class="s"><h2>' + esc(x.name) + '</h2><div class="c">Class ' + esc(x.cls) + '</div><div class="k">Username: <b>' + esc(x.user) + '</b></div><div class="k">PIN: <b>' + esc(x.pin) + '</b></div><div class="u">' + esc(url) + '</div></div>';
+      }).join('') + '</div></body></html>';
+    var w = window.open('', '_blank');
+    if (w) { w.document.open(); w.document.write(html); w.document.close(); }
+    else { var bl = new Blob([html], { type: 'text/html' }), a = document.createElement('a'); a.href = URL.createObjectURL(bl); a.download = 'login-slips.html'; document.body.appendChild(a); a.click(); a.remove(); }
+    toast('🎲 ' + list.length + ' login' + (list.length > 1 ? 's' : '') + ' made — print the slips now (PINs aren’t shown again).', 7000);
   }
   // ---------- teacher: end-of-year clear-down (every pupil's data off the sheet, optionally backed up first) ----------
   function openClearDown() {

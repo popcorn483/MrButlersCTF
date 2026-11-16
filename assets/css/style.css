@@ -1206,3 +1206,19 @@ html.mb-locked #waitModal, html.mb-locked #whoModal { display: grid !important; 
 .lg-msg:empty { display: none; }
 .badge.warn { color: var(--amber); border-color: var(--amber); }
 @media (max-width: 720px) { .lg-row { grid-template-columns: 1fr auto; } .lg-pin, .lg-more { grid-column: 1 / -1; } }
+
+/* sign-in: username & PIN (default) or name & class */
+.who-tabs { display: flex; gap: 4px; padding: 3px; margin: 4px 0 10px; border-radius: 999px; background: var(--bg2); border: 1px solid var(--line); }
+.who-tab { flex: 1; padding: 7px 10px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: .88rem; font-weight: 600; cursor: pointer; }
+.who-tab.on { background: var(--panel2); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.35); }
+.who-card.by-user .who-namebits, .who-card.by-user .who-pinhint { display: none; }
+.who-card:not(.by-user) .who-userbits { display: none; }
+.who-userbits .io { font-family: var(--mono); }
+/* Pupil logins: usernames, add pupil, login slips */
+.lg-user { font-family: var(--mono); font-size: .8rem; color: var(--accent); }
+.lg-pin .io.lg-u { width: 130px; letter-spacing: 0; }
+.lg-add { display: none; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 10px; padding: 10px; border: 1px dashed var(--line2); border-radius: 12px; }
+.lg-add.on { display: flex; }
+.lg-add .io { flex: 1 1 120px; min-width: 0; }
+.lg-add .io.lg-addpin { flex: 0 0 90px; font-family: var(--mono); }
+.lg-bulk { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: -2px 0 10px; font-size: .85rem; }
