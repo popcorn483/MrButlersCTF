@@ -6,7 +6,7 @@
    USE_FIREBASE: true = Firebase, false = the old Google Sheet. Add ?fb=1 / ?fb=0 to the address to try the other
    one on a single computer. */
 (function () {
-  var USE_FIREBASE = false;
+  var USE_FIREBASE = true;
   var legacy = 'https://script.google.com/macros/s/AKfycbxhmdYT_6aTnokjqv3hjz1jg35FD47Z_0Y3xMkU6pYR3Dc5lTzIJdJUbFUbU9Ah3i2MMQ/exec';
   var api = 'https://ergs-ctf.firebaseapp.com/__mbctf_api';
   var on = USE_FIREBASE;

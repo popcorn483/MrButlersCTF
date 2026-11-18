@@ -1,5 +1,5 @@
 {
-  "version": "mbctf-v57",
+  "version": "mbctf-v58",
   "date": "2026-11-18",
   "notes": [
     "\u26a1 Moved to a faster database: signing in, loading and checking flags are much quicker",
