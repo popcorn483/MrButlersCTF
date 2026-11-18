@@ -40,17 +40,26 @@
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
   // ---------- load Firebase (from Google's CDN) ----------
-  var FB = Promise.all([import(CDN + 'firebase-app.js'), import(CDN + 'firebase-auth.js'), import(CDN + 'firebase-firestore.js')]).then(function (m) {
+  // Pupils' computers use "Firestore Lite" (a quarter of the size, and each read is one plain web request, with no
+  // connection to set up first). Teacher screens use the full version, for the live listeners.
+  var FULL = isTeacherDevice();
+  var FB = Promise.all([import(CDN + 'firebase-app.js'), import(CDN + 'firebase-auth.js'), import(CDN + (FULL ? 'firebase-firestore.js' : 'firebase-firestore-lite.js'))]).then(function (m) {
     var A = m[0], AU = m[1], FS = m[2];
     var app = A.initializeApp(CFG.firebase);
     var auth = AU.getAuth(app);
     var db = FS.getFirestore(app);
-    var o = { A: A, AU: AU, FS: FS, app: app, auth: auth, db: db };
+    var o = { A: A, AU: AU, FS: FS, app: app, auth: auth, db: db, full: FULL };
     o.ready = new Promise(function (res) { var un = AU.onAuthStateChanged(auth, function (u) { un(); res(u); }); });
     AU.onAuthStateChanged(auth, function () { onAuth(o); });
     return o;
   });
   FB.catch(function (e) { console.warn('[mbctf] Firebase did not load', e); });
+  // a computer that becomes a teacher screen part-way through switches to the full version (listeners)
+  function fullFS(o) {
+    if (o.full) return Promise.resolve(o);
+    if (!o.fullP) o.fullP = import(CDN + 'firebase-firestore.js').then(function (FS) { o.FS = FS; o.db = FS.getFirestore(o.app); o.full = true; return o; });
+    return o.fullP;
+  }
   function ready() { return FB.then(function (o) { return o.ready.then(function () { return o; }); }); }
   function d(o, path) { return o.FS.doc.apply(null, [o.db].concat(path.split('/'))); }
   function get(o, path) { return o.FS.getDoc(d(o, path)); }
@@ -63,36 +72,34 @@
   var STAFF_OK = '';
   function pupilUser(o) { var u = user(o); return u && pidOfEmail(u.email) ? u : null; }
 
-  // ---------- the signed-in pupil's own record (kept up to date by a listener: 1 read per change) ----------
-  var ME = { pid: '', doc: null, un: null, tdoc: null, tun: null, ready: null };
+  // ---------- the signed-in pupil's own record (read when needed, kept for 15 seconds) ----------
+  var ME = { pid: '', doc: null, tdoc: null, at: 0, p: null };
   function onAuth(o) {
     var u = pupilUser(o), pid = u ? pidOfEmail(u.email) : '';
-    if (pid === ME.pid) return;
-    if (ME.un) ME.un(); if (ME.tun) ME.tun(); ME = { pid: pid, doc: null, un: null, tdoc: null, tun: null, ready: null };
-    if (!pid) return;
-    ME.ready = new Promise(function (res) {
-      ME.un = o.FS.onSnapshot(d(o, 'pupils/' + pid), function (s) {
-        ME.doc = s.exists() ? s.data() : false; watchTarget(o); res();
-      }, function () { ME.doc = false; res(); });
-    });
+    if (pid !== ME.pid) ME = { pid: pid, doc: null, tdoc: null, at: 0, p: null };
     renderTeacherBar();
   }
-  function watchTarget(o) {   // a merged login: also watch the pupil it now belongs to
-    var t = ME.doc && ME.doc.mergedInto;
-    if (!t) { if (ME.tun) { ME.tun(); ME.tun = null; } ME.tdoc = null; return; }
-    if (ME.tun && ME.tid === t) return;
-    if (ME.tun) ME.tun(); ME.tid = t;
-    ME.tun = o.FS.onSnapshot(d(o, 'pupils/' + t), function (s) { ME.tdoc = s.exists() ? s.data() : null; }, function () { ME.tdoc = null; });
+  function meStale() { ME.at = 0; }
+  function loadMe(o) {
+    if (ME.doc !== null && now() - ME.at < 15000) return Promise.resolve();
+    if (ME.p) return ME.p;
+    var pid = ME.pid;
+    ME.p = get(o, 'pupils/' + pid).then(function (s) {
+      var doc = s.exists() ? s.data() : false, t = doc && doc.mergedInto;
+      return (t ? get(o, 'pupils/' + t).then(function (x) { return x.exists() ? x.data() : {}; }, function () { return {}; }) : Promise.resolve(null)).then(function (td) {
+        if (ME.pid !== pid) return;
+        ME.doc = doc; ME.tdoc = td; ME.at = now();
+      });
+    }, function () { if (ME.pid === pid) { ME.doc = false; ME.at = now(); } }).then(function () { ME.p = null; });
+    return ME.p;
   }
   function meNow(o) {   // -> { pid, doc, target pid, tdoc } for the signed-in pupil, or null
     var u = pupilUser(o); if (!u) return Promise.resolve(null);
-    var p = ME.ready || Promise.resolve();
-    return p.then(function () {
+    if (ME.pid !== pidOfEmail(u.email)) onAuth(o);
+    return loadMe(o).then(function () {
       if (!ME.doc || ME.doc.email !== u.email.toLowerCase()) return null;
       var t = ME.doc.mergedInto || ME.pid;
-      if (t === ME.pid) return { pid: ME.pid, doc: ME.doc, tid: t, tdoc: ME.doc };
-      if (ME.tdoc) return { pid: ME.pid, doc: ME.doc, tid: t, tdoc: ME.tdoc };
-      return get(o, 'pupils/' + t).then(function (s) { return { pid: ME.pid, doc: ME.doc, tid: t, tdoc: s.exists() ? s.data() : {} }; });
+      return { pid: ME.pid, doc: ME.doc, tid: t, tdoc: t === ME.pid ? ME.doc : (ME.tdoc || {}) };
     });
   }
   var PUB = { at: 0, v: null };
@@ -108,7 +115,7 @@
       var t = m.tid, td = m.tdoc || {};
       var st = m.doc.mergedInto ? (td.status || 'approved') : m.doc.status;
       return Promise.all([
-        get(o, 'progress/' + t).then(function (s) { return s.exists() ? (s.data().json || '') : ''; }).catch(function () { return ''; }),
+        get(o, 'progress/' + t).then(function (s) { var j = s.exists() ? (s.data().json || '') : ''; LASTP = { pid: t, json: j, at: now() }; return j; }).catch(function () { return ''; }),
         st === 'approved' ? get(o, 'secret/key').then(function (s) { return s.exists() ? s.data().k : null; }).catch(function () { return null; }) : null
       ]).then(function (r) {
         return { ok: true, id: t, name: td.name || m.doc.name, cls: td.cls || m.doc.cls, json: r[0], status: st, k: r[1] || undefined, user: m.doc.user || '' };
@@ -179,7 +186,7 @@
     return o.AU.createUserWithEmailAndPassword(o.auth, emailFor(pid, 1), PW(pin)).then(function () {
       var email = emailFor(pid, 1);
       return o.FS.setDoc(d(o, 'pupils/' + pid), { name: name, cls: cls, who: normWho(name, cls), status: 'pending', at: now(), email: email, gen: 1, user: '', lk: key })
-        .then(function () { onAuth(o); return o.FS.setDoc(d(o, 'logins/' + key), { pid: pid, email: email }); })
+        .then(function () { onAuth(o); meStale(); return o.FS.setDoc(d(o, 'logins/' + key), { pid: pid, email: email }); })
         .then(function () { notifyLegacy(name, cls); return { ok: true, id: pid, name: name, cls: cls, fresh: true, status: 'pending' }; });
     }, function (e) {
       if (/email-already-in-use/.test(code(e))) return { ok: false, error: 'removed' };   // this computer's old ID was used before: the site picks a new one
@@ -197,11 +204,11 @@
       var pid = j.id, pin = params.pin;
       return makeAccount(o, pid, 1, pin, false).then(function (email) {
         return o.FS.updateDoc(d(o, 'pupils/' + pid), { email: email, gen: genOf(email) }).then(function () {
-          return (ME.ready || Promise.resolve()).then(function () { return relink(o, pid, email); });
+          meStale(); return relink(o, pid, email);
         });
       }, function (e) {
         // an account already exists with this ID (a half-finished earlier try): sign in with the same PIN
-        return signInAs(o, emailFor(pid, 1), pin).then(function (r) { if (r !== true) throw e; return o.FS.updateDoc(d(o, 'pupils/' + pid), { email: emailFor(pid, 1), gen: 1 }).catch(function () { }).then(function () { return relink(o, pid, emailFor(pid, 1)); }); });
+        return signInAs(o, emailFor(pid, 1), pin).then(function (r) { if (r !== true) throw e; return o.FS.updateDoc(d(o, 'pupils/' + pid), { email: emailFor(pid, 1), gen: 1 }).catch(function () { }).then(function () { meStale(); return relink(o, pid, emailFor(pid, 1)); }); });
       }).then(function () { return welcome(o, pid); });
     });
   }
@@ -215,8 +222,7 @@
     var pid = l.pid;
     return makeAccount(o, pid, genOf(l.email) + 1, pin, false).then(function (email) {
       return o.FS.updateDoc(d(o, 'pupils/' + pid), { email: email, gen: genOf(email), resetPin: false })
-        .then(function () { onAuth(o); return (ME.ready || Promise.resolve()); })
-        .then(function () { return relink(o, pid, email); })
+        .then(function () { onAuth(o); meStale(); return relink(o, pid, email); })
         .then(function () { return welcome(o, pid); });
     });
   }
@@ -288,7 +294,7 @@
       if (!m) return { ok: true, awards: {} };
       var res = { ok: true, awards: (m.tdoc && m.tdoc.aw) || {} };
       if (m.tid !== m.pid) { res.movedTo = m.tid; res.name = m.tdoc.name; res.cls = m.tdoc.cls; }
-      return get(o, 'progress/' + m.tid).then(function (s) { res.json = s.exists() ? (s.data().json || '') : ''; return res; }, function () { return res; });
+      return get(o, 'progress/' + m.tid).then(function (s) { res.json = s.exists() ? (s.data().json || '') : ''; LASTP = { pid: m.tid, json: res.json, at: now() }; return res; }, function () { return res; });
     });
   }
   // progress from a pupil's computer: combined with what's already saved (another computer), so solves are never lost
@@ -305,7 +311,7 @@
     if (old.prevPids) cur.prevPids = (cur.prevPids || []).concat(old.prevPids.filter(function (x) { return (cur.prevPids || []).indexOf(x) < 0; })).slice(-10);
     return cur;
   }
-  var SYNCQ = Promise.resolve();
+  var SYNCQ = Promise.resolve(), LASTP = { pid: '', json: '', at: 0 };
   function sync(o, body) {
     var dd = body && body.data;
     if (!dd || dd.app !== 'MrButlersCTF' || !okPid(dd.pid)) return Promise.resolve({ ok: false, error: 'not ctf progress' });
@@ -316,8 +322,11 @@
         if (st !== 'approved') return { ok: true, waiting: true };
         if (dd.pid !== m.tid && dd.pid !== m.pid) return { ok: false, error: 'not this pupil' };
         var ref = d(o, 'progress/' + m.tid);
-        return o.FS.getDoc(ref).then(function (s) {
-          var prev = null; if (s.exists() && s.data().json) { try { prev = JSON.parse(s.data().json).data; } catch (e) { } }
+        // what's saved already (another computer may have added to it): re-read at most every 3 minutes, otherwise
+        // use what this computer last saved — so most saves are a single write
+        var fresh = LASTP.pid === m.tid && now() - LASTP.at < 3 * 60000;
+        return (fresh ? Promise.resolve(LASTP.json) : o.FS.getDoc(ref).then(function (s) { return s.exists() ? (s.data().json || '') : ''; })).then(function (pj) {
+          var prev = null; if (pj) { try { prev = JSON.parse(pj).data; } catch (e) { } }
           if (prev) dd = union(prev, dd);
           dd.pid = m.tid; if (td.name) { dd.name = td.name; dd.cls = td.cls; }
           dd.exported = now();
@@ -325,7 +334,7 @@
             if (body.test) signed.test = body.test;
             var json = JSON.stringify(signed);
             return o.FS.setDoc(ref, { json: json, seen: now(), name: dd.name || '', cls: dd.cls || '', n: Object.keys(dd.solved || {}).length, score: Number(dd.score) || 0 }, { merge: true })
-              .then(function () { return { ok: true }; });
+              .then(function () { if (!fresh) LASTP.at = now(); LASTP.pid = m.tid; LASTP.json = json; return { ok: true }; });
           });
         });
       });
@@ -337,6 +346,7 @@
   var LV = { pupils: null, progress: null, unP: null, unG: null, ready: null };
   function startLive(o) {
     if (LV.ready) return LV.ready;
+    if (!o.full) return fullFS(o).then(function () { return startLive(o); });
     var a, b;
     LV.ready = new Promise(function (res, rej) {
       var got = 0; function one() { if (++got === 2) res(); }
@@ -761,6 +771,7 @@
   function renderTeacherBar() {
     FB.then(function (o) { return o.ready.then(function () { return o; }); }).catch(function () { return null; }).then(function (o) {
       if (!o) return;
+      if (!document.body) return;
       var bar = document.getElementById('fbTeacherBar');
       var need = isTeacherDevice() && !teacherUser(o);
       if (!need) { if (bar) bar.remove(); return; }

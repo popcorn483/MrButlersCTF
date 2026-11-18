@@ -1,9 +1,8 @@
 {
-  "version": "mbctf-v60",
+  "version": "mbctf-v61",
   "date": "2026-11-18",
   "notes": [
-    "\u26a1 Moved to a faster database: signing in, loading and checking flags are much quicker",
-    "\ud83d\udd11 Your PIN still works \u2014 just sign in as normal",
-    "\ud83c\udfc6 The leaderboard updates live during lessons"
+    "\u26a1 Faster start-up and flag checks",
+    "\ud83d\udcbe Saving your progress uses less data"
   ]
 }
