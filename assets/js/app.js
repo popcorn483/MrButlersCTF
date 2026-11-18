@@ -210,7 +210,7 @@
     var m = CONTENT_MSG[CONTENT_STATE] || CONTENT_MSG.loading;
     var t = isTeacherDevice() && CONTENT_STATE !== 'loading';
     return '<div class="callout content-note"><div class="cn-ic">' + m[0] + '</div><h3>' + m[1] + '</h3><p class="muted">' + m[2] + '</p>' +
-      (t ? '<p class="small">Teacher PC: unlock them here with your Teacher password (this also installs the answers on your Google script once it’s updated).</p><button type="button" class="btn primary" data-unlock>🔑 Unlock with Teacher password</button>' : '') + '</div>';
+      (t ? '<p class="small">Teacher PC: unlock them here with your Teacher password (this also installs the answers in the class database once it’s updated).</p><button type="button" class="btn primary" data-unlock>🔑 Unlock with Teacher password</button>' : '') + '</div>';
   }
   function renderBoard() {
     var board = $('#board'); board.innerHTML = '';
@@ -1461,7 +1461,7 @@
       if (!LIVE.key && !askLiveKey()) return;
       fetch(liveUrl('&action=resetpin&pid=' + encodeURIComponent(d.pid)), { cache: 'no-store' }).then(function (x) { return x.json(); }).then(function (res) {
         if (res.ok && res.reset) toast('🔑 PIN reset — ' + st.name + ' can choose a new one when they next sign in', 4500);
-        else if (res.ok) toast('Your Google script needs updating to reset PINs — see teacher-sync/SETUP.md (step 4)', 6000);
+        else if (res.ok) toast('The class database needs updating to reset PINs — see teacher-sync/SETUP.md (step 4)', 6000);
         else toast(res.error === 'not registered' ? st.name + ' hasn\'t signed in with a PIN yet' : 'Not reset: ' + (res.error || 'error'));
       }).catch(function () { toast('Couldn\'t reach the sheet'); });
     });
@@ -1598,7 +1598,7 @@
     var c = BY_ID[cid]; if (on && !confirm('Mark "' + c.title + '" as completed for ' + name + '?\n\nThey get the full ' + c.pts + ' points, and it shows on their computer as marked by you.')) return;
     fetch(liveUrl('&action=' + (on ? 'award' : 'unaward') + '&pid=' + encodeURIComponent(d.pid) + '&cid=' + encodeURIComponent(cid)), { cache: 'no-store' })
       .then(function (x) { return x.json(); }).then(function (res) {
-        if (!res.ok || res.awarded === undefined) { toast(res.error === 'key' ? 'Teacher key not accepted' : 'Your Google script needs updating to mark flags — see teacher-sync/SETUP.md (step 4)', 6000); return; }
+        if (!res.ok || res.awarded === undefined) { toast(res.error === 'key' ? 'Teacher key not accepted' : 'The class database needs updating to mark flags — see teacher-sync/SETUP.md (step 4)', 6000); return; }
         T.awards = T.awards || {}; T.awards[d.pid] = T.awards[d.pid] || {};
         if (on) T.awards[d.pid][cid] = Date.now(); else delete T.awards[d.pid][cid];
         var row = T.rows.filter(function (x) { return x.data.pid === d.pid; })[0]; if (row) injectAwards(row.data);
@@ -1628,7 +1628,7 @@
       go.disabled = true; go.textContent = 'Merging…';
       fetch(liveUrl('&action=merge&from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(r.data.pid)), { cache: 'no-store' }).then(function (x) { return x.json(); }).then(function (res) {
         if (res.ok && res.merged) { toast('🔗 Merged ' + label + ' into ' + name, 4000); T.rows = T.rows.filter(function (x) { return x.data.pid !== from; }); liveFetch(); }
-        else { go.disabled = false; go.textContent = 'Merge into ' + name.split(' ')[0]; toast(res.error === 'key' ? 'Teacher key not accepted' : res.ok ? 'Your Google script needs updating to merge pupils — see teacher-sync/SETUP.md (step 4)' : 'Not merged: ' + (res.error || 'error'), 6000); }
+        else { go.disabled = false; go.textContent = 'Merge into ' + name.split(' ')[0]; toast(res.error === 'key' ? 'Teacher key not accepted' : res.ok ? 'The class database needs updating to merge pupils — see teacher-sync/SETUP.md (step 4)' : 'Not merged: ' + (res.error || 'error'), 6000); }
       }).catch(function () { go.disabled = false; go.textContent = 'Merge into ' + name.split(' ')[0]; toast('Couldn’t reach the sheet'); });
     });
   }
@@ -1643,7 +1643,7 @@
     if (!LIVE.key && !askLiveKey()) return;
     fetch(liveUrl('&action=delete&pid=' + encodeURIComponent(pid)), { cache: 'no-store' }).then(function (res) { return res.json(); }).then(function (res) {
       if (res.ok && res.deleted) { dropLocal(); toast('🗑 Deleted ' + name); }
-      else if (res.ok) toast('Your Google script needs updating to delete pupils — see teacher-sync/SETUP.md (step 4)', 6000);
+      else if (res.ok) toast('The class database needs updating to delete pupils — see teacher-sync/SETUP.md (step 4)', 6000);
       else toast(res.error === 'key' ? 'Teacher key not accepted' : 'Not deleted: ' + (res.error || 'error'));
     }).catch(function () { toast('Couldn\'t reach the sheet'); });
   }
@@ -1719,7 +1719,8 @@
     fetch(liveUrl(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (res) {
       if (!res.ok) {
         if (res.error === 'key') { stopLive(); try { localStorage.removeItem(LIVE_KEY_STORE); } catch (e) { } LIVE.key = ''; try { localStorage.removeItem(TEACHER_PC); sessionStorage.removeItem(STAFF_SS); } catch (e) { } liveSignedIn(); liveInfo('bad-text', 'The teacher password has changed. Sign in again with the new one.'); openTeacherSignIn(); $('#tmMsg').className = 'flag-msg'; $('#tmMsg').textContent = 'The teacher password has changed — enter the new one.'; }
-        else liveInfo('bad-text', 'The sheet replied with an error: ' + esc(res.error || 'unknown'));
+        else if (res.error === 'fbauth') liveInfo('bad-text', '🔐 Press <b>Sign in with Google</b> (the bar at the bottom of the screen) to connect this teacher screen to the class data.');
+        else liveInfo('bad-text', 'The class data replied with an error: ' + esc(res.error || 'unknown'));
         return;
       }
       var byPid = {};
@@ -1742,9 +1743,15 @@
       Object.keys(byPid).forEach(function (k) { injectAwards(byPid[k].data); });
       T.rows = Object.keys(byPid).map(function (k) { return byPid[k]; });
       renderTeacher(); renderLiveTests(tests); feedEventChallenges(); renderPending(res.pending || [], res.approval, res.mail); renderInstall(res.installed);
+      if (window.FBAPI && T.key && Object.keys(T.key).length) {
+        var brows = T.rows.map(function (r) { var st = rowStats(r), nm = st.name.trim().split(/\s+/); return { n: nm[0] + (nm.length > 1 ? ' ' + nm[nm.length - 1].charAt(0) + '.' : ''), c: st.cls, p: st.pts, f: st.n, t: st.last, k: sha256('board|' + r.data.pid).slice(0, 10) }; })
+          .filter(function (x) { return x.f > 0; });
+        brows.sort(function (a, b) { return (b.p - a.p) || (a.t - b.t); });
+        window.FBAPI.publishBoard(brows);
+      }
       var n = T.rows.filter(function (r) { return r.seen || r.fresh; }).length, active = (res.rows || []).filter(function (x) { return Date.now() - x.seen < 5 * 60000; }).length;
       liveInfo('muted', '<span class="live-dot"></span>Live · ' + n + ' pupil' + (n === 1 ? '' : 's') + ' · ' + active + ' active · updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + (bad ? ' · ' + bad + ' unreadable' : ''));
-    }).catch(function () { liveInfo('bad-text', 'Couldn\'t reach the Google Sheet — trying again in a moment…'); });
+    }).catch(function () { liveInfo('bad-text', 'Couldn\'t reach the class data — trying again in a moment…'); });
   }
   // ---------- projector event screen: the practice-challenge leaderboard, and a refresh it can ask for ----------
   function feedEventChallenges() {
@@ -1790,7 +1797,7 @@
         b.disabled = true;
         fetch(liveUrl('&action=testreset&tid=' + encodeURIComponent(b.dataset.resit)), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
           if (j && j.ok) { b.textContent = '✓ Resit allowed'; toast('↺ ' + b.dataset.who + ' can sit ' + b.dataset.paper + ' again'); }
-          else { b.disabled = false; toast(j && j.error === 'key' ? 'Teacher key not accepted' : 'Your Google script needs updating for resits — paste in the latest Code.gs and deploy a New version.', 6000); }
+          else { b.disabled = false; toast(j && j.error === 'key' ? 'Teacher key not accepted' : 'The class database needs updating for resits — paste in the latest Code.gs and deploy a New version.', 6000); }
         }).catch(function () { b.disabled = false; toast('Couldn’t reach the sheet'); });
       });
     });
@@ -1837,7 +1844,7 @@
           : '<button class="btn small req-ghost" data-decl="' + p + '">Decline</button><button class="btn primary small" data-appr="' + p + '">Approve</button>') +
         '</span></li>';
     }
-    var mailLine = oldScript ? '<span class="bad-text">⚠ Your Google script is an older version, so approvals and sign-up emails are off. Paste in the latest Code.gs, run “authorise” once, then deploy a New version.</span>'
+    var mailLine = oldScript ? '<span class="bad-text">⚠ The class database is an older version, so approvals and sign-up emails are off. Paste in the latest Code.gs, run “authorise” once, then deploy a New version.</span>'
       : PEND.mail && PEND.mail.error ? '<span class="bad-text">⚠ Last sign-up email failed: ' + esc(PEND.mail.error) + '</span>'
       : PEND.mail && PEND.mail.on === false ? '<span>Sign-up emails are off</span>'
       : '<span>✉ You’re emailed for each new sign-up</span>';
@@ -1882,7 +1889,7 @@
   function setAccessFor(pids, ok) {
     if (!LIVE.key && !askLiveKey()) { renderPending(PEND.list); return; }
     fetch(liveUrl('&action=' + (ok ? 'approve' : 'decline') + '&pids=' + encodeURIComponent(pids)), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (res) {
-      if (!res.ok || res.access === undefined) { renderPending(PEND.list); toast(res.error === 'key' ? 'Teacher key not accepted' : 'Your Google script needs updating for approvals — see teacher-sync/SETUP.md', 6000); return; }
+      if (!res.ok || res.access === undefined) { renderPending(PEND.list); toast(res.error === 'key' ? 'Teacher key not accepted' : 'The class database needs updating for approvals — see teacher-sync/SETUP.md', 6000); return; }
       var set = {}; pids.split(',').forEach(function (p) { set[p] = 1; });
       if (ok) {
         var have = {}; T.rows.forEach(function (r) { have[r.data.pid] = 1; });
@@ -1966,7 +1973,7 @@
     var msg = $('#installMsg');
     if (!T.vault) {
       T.installWanted = true;
-      var pw = prompt('Enter the Teacher Area password to install the answers on your Google script:'); if (!pw) { T.installWanted = false; return; }
+      var pw = prompt('Enter the Teacher Area password to install the answers in the class database:'); if (!pw) { T.installWanted = false; return; }
       openVault(pw).then(function (d) { try { sessionStorage.setItem(STAFF_SS, pw); } catch (e) { } useVault(d, pw); }, function () { T.installWanted = false; alert('That password isn’t right.'); });
       return;
     }
@@ -1974,12 +1981,12 @@
     if (!SYNC_URL || !LIVE.key || T.installing) return;
     var d = T.vault, info = d.info || {};
     if (!d.answers || !info.contentKey) { if (msg) msg.textContent = 'The answer book is out of date — reload the page.'; return; }
-    T.installing = true; if (msg) { msg.className = 'small'; msg.textContent = 'Installing answers on your Google script…'; } if (manual) toast('🔐 Installing answers…');
+    T.installing = true; if (msg) { msg.className = 'small'; msg.textContent = 'Installing answers in the class database…'; } if (manual) toast('🔐 Installing answers…');
     fetch(SYNC_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ kind: 'install', key: LIVE.key, k: info.contentKey, ver: info.contentVer, answers: d.answers, testpw: info.testPassword || '' }) })
       .then(function (r) { return r.json(); }).then(function (j) {
         T.installing = false;
         if (j && j.ok && j.installed) { T.installed = j.ver; renderInstall(j.ver); if (manual || j.cleaned) toast('🔐 Answers installed for ' + j.installed + ' challenges' + (j.cleaned ? ' · ' + j.cleaned + ' pupil record(s) had unprovable solves removed' : ''), 5000); }
-        else if (msg) { $('#installBox').hidden = false; msg.className = 'small bad-text'; msg.textContent = j && j.error === 'key' ? 'The script rejected the teacher key.' : 'Your Google script needs updating first (see teacher-sync/SETUP.md).'; }
+        else if (msg) { $('#installBox').hidden = false; msg.className = 'small bad-text'; msg.textContent = j && j.error === 'key' ? 'The script rejected the teacher key.' : 'The class database needs updating first (see teacher-sync/SETUP.md).'; }
       }).catch(function () { T.installing = false; if (msg) { $('#installBox').hidden = false; msg.className = 'small bad-text'; msg.textContent = 'Couldn’t reach the script (it may need updating — see teacher-sync/SETUP.md).'; } });
   }
   // ---------- teacher: pupil logins — see everyone, give a new PIN, unlock, approve ----------
@@ -1997,7 +2004,7 @@
   function loadLogins() {
     var box = $('#loginsBox');
     fetch(liveUrl('&action=pupils'), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
-      if (!j || !j.ok || !j.pupils) { box.innerHTML = '<div class="tpw-head"><h3>🧑‍🎓 Pupil logins &amp; PINs</h3><button class="ibtn" id="lgClose" aria-label="Close">✕</button></div><p class="bad-text small">' + (j && j.error === 'key' ? 'Teacher key not accepted.' : 'Your Google script needs updating for this: paste in the latest teacher-sync/Code.gs, then Deploy › Manage deployments › New version.') + '</p>'; $('#lgClose').addEventListener('click', function () { box.hidden = true; }); return; }
+      if (!j || !j.ok || !j.pupils) { box.innerHTML = '<div class="tpw-head"><h3>🧑‍🎓 Pupil logins &amp; PINs</h3><button class="ibtn" id="lgClose" aria-label="Close">✕</button></div><p class="bad-text small">' + (j && j.error === 'key' ? 'Teacher key not accepted.' : 'The class database needs updating for this: paste in the latest teacher-sync/Code.gs, then Deploy › Manage deployments › New version.') + '</p>'; $('#lgClose').addEventListener('click', function () { box.hidden = true; }); return; }
       LG.list = j.pupils; drawLogins();
     }).catch(function () { var p = box.querySelector('p'); if (p) { p.className = 'bad-text small'; p.textContent = 'Couldn’t reach the Google script.'; } });
   }
@@ -2044,7 +2051,7 @@
       fetch(liveUrl('&action=addpupil&name=' + encodeURIComponent(nm) + '&cls=' + encodeURIComponent(cl) + '&u=' + encodeURIComponent(un) + '&pin=' + pn), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         b.disabled = false;
         if (j && j.ok && j.pid) { LG.list.push({ pid: j.pid, name: j.name, cls: j.cls, user: j.user, pin: true, locked: false, fails: 0, status: 'approved', at: Date.now() }); LG.q = ''; drawLogins(); toast('✓ Added ' + j.name + ' — username ' + j.user + ', PIN ' + pn, 6000); return; }
-        bad(j && j.error === 'exists' ? 'There’s already a ' + nm + ' in ' + cl + ' — give them a login from the list instead.' : j && j.error === 'taken' ? 'That username is already used.' : 'Not added — update your Google script (Code.gs) and deploy a New version.');
+        bad(j && j.error === 'exists' ? 'There’s already a ' + nm + ' in ' + cl + ' — give them a login from the list instead.' : j && j.error === 'taken' ? 'That username is already used.' : 'Not added — update the class database (Code.gs) and deploy a New version.');
       }).catch(function () { b.disabled = false; bad('Couldn’t reach the script.'); });
     });
     $('#lgAuto').addEventListener('click', function () {
@@ -2054,7 +2061,7 @@
       b.disabled = true; b.textContent = 'Making logins…';
       fetch(liveUrl('&action=autologins' + (all ? '&all=1' : '')), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         b.disabled = false; b.innerHTML = '🎲 Usernames &amp; PINs for everyone without one';
-        if (!j || !j.ok || !j.logins) { toast('Not done — update your Google script (Code.gs) and deploy a New version.', 6000); return; }
+        if (!j || !j.ok || !j.logins) { toast('Not done — update the class database (Code.gs) and deploy a New version.', 6000); return; }
         slips(j.logins, false); loadLogins();
       }).catch(function () { b.disabled = false; toast('Couldn’t reach the script.'); });
     });
@@ -2089,7 +2096,7 @@
             eb.textContent = x.user ? '✏️ Edit' : '🔑 Give login'; eb.classList.toggle('primary', !x.user);
             ef.hidden = true; ef.querySelector('.lg-ep').value = ''; ef.querySelector('.lg-ep').placeholder = 'keep';
             done(true, '✓ Saved.' + (x.user ? ' ' + x.name.split(' ')[0] + ' signs in with username ' + x.user + (pn ? ' and PIN ' + pn : ' and their usual PIN') + '.' : ' They sign in with their name, class ' + x.cls + (pn ? ' and PIN ' + pn : '') + '.'));
-          } else done(false, j && j.error === 'taken' ? 'That username is already used by another pupil.' : j && j.error === 'exists' ? 'Another pupil already has that name in that class.' : j && j.error === 'not registered' ? 'Not found — refresh the list.' : 'Not saved — update your Google script (Code.gs) and deploy a New version.');
+          } else done(false, j && j.error === 'taken' ? 'That username is already used by another pupil.' : j && j.error === 'exists' ? 'Another pupil already has that name in that class.' : j && j.error === 'not registered' ? 'Not found — refresh the list.' : 'Not saved — update the class database (Code.gs) and deploy a New version.');
         }).catch(function () { b.disabled = false; done(false, 'Couldn’t reach the script.'); });
       });
       var ap = row.querySelector('[data-lgappr]'); if (ap) ap.addEventListener('click', function () {
@@ -2101,7 +2108,7 @@
       var ul = row.querySelector('[data-lgunlock]'); if (ul) ul.addEventListener('click', function () {
         ul.disabled = true;
         fetch(liveUrl('&action=unlockpin&pid=' + pid), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
-          if (j && j.ok && j.unlocked) { x.locked = false; ul.remove(); done(true, '✓ Unlocked — they can try their PIN again.'); } else { ul.disabled = false; done(false, 'Update your Google script (Code.gs) for this.'); }
+          if (j && j.ok && j.unlocked) { x.locked = false; ul.remove(); done(true, '✓ Unlocked — they can try their PIN again.'); } else { ul.disabled = false; done(false, 'Update the class database (Code.gs) for this.'); }
         }).catch(function () { ul.disabled = false; done(false, 'Couldn’t reach the script.'); });
       });
     });
@@ -2146,7 +2153,7 @@
     go.addEventListener('click', function () {
       var m = $('#cdMsg'); go.disabled = true; m.className = 'small muted'; m.textContent = $('#cdBackup').checked ? 'Making a backup copy, then clearing… (this can take half a minute)' : 'Clearing…';
       fetch(liveUrl('&action=cleardown&confirm=DELETE&backup=' + ($('#cdBackup').checked ? '1' : '0')), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
-        if (!j || !j.ok || !j.cleared) { go.disabled = false; m.className = 'small bad-text'; m.textContent = j && j.error === 'key' ? 'Teacher key not accepted.' : 'Your Google script needs updating for this — paste in the latest Code.gs and deploy a New version.'; return; }
+        if (!j || !j.ok || !j.cleared) { go.disabled = false; m.className = 'small bad-text'; m.textContent = j && j.error === 'key' ? 'Teacher key not accepted.' : 'The class database needs updating for this — paste in the latest Code.gs and deploy a New version.'; return; }
         T.rows = T.rows.filter(function (r) { return !r.seen && !r.fresh; }); renderTeacher(); renderLiveTests([]); renderPending([]);
         m.className = 'small good-text';
         m.innerHTML = '✓ All pupil data cleared.' + (j.backup ? ' Backup saved as <a href="' + esc(j.backup.url) + '" target="_blank" rel="noopener">' + esc(j.backup.name) + '</a>.' : '');
@@ -2165,7 +2172,7 @@
     $('#tpwClose').addEventListener('click', function () { box.hidden = true; });
     box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     fetch(liveUrl('&action=testpws'), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
-      if (!j || !j.ok || !j.papers) { box.querySelector('p').outerHTML = '<p class="bad-text small">' + (j && j.error === 'key' ? 'Teacher key not accepted.' : 'Your Google script needs updating for per-paper passwords: paste in the latest teacher-sync/Code.gs, then Deploy › Manage deployments › New version.') + '</p>'; return; }
+      if (!j || !j.ok || !j.papers) { box.querySelector('p').outerHTML = '<p class="bad-text small">' + (j && j.error === 'key' ? 'Teacher key not accepted.' : 'The class database needs updating for per-paper passwords: paste in the latest teacher-sync/Code.gs, then Deploy › Manage deployments › New version.') + '</p>'; return; }
       var fb = j.fallback || '';
       box.innerHTML = '<div class="tpw-head"><h3>🔑 Test passwords</h3><button class="ibtn" id="tpwClose" aria-label="Close" title="Close">✕</button></div>' +
         '<p class="muted small">Pupils need the password for the paper they choose. Leave one blank to use the answer-book password' + (fb ? ' (<code>' + esc(fb) + '</code>)' : '') + '. Changes work straight away.</p>' +
@@ -2183,7 +2190,7 @@
           fetch(liveUrl('&action=settestpw&paper=' + f.dataset.paper + '&pw=' + encodeURIComponent(pw)), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (r) {
             btn.disabled = false;
             if (r && r.ok) { m.className = 'tpw-msg small good-text'; m.textContent = pw ? '✓ Saved' : '✓ Using the answer-book password'; }
-            else { m.className = 'tpw-msg small bad-text'; m.textContent = r && r.error === 'too long' ? 'Keep it under 40 characters.' : 'Not saved — update your Google script.'; }
+            else { m.className = 'tpw-msg small bad-text'; m.textContent = r && r.error === 'too long' ? 'Keep it under 40 characters.' : 'Not saved — update the class database.'; }
           }).catch(function () { btn.disabled = false; m.className = 'tpw-msg small bad-text'; m.textContent = 'Couldn’t reach the script.'; });
         });
       });
@@ -2196,7 +2203,7 @@
     var ok = ver && ver === META.ver; box.hidden = !!ok;
     box.className = 'callout ' + (ok ? 'install-ok' : 'warn');
     box.innerHTML = ok ? '<span id="installMsg" class="small"></span> <button type="button" class="linkish small" id="installBtn">Retry</button>'
-      : '<b>🔐 Answers need installing</b><p class="small">' + (ver ? 'The challenges have changed since the answers were installed.' : 'Your Google script doesn’t have the answers yet, so pupils can’t open or score any challenges.') + '</p><button type="button" class="btn primary small" id="installBtn">Install answers now</button> <span id="installMsg" class="small"></span>';
+      : '<b>🔐 Answers need installing</b><p class="small">' + (ver ? 'The challenges have changed since the answers were installed.' : 'The class database doesn’t have the answers yet, so pupils can’t open or score any challenges.') + '</p><button type="button" class="btn primary small" id="installBtn">Install answers now</button> <span id="installMsg" class="small"></span>';
     $('#installBtn').addEventListener('click', function () { installAnswers(true); });
     if (!ok && T.vault && !T.installing && T.autoTried !== META.ver) { T.autoTried = META.ver; installAnswers(false); }
   }
@@ -2254,10 +2261,13 @@
     $('#tdTestPw').addEventListener('click', function () { openTestPw(); });
     $('#tdLogins').addEventListener('click', function () { openLogins(); });
     $('#tdLoginsBtn').addEventListener('click', function () { openLogins(); });
+    $('#tdMigrate').addEventListener('click', function () { openMigrate(); });
+    $('#tdFbOut').addEventListener('click', function () { if (window.FBAPI && confirm('Sign this PC out of Google for the class data? (You can sign in again from the bar that appears.)')) FBAPI.signOut().then(function () { toast('Signed out of Google'); }); });
     $('#tdMail').addEventListener('click', function () { PEND.open = true; renderPending(PEND.list || []); var m = $('#pendMail'); if (m) m.click(); });
     $('#liveKeyBtn').addEventListener('click', function () { if (askLiveKey() && LIVE.on) liveFetch(); });
     $('#liveSignOut').addEventListener('click', function () {
       if (!confirm('Sign this PC out of the teacher view?\n\nThe teacher key is forgotten here, and anyone using this PC afterwards is tracked as a pupil again.')) return;
+      if (window.FBAPI) FBAPI.signOut();
       stopLive(); LIVE.key = ''; try { localStorage.removeItem(LIVE_KEY_STORE); localStorage.removeItem(TEACHER_PC); sessionStorage.removeItem(STAFF_SS); } catch (e) { } wipeContent(); setTimeout(function () { location.reload(); }, 1200);
       T.rows = T.rows.filter(function (r) { return !r.seen; }); T.sel = null; renderTeacher(); renderLiveTests([]);
       liveSignedIn(); show('home'); toast('Signed out of teacher access on this PC');
@@ -2267,6 +2277,26 @@
     document.addEventListener('visibilitychange', function () { if (!document.hidden && LIVE.on) liveFetch(); });
     if (LIVE.key) startLive(); else liveInfo('muted', 'Press ▶ and enter your teacher key to see the class live.');
   })();
+
+  // ---------- moving the class data from the Google Sheet to Firebase (safe to run again) ----------
+  function openMigrate() {
+    var box = $('#migrateBox'); if (!box) return;
+    box.hidden = false;
+    box.innerHTML = '<div class="cd-card"><h3>⇪ Copy data from the Google Sheet</h3>' +
+      '<p class="small">Copies every pupil, their progress, approvals, teacher marks, merged logins and test passwords from the old Google Sheet into Firebase. ' +
+      'Pupils keep their PINs: the first time each one signs in, the old script checks their PIN and their Firebase account is made. ' +
+      'Safe to run again — anyone already moved keeps their account, and progress is combined, never replaced.</p>' +
+      '<div class="who-btns"><button type="button" class="btn" id="mgClose">Close</button><button type="button" class="btn primary" id="mgGo">Copy everything now</button></div>' +
+      '<pre class="small" id="mgLog" style="white-space:pre-wrap"></pre></div>';
+    box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    $('#mgClose').addEventListener('click', function () { box.hidden = true; box.innerHTML = ''; });
+    $('#mgGo').addEventListener('click', function () {
+      var b = this, lg = $('#mgLog'); if (!LIVE.key && !askLiveKey()) return;
+      if (!window.FBAPI) { lg.textContent = 'Firebase isn’t loaded on this page.'; return; }
+      b.disabled = true; lg.textContent = '';
+      FBAPI.migrate(LIVE.key, function (t) { lg.textContent += t + '\n'; }).then(function () { b.disabled = false; liveFetch(true); }, function (e) { b.disabled = false; lg.textContent += '✗ ' + ((e && e.message) || e) + '\n'; });
+    });
+  }
 
   // ---------- getting started page ----------
   $('#startContent').innerHTML = window.CTF_START_HTML(CATS);

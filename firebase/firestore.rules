@@ -1,0 +1,108 @@
+rules_version = '2';
+// Mr Butler's CTF — who may read and write what (Firebase free "Spark" plan: no server code, so these rules ARE the server).
+// Pupils sign in with Firebase email/password accounts made for them: <pupil id>x<n>@pupils.ergs-ctf.firebaseapp.com
+// (the password is their 4-digit PIN, padded). Teachers sign in with Google.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function em() { return request.auth.token.email; }
+    function owner() { return em() in ['jbutler483@gmail.com', 'jbutler803@c2ken.net']; }
+    function isTeacher() {
+      return signedIn() && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && (owner() || exists(/databases/$(database)/documents/staff/$(em())));
+    }
+    // a pupil's account: the email tells us which pupil they are
+    function pupilEmail() {
+      return signedIn() && request.auth.token.firebase.sign_in_provider == 'password'
+        && em().matches('^[0-9a-f]{16}x[0-9]+@pupils[.]ergs-ctf[.]firebaseapp[.]com$');
+    }
+    function myPid() { return em().split('x')[0]; }
+    function pupilDoc(pid) { return get(/databases/$(database)/documents/pupils/$(pid)); }
+    function me() { return pupilDoc(myPid()).data; }
+    // the pupil's CURRENT account (a teacher setting a new PIN makes a new account; old ones stop working)
+    function isPupil() { return pupilEmail() && exists(/databases/$(database)/documents/pupils/$(myPid())) && me().email == em(); }
+    function approvedPupil() { return isPupil() && me().status == 'approved'; }
+    // this pupil, or the pupil the teacher merged this login into
+    function actsFor(pid) { return isPupil() && (myPid() == pid || me().get('mergedInto', '') == pid); }
+    function approvedFor(pid) { return actsFor(pid) && pupilDoc(pid).data.status == 'approved'; }
+
+    // ---------- pupils: name, class, status (pending/approved/declined), current account, teacher marks ----------
+    match /pupils/{pid} {
+      allow read: if isTeacher() || actsFor(pid) || (pupilEmail() && myPid() == pid);
+      // a new pupil signing up: always starts as "pending"
+      allow create: if isTeacher() || (pupilEmail() && myPid() == pid
+        && request.resource.data.keys().hasOnly(['name', 'cls', 'who', 'status', 'at', 'email', 'gen', 'user', 'lk'])
+        && request.resource.data.email == em() && request.resource.data.status == 'pending' && request.resource.data.user == ''
+        && request.resource.data.lk is string && request.resource.data.lk.matches('^n:[0-9a-f]{40}$'));
+      // a pupil taking over their account: first sign-in after the move from Google Sheets (PIN checked by the old
+      // script), or after the teacher pressed "Reset PIN" (they choose a new one)
+      allow update: if isTeacher() || (pupilEmail() && myPid() == pid
+        && (resource.data.email == null || resource.data.get('resetPin', false) == true)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email', 'gen', 'resetPin'])
+        && request.resource.data.email == em() && request.resource.data.get('resetPin', false) == false);
+      allow delete: if isTeacher();
+    }
+
+    // ---------- sign-in lookups: name+class or username -> pupil (readable before signing in, one at a time) ----------
+    match /logins/{key} {
+      allow get: if true;
+      allow list: if isTeacher();
+      allow create, update: if isTeacher() || (isPupil()
+        && request.resource.data.keys().hasOnly(['pid', 'email']) && request.resource.data.pid == myPid() && request.resource.data.email == em()
+        && (key == me().get('lk', '') || key == 'u:' + me().get('user', ''))
+        && (resource == null || resource.data.get('pid', '') == myPid() || me().get('mig', false) == true));
+      allow delete: if isTeacher();
+    }
+
+    // ---------- progress: the signed progress file, plus answers the pupil chose to reveal ----------
+    match /progress/{pid} {
+      allow read: if isTeacher() || actsFor(pid);
+      allow create, update: if isTeacher() || (approvedFor(pid)
+        && request.resource.data.keys().hasOnly(['json', 'seen', 'name', 'cls', 'n', 'score', 'rev'])
+        && (!('json' in request.resource.data) || request.resource.data.json.size() < 200000));
+      allow delete: if isTeacher();
+    }
+
+    // ---------- flags: document id = SHA-256 of the challenge + flag. A pupil can only test one guess at a time ----------
+    match /flags/{h} {
+      allow get: if isTeacher() || approvedPupil();
+      allow list, write: if isTeacher();
+    }
+    // ---------- solutions: only after the pupil has recorded that they revealed it (it scores 0) ----------
+    match /answers/{cid} {
+      allow get: if isTeacher() || (approvedPupil()
+        && cid in get(/databases/$(database)/documents/progress/$(me().get('mergedInto', myPid()))).data.get('rev', {}));
+      allow list, write: if isTeacher();
+    }
+    // ---------- the key that unlocks the (encrypted) challenges ----------
+    match /secret/{d} {
+      allow get: if isTeacher() || approvedPupil();
+      allow list, write: if isTeacher();
+    }
+    // ---------- settings: public (season, installed version) and teacher-only (test passwords) ----------
+    match /config/{d} {
+      allow get: if d == 'public' || isTeacher();
+      allow list, write: if isTeacher();
+    }
+    // ---------- Test area: password checks (id = hash of paper + password) and resits ----------
+    match /testpw/{h} {
+      allow get: if signedIn();
+      allow list, write: if isTeacher();
+    }
+    match /testresets/{tid} {
+      allow get: if signedIn();
+      allow list, write: if isTeacher();
+    }
+    // ---------- pupils' leaderboard: worked out (and proof-checked) by the teacher's screen ----------
+    match /board/{d} {
+      allow get: if signedIn();
+      allow list, write: if isTeacher();
+    }
+    // ---------- other staff who may use the Teacher tab (document id = their Google email) ----------
+    match /staff/{email} {
+      allow read, write: if isTeacher();
+    }
+  }
+}

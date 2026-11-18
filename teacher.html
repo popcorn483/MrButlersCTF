@@ -112,7 +112,7 @@
   var AUTO = false;
   try { var _ss = sessionStorage.getItem('mbctf-staff-v1'); if (_ss) { AUTO = true; setTimeout(function () { unlock(_ss); }, 0); } } catch (e) { }
   $('#forgotBtn').addEventListener('click', function () {
-    var msg = $('#msg'), url = (window.CTF_CONFIG && window.CTF_CONFIG.syncUrl) || '';
+    var msg = $('#msg'), url = (window.CTF_CONFIG && (window.CTF_CONFIG.legacyUrl || window.CTF_CONFIG.syncUrl)) || '';
     if (!url) { msg.textContent = 'Password emails need the live class Google script set up.'; return; }
     msg.style.color = 'var(--muted)'; msg.textContent = 'Sending…';
     fetch(url + (url.indexOf('?') < 0 ? '?' : '&') + 'action=forgot&t=' + Date.now(), { cache: 'no-store', credentials: 'omit' }).then(function (r) { return r.json(); }).then(function (j) {

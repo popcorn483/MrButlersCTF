@@ -313,6 +313,8 @@
               <button type="button" role="menuitem" id="tdTestPw">🔑 Test passwords</button>
               <button type="button" role="menuitem" id="tdInstall">🔐 Reinstall answers</button>
               <button type="button" role="menuitem" id="tdMail">✉ Send test email</button>
+              <button type="button" role="menuitem" id="tdMigrate">⇪ Copy data from the Google Sheet</button>
+              <button type="button" role="menuitem" id="tdFbOut">⎋ Sign out of Google (class data)</button>
               <button type="button" role="menuitem" id="liveKeyBtn">🔑 Teacher key</button>
               <button type="button" role="menuitem" id="liveSignOut" hidden>⎋ Sign out of this PC</button>
               <hr>
@@ -326,6 +328,7 @@
       <div id="loginsBox" hidden></div>
       <div id="testPwBox" hidden></div>
       <div id="clearDownBox" hidden></div>
+      <div id="migrateBox" hidden></div>
       <div id="pendBox"></div>
       <div id="teacherMsg" class="notice" hidden></div>
       <div class="teacher-filter"><select class="io" id="teacherClass" hidden aria-label="Filter by class"></select></div>
@@ -527,6 +530,7 @@
 <div class="toast" id="toast" hidden></div>
 
 <script src="assets/js/config.js"></script>
+<script src="assets/js/fbapi.js"></script>
 <script src="assets/js/content-meta.js"></script>
 <script src="assets/js/hashes.js"></script>
 <script src="assets/js/content.js"></script>
