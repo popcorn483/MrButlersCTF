@@ -346,7 +346,16 @@
     return LV.ready;
   }
   function stopLive() { if (LV.unP) LV.unP(); if (LV.unG) LV.unG(); LV = { pupils: null, progress: null, unP: null, unG: null, ready: null }; }
+  var AUTO = { at: 0, busy: false };
+  function autoCopy() {
+    if (!LEGACY || AUTO.busy || now() - AUTO.at < 3 * 60000) return;
+    var key = ''; try { key = localStorage.getItem('mbctf-teacher-livekey-v1') || ''; } catch (e) { }
+    if (!key) return;
+    AUTO.busy = true; AUTO.at = now();
+    migrate(key, null, true).then(function (r) { AUTO.busy = false; if (r && r.wrote) console.info('[mbctf] copied ' + r.wrote + ' new record(s) from the Google Sheet'); }, function (e) { AUTO.busy = false; console.warn('[mbctf] auto-copy', e); });
+  }
   function live(o) {
+    autoCopy();
     return Promise.all([startLive(o), pubConfig(o)]).then(function (r) {
       var P = LV.pupils || {}, G = LV.progress || {}, pub = r[1] || {};
       var rows = [], awards = {}, aliases = {}, pending = [], joined = [];
@@ -517,7 +526,11 @@
   function decide(o, q, status) {
     var ids = String(q.pids || '').split(',').filter(okPid), b = o.FS.writeBatch(o.db);
     ids.forEach(function (pid) { b.update(d(o, 'pupils/' + pid), { status: status, decided: now() }); });
-    return b.commit().then(function () { return { ok: true, access: status, done: ids.length }; });
+    return b.commit().then(function () {
+      var key = ''; try { key = localStorage.getItem('mbctf-teacher-livekey-v1') || ''; } catch (e) { }
+      if (LEGACY && key && ids.length) realFetch(LEGACY + '?key=' + encodeURIComponent(key) + '&action=' + (status === 'approved' ? 'approve' : 'decline') + '&pids=' + ids.join(',') + '&t=' + now(), { cache: 'no-store' }).catch(function () { });
+      return { ok: true, access: status, done: ids.length };
+    });
   }
   function award(o, q, on) {
     var pid = String(q.pid || ''), cid = String(q.cid || ''), u = {};
@@ -656,7 +669,7 @@
   }
 
   // ---------- one-off: copy everything across from the Google Sheet (Teacher tab › ⋯ › Move data to Firebase) ----------
-  function migrate(key, log) {
+  function migrate(key, log, quiet) {
     log = log || function () { };
     function lg(u) { return realFetch(LEGACY + '?key=' + encodeURIComponent(key) + u + '&t=' + now(), { cache: 'no-store' }).then(function (r) { return r.json(); }); }
     return ready().then(function (o) {
@@ -674,43 +687,56 @@
           return Promise.all([eachDoc(o, 'pupils', function (x) { return [x.id, x.data()]; }), eachDoc(o, 'progress', function (x) { return [x.id, x.data()]; })]).then(function (ex) {
             var EP = {}, EG = {}; ex[0].forEach(function (x) { EP[x[0]] = x[1]; }); ex[1].forEach(function (x) { EG[x[0]] = x[1]; });
             return Promise.all(pupils.map(function (p) { return nameKey(p.name, p.cls).then(function (lk) { p.lk = lk; return p; }); })).then(function () {
-            var ops = [], signs = [];
+            var ops = [], signs = [], sheetSt = {};
+            (live.pending || []).forEach(function (x) { sheetSt[x.pid] = x.status; });   // the Access tab: pending / declined
+            function same(a, b) { return JSON.stringify(a || {}) === JSON.stringify(b || {}); }
             pupils.forEach(function (p) {
-              var had = EP[p.pid];
-              if (had && had.email) { ops.push(['pupils/' + p.pid, { aw: Object.assign({}, awards[p.pid] || {}, had.aw || {}) }, true]); return; }
-              ops.push(['pupils/' + p.pid, { name: p.name, cls: p.cls, who: normWho(p.name, p.cls), status: p.status || 'approved', at: p.at || now(), email: null, gen: 0, user: normUser(p.user || ''), lk: p.lk, mig: true, aw: awards[p.pid] || {} }]);
-              ops.push(['logins/' + p.lk, { m: 1 }]);
-              if (p.user) ops.push(['logins/u:' + normUser(p.user), { m: 1 }]);
+              var had = EP[p.pid], st = sheetSt[p.pid] || p.status || 'approved', aw = awards[p.pid] || {};
+              if (had && had.email) {   // already has their Firebase account: only add new teacher marks
+                var aw2 = Object.assign({}, aw, had.aw || {});
+                if (!same(aw2, had.aw)) ops.push(['pupils/' + p.pid, { aw: aw2 }, true]);
+                return;
+              }
+              // never undo a decision made in Firebase: only a pupil still pending there takes the sheet's status
+              if (had && had.status && had.status !== 'pending') st = had.status;
+              var rec = { name: p.name, cls: p.cls, who: normWho(p.name, p.cls), status: st, at: p.at || now(), email: null, gen: 0, user: normUser(p.user || ''), lk: p.lk, mig: true, aw: Object.assign({}, aw, (had && had.aw) || {}) };
+              if (had && had.name === rec.name && had.cls === rec.cls && had.status === rec.status && had.user === rec.user && had.lk === rec.lk && same(had.aw, rec.aw)) return;
+              ops.push(['pupils/' + p.pid, rec]);
+              if (!had || had.lk !== p.lk) ops.push(['logins/' + p.lk, { m: 1 }]);
+              if (p.user && (!had || had.user !== rec.user)) ops.push(['logins/u:' + normUser(p.user), { m: 1 }]);
             });
             Object.keys(aliases).forEach(function (from) {
-              if (!okPid(from) || (EP[from] && EP[from].email)) return;
+              if (!okPid(from) || (EP[from] && (EP[from].email || EP[from].mergedInto === aliases[from]))) return;
               ops.push(['pupils/' + from, { name: '(merged login)', cls: '', status: 'approved', at: now(), email: null, gen: 0, user: '', mergedInto: aliases[from], mig: true }]);
             });
+            function core(x) { return JSON.stringify([x.solved || {}, x.hints || {}, x.tries || {}, x.tut || {}, x.revealed || {}, x.wrong || 0]); }
             (live.rows || []).forEach(function (x) {
               try {
                 var raw = JSON.parse(x.json), dd = raw.data; if (!dd || !okPid(dd.pid)) return;
                 var cur = EG[dd.pid];
-                if (cur && cur.json) {   // already in Firebase (moved before): add anything new from the sheet
-                  var c = JSON.parse(cur.json); var md = union(dd, c.data); md.exported = now();
-                  signs.push(sign(md).then(function (sg) { if (c.test) sg.test = c.test; ops.push(['progress/' + dd.pid, { json: JSON.stringify(sg), name: md.name || '', cls: md.cls || '', n: Object.keys(md.solved || {}).length, score: Number(md.score) || 0 }, true]); }));
+                if (cur && cur.json) {   // already in Firebase: add anything new from the sheet (and only write if there is some)
+                  var c = JSON.parse(cur.json), before = core(c.data), md = union(dd, JSON.parse(JSON.stringify(c.data)));
+                  if (core(md) === before) return;
+                  md.exported = now();
+                  signs.push(sign(md).then(function (sg) { if (c.test) sg.test = c.test; ops.push(['progress/' + dd.pid, { json: JSON.stringify(sg), name: md.name || '', cls: md.cls || '', n: Object.keys(md.solved || {}).length, score: Number(md.score) || 0, seen: Math.max(cur.seen || 0, x.seen || 0) }, true]); }));
                   return;
                 }
                 ops.push(['progress/' + dd.pid, { json: x.json, seen: x.seen || now(), name: dd.name || '', cls: dd.cls || '', n: Object.keys(dd.solved || {}).length, score: Number(dd.score) || 0 }]);
               } catch (e) { }
             });
-            if (acc && acc.season) ops.push(['config/public', { season: acc.season }, true]);
+            if (acc && acc.season && !(PUB.v && PUB.v.season === acc.season)) ops.push(['config/public', { season: acc.season }, true]);
             return Promise.all(signs).then(function () {
             var chunks = []; for (var i = 0; i < ops.length; i += 400) chunks.push(ops.slice(i, i + 400));
             log('Writing ' + ops.length + ' records to Firebase…');
             return chunks.reduce(function (pr, c) {
               return pr.then(function () { var b = o.FS.writeBatch(o.db); c.forEach(function (x) { if (x[2]) b.set(d(o, x[0]), x[1], { merge: true }); else b.set(d(o, x[0]), x[1]); }); return b.commit(); });
             }, Promise.resolve()).then(function () {
-              if (!tp.ok) return null;
+              if (!tp.ok || quiet) return null;
               return tconf(o).then(function (c) { c.papers = {}; PAPERS.forEach(function (p) { if ((tp.papers || {})[p]) c.papers[p] = tp.papers[p]; }); if (tp.fallback) c.fallback = tp.fallback; return writeTestpw(o, c); });
             }).then(function () {
               PUB.v = null;
               log('Done: ' + pupils.length + ' pupils and their progress are in Firebase. Each pupil keeps their PIN: the first time they sign in, the old script checks it and their Firebase account is made.');
-              return { ok: true, pupils: pupils.length, rows: (live.rows || []).length };
+              return { ok: true, pupils: pupils.length, rows: (live.rows || []).length, wrote: ops.length };
             });
             });
             });
